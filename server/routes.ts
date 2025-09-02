@@ -465,7 +465,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         q: q as string
       };
 
-      const parks = await storage.getParks(filters);
+      const result = await storage.getParks(filters);
+      const parksArray = result.parks;
       
       // Add pagination logic here if needed
       const pageNum = parseInt(page as string);
@@ -474,8 +475,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endIndex = startIndex + limitNum;
       
       res.json({
-        parks: parks.slice(startIndex, endIndex),
-        totalCount: parks.length,
+        parks: parksArray.slice(startIndex, endIndex),
+        totalCount: parksArray.length,
         page: pageNum,
         limit: limitNum
       });
@@ -576,12 +577,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Lot routes
   app.get('/api/lots', async (req, res) => {
     try {
-      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, page = '1', limit = '20' } = req.query;
+      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20' } = req.query;
+      
+      // Handle price range parameter (e.g. "100000-200000", "300000+", "0-100000")
+      let parsedMinPrice, parsedMaxPrice;
+      if (price && price !== 'all') {
+        const priceStr = price as string;
+        if (priceStr.includes('-')) {
+          const [min, max] = priceStr.split('-').map(p => parseFloat(p));
+          parsedMinPrice = min;
+          parsedMaxPrice = max;
+        } else if (priceStr.endsWith('+')) {
+          parsedMinPrice = parseFloat(priceStr.replace('+', ''));
+        }
+      }
+      
       const filters = {
         parkId: parkId as string,
         status: status as string,
-        minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
+        minPrice: minPrice ? parseFloat(minPrice as string) : parsedMinPrice,
+        maxPrice: maxPrice ? parseFloat(maxPrice as string) : parsedMaxPrice,
         bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
         bathrooms: bathrooms ? parseInt(bathrooms as string) : undefined,
         state: state as string,

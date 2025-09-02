@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 // Import pages
 import Home from "@/pages/home";
+import Properties from "@/pages/properties";
 import Parks from "@/pages/parks";
 import Lots from "@/pages/lots";
 import ParkDetail from "@/pages/park-detail";
@@ -27,6 +28,7 @@ function Router() {
       <Navigation />
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/properties" component={Properties} />
         <Route path="/parks" component={Parks} />
         <Route path="/lots" component={Lots} />
         <Route path="/parks/:id" component={ParkDetail} />

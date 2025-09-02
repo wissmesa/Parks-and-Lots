@@ -19,8 +19,7 @@ export function Navigation() {
   };
 
   const navigationItems = [
-    { href: "/parks", label: "Browse Parks", public: true },
-    { href: "/lots", label: "Find Lots", public: true },
+    { href: "/properties", label: "Browse Properties", public: true },
   ];
 
   const NavLinks = ({ mobile = false, onClose = () => {} }) => (

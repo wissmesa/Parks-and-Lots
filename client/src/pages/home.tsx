@@ -31,7 +31,7 @@ export default function Home() {
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      window.location.href = `/parks?q=${encodeURIComponent(searchQuery)}`;
+      window.location.href = `/properties?tab=parks&q=${encodeURIComponent(searchQuery)}`;
     }
   };
 
@@ -58,7 +58,7 @@ export default function Home() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="w-full"
+                    className="w-full text-foreground bg-background border-input placeholder:text-muted-foreground"
                     data-testid="input-search"
                   />
                 </div>
