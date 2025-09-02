@@ -31,7 +31,7 @@ export default function Home() {
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      window.location.href = `/properties?tab=parks&q=${encodeURIComponent(searchQuery)}`;
+      window.location.href = `/properties?q=${encodeURIComponent(searchQuery)}`;
     }
   };
 
