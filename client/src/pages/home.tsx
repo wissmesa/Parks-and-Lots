@@ -18,7 +18,12 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: parksData } = useQuery({
-    queryKey: ["/api/parks", { limit: "6" }],
+    queryKey: ["/api/parks", "limit-6"],
+    queryFn: async () => {
+      const response = await fetch('/api/parks?limit=6', { credentials: 'include' });
+      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
 

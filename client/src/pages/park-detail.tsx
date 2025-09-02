@@ -56,7 +56,17 @@ export default function ParkDetail() {
   });
 
   const { data: lotsData, isLoading: lotsLoading } = useQuery({
-    queryKey: ["/api/lots", { parkId: id, status: statusFilter || undefined }],
+    queryKey: ["/api/lots", id, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (id) params.set('parkId', id);
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+      
+      const url = `/api/lots${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      return response.json();
+    },
     enabled: !!id,
   });
 
@@ -65,8 +75,8 @@ export default function ParkDetail() {
     enabled: !!id,
   });
 
-  const lots = lotsData?.lots || [];
-  const parkPhotos = photos || [];
+  const lots = (lotsData?.lots || []) as Lot[];
+  const parkPhotos = (photos || []) as any[];
 
   if (parkLoading) {
     return (
@@ -111,14 +121,14 @@ export default function ParkDetail() {
             <li><ChevronRight className="w-4 h-4" /></li>
             <li><Link href="/parks" className="hover:text-foreground">Parks</Link></li>
             <li><ChevronRight className="w-4 h-4" /></li>
-            <li className="text-foreground">{park.name}</li>
+            <li className="text-foreground">{(park as Park)?.name || 'Unknown Park'}</li>
           </ol>
         </nav>
 
         {/* Park Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-foreground">{park.name}</h1>
+            <h1 className="text-3xl font-bold text-foreground">{(park as Park)?.name || 'Unknown Park'}</h1>
             <div className="flex items-center space-x-2">
               <div className="flex items-center text-yellow-500">
                 <Star className="w-5 h-5 fill-current" />
@@ -129,7 +139,7 @@ export default function ParkDetail() {
           </div>
           <p className="text-muted-foreground flex items-center">
             <MapPin className="w-4 h-4 mr-2" />
-            {park.address}, {park.city}, {park.state} {park.zip}
+            {(park as Park)?.address || ''}, {(park as Park)?.city || ''}, {(park as Park)?.state || ''} {(park as Park)?.zip || ''}
           </p>
         </div>
 
@@ -170,7 +180,7 @@ export default function ParkDetail() {
               <CardContent className="p-6">
                 <h3 className="text-xl font-semibold mb-4">About This Park</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  {park.description || "A premium residential community offering luxury living with modern amenities and beautiful surroundings."}
+                  {(park as Park)?.description || "A premium residential community offering luxury living with modern amenities and beautiful surroundings."}
                 </p>
               </CardContent>
             </Card>
@@ -186,7 +196,7 @@ export default function ParkDetail() {
                         <SelectValue placeholder="All Lots" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Lots</SelectItem>
+                        <SelectItem value="all">All Lots</SelectItem>
                         <SelectItem value="FOR_RENT">For Rent</SelectItem>
                         <SelectItem value="FOR_SALE">For Sale</SelectItem>
                       </SelectContent>
@@ -196,7 +206,7 @@ export default function ParkDetail() {
                         <SelectValue placeholder="Any Size" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any Size</SelectItem>
+                        <SelectItem value="all">Any Size</SelectItem>
                         <SelectItem value="small">1-2 BR</SelectItem>
                         <SelectItem value="large">3+ BR</SelectItem>
                       </SelectContent>

@@ -38,12 +38,19 @@ export default function Parks() {
   }, [location]);
 
   const { data: parksData, isLoading } = useQuery({
-    queryKey: ["/api/parks", { 
-      q: searchQuery, 
-      state: selectedState, 
-      city: selectedCity, 
-      companyId: selectedCompany 
-    }],
+    queryKey: ["/api/parks", searchQuery, selectedState, selectedCity, selectedCompany],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('q', searchQuery);
+      if (selectedState && selectedState !== 'all') params.set('state', selectedState);
+      if (selectedCity && selectedCity !== 'all') params.set('city', selectedCity);
+      if (selectedCompany && selectedCompany !== 'all') params.set('companyId', selectedCompany);
+      
+      const url = `/api/parks${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      return response.json();
+    },
     staleTime: 5 * 60 * 1000,
   });
 
@@ -53,7 +60,7 @@ export default function Parks() {
   });
 
   const parks = parksData?.parks || [];
-  const companiesList = companies || [];
+  const companiesList = (companies || []) as Company[];
 
   const handleSearch = () => {
     const params = new URLSearchParams();
@@ -114,7 +121,7 @@ export default function Parks() {
                   <SelectValue placeholder="All Companies" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Companies</SelectItem>
+                  <SelectItem value="all">All Companies</SelectItem>
                   {companiesList.map((company: Company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -127,7 +134,7 @@ export default function Parks() {
                   <SelectValue placeholder="All States" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All States</SelectItem>
+                  <SelectItem value="all">All States</SelectItem>
                   <SelectItem value="CA">California</SelectItem>
                   <SelectItem value="TX">Texas</SelectItem>
                   <SelectItem value="FL">Florida</SelectItem>
