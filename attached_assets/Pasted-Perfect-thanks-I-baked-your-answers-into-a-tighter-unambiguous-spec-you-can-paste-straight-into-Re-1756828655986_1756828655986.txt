@@ -1,0 +1,169 @@
+Perfect—thanks! I baked your answers into a tighter, unambiguous spec you can paste straight into Replit/Ghostwriter. It locks in **invite-only managers**, **per-manager Google Calendar**, **no payments**, **public images**, and keeps booking fields minimal.
+
+---
+
+# Build a Bookings Web App (Parks & Lots)
+
+**Goal**
+MVP to manage companies → parks → park managers → lots, and to book showings. Public gallery for parks/lots; private admin for CRUD + per-manager Google Calendar sync.
+
+**Tech Stack (suggested)**
+
+* Backend: **FastAPI + SQLAlchemy + Alembic**
+* Auth: **JWT** (access+refresh), bcrypt
+* DB: **PostgreSQL** (use SQLite fallback on Replit)
+* Calendar: **Google Calendar API** via OAuth (per **manager**)
+* Storage: local `/static` for images (S3-ready abstraction later)
+* Frontend: **React + Vite + Tailwind**
+* API docs: **OpenAPI** at `/docs`
+
+---
+
+## Roles & Policy
+
+* **Admin**: full CRUD, invite managers, assign parks, query everything.
+* **Park Manager**: limited to assigned park(s); manage lots & showings; connect Google Calendar.
+* **Public**: browse parks/lots/photos (read-only).
+
+> **Registration**: Managers are **invite-only** (admin issues invite). Self-registration may be enabled **later** via feature flag.
+
+---
+
+## Data Model
+
+* **User**(id, email, password\_hash, full\_name, role\[ADMIN,MANAGER], is\_active, created\_at)
+* **Invite**(id, email, role, expires\_at, token, accepted\_at, created\_by\_user\_id)
+* **Company**(id, name, description, created\_at)
+* **Park**(id, company\_id, name, address, city, state, zip, description, created\_at)
+* **ManagerAssignment**(id, user\_id, park\_id) // manager ↔ parks (many-to-many)
+* **Lot**(id, park\_id, name\_or\_number, status\[FOR\_RENT,FOR\_SALE], price, description, bedrooms, bathrooms, sq\_ft, is\_active)
+* **Photo**(id, entity\_type\[PARK,LOT], entity\_id, url\_or\_path, caption, sort\_order)
+* **Showing**(id, lot\_id, manager\_id, start\_dt, end\_dt, client\_name, client\_email, client\_phone, status\[SCHEDULED,CANCELED,COMPLETED], calendar\_event\_id, calendar\_html\_link, calendar\_sync\_error\:boolean, created\_at)
+* **Availability**(id, lot\_id, rule\_type\[OPEN\_SLOT,BLOCKED], start\_dt, end\_dt, note)
+* **OAuthAccount**(id, user\_id, provider:'google', access\_token, refresh\_token, token\_expiry, external\_calendar\_id)
+
+**Rules**
+
+* A lot is “available” if active and the requested window **does not overlap** another Showing or a BLOCKED Availability.
+* On create/cancel/update of a **Showing**, upsert/delete a **Google Calendar event for that manager**. If sync fails, persist showing and set `calendar_sync_error=true` (include message).
+* Images are **public** (anonymous GET).
+
+---
+
+## AuthN/Z
+
+* **Invite flow**: Admin creates Invite → email link → `POST /auth/accept-invite` sets password & profile (no self-register for now).
+* Disable public `/auth/register` in MVP; keep code path behind feature flag for future.
+* RBAC: Admin-only routes; manager routes auto-scope to assigned parks.
+
+---
+
+## Public UI (no login)
+
+* `/parks` list (+ search: q, state, city, company\_id)
+* `/parks/{id}` details + photos + lots
+* `/lots/{id}` details + photos + **“Book a showing”** form
+
+  * Minimal booking fields: name, email, phone, start\_dt, end\_dt
+  * Client sees existing showings and open/blocked windows
+
+---
+
+## Private UI
+
+* **Admin**: dashboard; CRUD companies, parks, lots, users; invite managers; assign managers ↔ parks; global calendar of showings.
+* **Manager**: dashboard; **Connect Google Calendar**; manage lots/photos; view/manage showings; edit availability.
+
+---
+
+## API (v1)
+
+**Auth**
+
+* `POST /auth/login`
+* `POST /auth/refresh`
+* `POST /auth/logout`
+* `POST /auth/invites` (admin) → {email, role=MANAGER, expiresAt}
+* `POST /auth/accept-invite` (public) → create manager acct from valid token
+  *(Keep `POST /auth/register` behind feature flag for future self-serve.)*
+
+**Companies**
+
+* `GET /companies`, `POST /companies` (admin)
+* `GET /companies/{id}`, `PATCH /companies/{id}`, `DELETE /companies/{id}` (admin)
+
+**Parks**
+
+* `GET /parks` (public filters: company\_id, city, state, q, page, limit)
+* `GET /parks/{id}` (public)
+* `POST /parks`, `PATCH /parks/{id}`, `DELETE /parks/{id}` (admin)
+* `GET /parks/{id}/photos` (public), `POST` (admin/assigned manager)
+* `POST /parks/{id}/managers/{user_id}` (admin assign)
+
+**Lots**
+
+* `GET /lots` (public; filters: park\_id, status, price range, beds, baths)
+* `GET /lots/{id}` (public)
+* `GET /lots/{id}/photos` (public), `POST` (admin/assigned manager)
+* `POST /lots` (admin/assigned manager), `PATCH /lots/{id}`, `DELETE /lots/{id}`
+* `GET /lots/{id}/availability` (public)
+* `GET /lots/{id}/showings` (manager/admin)
+
+**Booking & Availability**
+
+* `POST /lots/{id}/book`
+  Body: {client\_name, client\_email, client\_phone, start\_dt, end\_dt}
+  Behavior: transactional overlap check; create Showing; **sync to manager’s Google Calendar**; return showing with `calendar_event_id` & `calendar_html_link`.
+* `POST /lots/{id}/availability` (admin/manager): OPEN\_SLOT or BLOCKED
+* `DELETE /availability/{id}` (admin/manager)
+* `PATCH /showings/{id}` (manager/admin: cancel/complete) with calendar sync
+
+**Calendar OAuth**
+
+* `GET /oauth/google/start`
+* `GET /oauth/google/callback` → persist tokens to **OAuthAccount**, set default `external_calendar_id`
+
+---
+
+## Acceptance Criteria
+
+1. **Public browsing** works without login; parks/lots/photos visible; lot page shows existing showings + availability.
+2. **Booking** rejects overlaps (422/409) and creates Showing; on success, **creates/updates Google Calendar event for that manager** and returns link; failures flip `calendar_sync_error=true`.
+3. **No self-registration** in MVP; only **invite → accept** creates manager accounts.
+4. RBAC enforced: managers only see/edit assigned parks/lots; admin unrestricted.
+5. `/docs` and `/healthz` available; migrations run on boot in Replit.
+
+---
+
+## Implementation Notes
+
+* Timezone: store UTC; show per-park local time (add `park.timezone` later).
+* Overlap check: `SELECT … FOR UPDATE` on (lot\_id, time range).
+* Pagination: `limit` (default 20, max 100) + `total_count`.
+* Testing: unit tests for overlap logic, invite flow, RBAC, calendar sync stub.
+* Seeds: one admin, one company, 2 parks, 6 lots, sample photos, one invited manager assigned to a park (plus an accepted invite).
+
+---
+
+## Replit Setup
+
+* Secrets: `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
+* Fallback to SQLite if `DATABASE_URL` missing; Alembic auto-migrate; seed on first run.
+* README: invite flow steps + how to connect Google Calendar.
+
+---
+
+## “Output Quality Bar”
+
+* Boot-and-run on Replit with one click.
+* Typed JSON responses (camelCase).
+* Clear errors: 401/403 auth, 422 validation, 409 overlap.
+
+---
+
+### Small test plan
+
+* Invite → accept with expired token → 410 Gone.
+* Book overlapping showing → 409 Conflict.
+* Cancel showing → Google event deleted.
+* Manager tries to edit another park → 403 Forbidden.
