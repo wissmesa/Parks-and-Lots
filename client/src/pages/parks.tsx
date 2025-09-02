@@ -16,17 +16,12 @@ interface Park {
   companyId: string;
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
 
 export default function Parks() {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedState, setSelectedState] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("");
 
   // Parse URL parameters
   useEffect(() => {
@@ -34,17 +29,15 @@ export default function Parks() {
     setSearchQuery(params.get('q') || '');
     setSelectedState(params.get('state') || '');
     setSelectedCity(params.get('city') || '');
-    setSelectedCompany(params.get('company_id') || '');
   }, [location]);
 
   const { data: parksData, isLoading } = useQuery({
-    queryKey: ["/api/parks", searchQuery, selectedState, selectedCity, selectedCompany],
+    queryKey: ["/api/parks", searchQuery, selectedState, selectedCity],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
       if (selectedCity && selectedCity !== 'all') params.set('city', selectedCity);
-      if (selectedCompany && selectedCompany !== 'all') params.set('companyId', selectedCompany);
       
       const url = `/api/parks${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { credentials: 'include' });
@@ -54,20 +47,14 @@ export default function Parks() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: companies } = useQuery({
-    queryKey: ["/api/companies"],
-    staleTime: 10 * 60 * 1000,
-  });
 
   const parks = parksData?.parks || [];
-  const companiesList = (companies || []) as Company[];
 
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchQuery) params.set('q', searchQuery);
     if (selectedState) params.set('state', selectedState);
     if (selectedCity) params.set('city', selectedCity);
-    if (selectedCompany) params.set('company_id', selectedCompany);
     
     const queryString = params.toString();
     window.location.href = `/parks${queryString ? `?${queryString}` : ''}`;
@@ -77,7 +64,6 @@ export default function Parks() {
     setSearchQuery("");
     setSelectedState("");
     setSelectedCity("");
-    setSelectedCompany("");
     window.location.href = "/parks";
   };
 
@@ -106,7 +92,7 @@ export default function Parks() {
         {/* Search and Filters */}
         <Card className="mb-8">
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="lg:col-span-2">
                 <Input
                   placeholder="Search parks..."
@@ -116,19 +102,6 @@ export default function Parks() {
                   data-testid="input-park-search"
                 />
               </div>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger data-testid="select-company">
-                  <SelectValue placeholder="All Companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companiesList.map((company: Company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={selectedState} onValueChange={setSelectedState}>
                 <SelectTrigger data-testid="select-state">
                   <SelectValue placeholder="All States" />
