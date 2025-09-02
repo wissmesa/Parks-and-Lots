@@ -9,12 +9,14 @@ import { useAuth } from "@/hooks/use-auth";
 // Import pages
 import Home from "@/pages/home";
 import Parks from "@/pages/parks";
+import Lots from "@/pages/lots";
 import ParkDetail from "@/pages/park-detail";
 import LotDetail from "@/pages/lot-detail";
 import Login from "@/pages/login";
 import AcceptInvite from "@/pages/accept-invite";
 import AdminDashboard from "@/pages/admin-dashboard";
 import ManagerDashboard from "@/pages/manager-dashboard";
+import ManagerLots from "@/pages/manager-lots";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +28,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/parks" component={Parks} />
+        <Route path="/lots" component={Lots} />
         <Route path="/parks/:id" component={ParkDetail} />
         <Route path="/lots/:id" component={LotDetail} />
         <Route path="/login" component={Login} />
@@ -38,7 +41,10 @@ function Router() {
         
         {/* Protected manager routes */}
         {isAuthenticated && user?.role === 'MANAGER' && (
-          <Route path="/manager" component={ManagerDashboard} />
+          <>
+            <Route path="/manager" component={ManagerDashboard} />
+            <Route path="/manager/lots" component={ManagerLots} />
+          </>
         )}
         
         {/* Fallback to 404 */}

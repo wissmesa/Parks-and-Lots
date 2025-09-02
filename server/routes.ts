@@ -50,6 +50,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Admin Stats Endpoint
+  app.get('/api/admin/stats', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const totalParks = await storage.getParks();
+      const allLots = await storage.getLots();
+      const activeLots = allLots.filter(lot => lot.isActive);
+      const allShowings = await storage.getShowings();
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+      
+      const monthlyBookings = allShowings.filter(showing => 
+        new Date(showing.startDt) >= thisMonth
+      );
+      
+      const managers = await storage.getUsers({ role: 'MANAGER' });
+      
+      res.json({
+        totalParks: totalParks.parks?.length || 0,
+        activeLots: activeLots.length,
+        monthlyBookings: monthlyBookings.length,
+        activeManagers: managers.length
+      });
+    } catch (error) {
+      console.error('Admin stats error:', error);
+      res.status(500).json({ message: 'Failed to fetch stats' });
+    }
+  });
+
+  // Recent Bookings Endpoint
+  app.get('/api/admin/recent-bookings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const showings = await storage.getShowings();
+      const recentBookings = showings
+        .slice(0, 10)
+        .map(showing => ({
+          ...showing,
+          lotName: showing.lotId
+        }));
+      
+      res.json(recentBookings);
+    } catch (error) {
+      console.error('Recent bookings error:', error);
+      res.status(500).json({ message: 'Failed to fetch recent bookings' });
+    }
+  });
+
+  // Managers List Endpoint
+  app.get('/api/admin/managers', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const managers = await storage.getUsers({ role: 'MANAGER' });
+      res.json(managers);
+    } catch (error) {
+      console.error('Managers list error:', error);
+      res.status(500).json({ message: 'Failed to fetch managers' });
+    }
+  });
+
+  // Manager API Endpoints
+  app.get('/api/manager/assignments', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Manager assignments error:', error);
+      res.status(500).json({ message: 'Failed to fetch assignments' });
+    }
+  });
+
+  app.get('/api/manager/showings/today', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      const showings = await storage.getShowings({ managerId: req.user!.id });
+      const todayShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfDay && showingDate < endOfDay;
+      });
+
+      res.json(todayShowings);
+    } catch (error) {
+      console.error('Today showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch today showings' });
+    }
+  });
+
+  app.get('/api/manager/stats', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      let availableLots = 0;
+      for (const parkId of parkIds) {
+        const lots = await storage.getLots({ parkId });
+        availableLots += lots.filter(lot => lot.status === 'AVAILABLE').length;
+      }
+
+      const showings = await storage.getShowings({ managerId: req.user!.id });
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      
+      const todayShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfDay && showingDate < endOfDay;
+      });
+
+      const pendingRequests = showings.filter(showing => showing.status === 'SCHEDULED').length;
+
+      res.json({
+        todayShowings: todayShowings.length,
+        availableLots,
+        pendingRequests
+      });
+    } catch (error) {
+      console.error('Manager stats error:', error);
+      res.status(500).json({ message: 'Failed to fetch manager stats' });
+    }
+  });
+
+  // Manager Lots CRUD Endpoints
+  app.get('/api/manager/lots', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      let allLots = [];
+      for (const parkId of parkIds) {
+        const lots = await storage.getLotsWithParkInfo({ parkId });
+        allLots.push(...lots);
+      }
+      
+      res.json(allLots);
+    } catch (error) {
+      console.error('Manager lots error:', error);
+      res.status(500).json({ message: 'Failed to fetch lots' });
+    }
+  });
+
+  app.post('/api/manager/lots', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      // Verify manager has access to the park
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      if (!parkIds.includes(req.body.parkId)) {
+        return res.status(403).json({ message: 'You can only create lots in your assigned parks' });
+      }
+      
+      const lotData = insertLotSchema.parse(req.body);
+      const lot = await storage.createLot(lotData);
+      res.status(201).json(lot);
+    } catch (error) {
+      console.error('Create lot error:', error);
+      res.status(400).json({ message: 'Invalid lot data' });
+    }
+  });
+
+  app.patch('/api/manager/lots/:id', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      // Verify manager owns the lot (through park assignment)
+      const lot = await storage.getLot(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      if (!parkIds.includes(lot.parkId)) {
+        return res.status(403).json({ message: 'You can only edit lots in your assigned parks' });
+      }
+      
+      const updates = insertLotSchema.partial().parse(req.body);
+      const updatedLot = await storage.updateLot(req.params.id, updates);
+      res.json(updatedLot);
+    } catch (error) {
+      console.error('Update lot error:', error);
+      res.status(400).json({ message: 'Invalid lot data' });
+    }
+  });
+
+  app.delete('/api/manager/lots/:id', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      // Verify manager owns the lot (through park assignment)
+      const lot = await storage.getLot(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      if (!parkIds.includes(lot.parkId)) {
+        return res.status(403).json({ message: 'You can only delete lots in your assigned parks' });
+      }
+      
+      await storage.deleteLot(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete lot error:', error);
+      res.status(500).json({ message: 'Failed to delete lot' });
+    }
+  });
+
   // Auth routes
   app.post('/api/auth/login', async (req, res) => {
     try {
@@ -369,17 +576,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Lot routes
   app.get('/api/lots', async (req, res) => {
     try {
-      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, page = '1', limit = '20' } = req.query;
+      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, page = '1', limit = '20' } = req.query;
       const filters = {
         parkId: parkId as string,
         status: status as string,
         minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
         maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
         bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
-        bathrooms: bathrooms ? parseInt(bathrooms as string) : undefined
+        bathrooms: bathrooms ? parseInt(bathrooms as string) : undefined,
+        state: state as string,
+        q: q as string
       };
 
-      const lots = await storage.getLots(filters);
+      const lots = await storage.getLotsWithParkInfo(filters);
       
       const pageNum = parseInt(page as string);
       const limitNum = Math.min(parseInt(limit as string), 100);

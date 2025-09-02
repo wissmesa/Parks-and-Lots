@@ -34,6 +34,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   
@@ -45,7 +46,7 @@ export interface IStorage {
   deleteCompany(id: string): Promise<void>;
   
   // Park operations
-  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<Park[]>;
+  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<{ parks: Park[] }>;
   getPark(id: string): Promise<Park | undefined>;
   createPark(park: InsertPark): Promise<Park>;
   updatePark(id: string, updates: Partial<InsertPark>): Promise<Park>;
@@ -113,6 +114,21 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' }): Promise<User[]> {
+    let query = db.select().from(users);
+    const conditions = [];
+
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
+    }
+
+    return await query.orderBy(asc(users.fullName));
+  }
+
   async getCompanies(): Promise<Company[]> {
     return await db.select().from(companies).orderBy(asc(companies.name));
   }
@@ -136,7 +152,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(companies).where(eq(companies.id, id));
   }
 
-  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<Park[]> {
+  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<{ parks: Park[] }> {
     let query = db.select().from(parks);
     const conditions = [];
 
@@ -163,7 +179,8 @@ export class DatabaseStorage implements IStorage {
       query = query.where(and(...conditions));
     }
 
-    return await query.orderBy(asc(parks.name));
+    const parksResult = await query.orderBy(asc(parks.name));
+    return { parks: parksResult };
   }
 
   async getPark(id: string): Promise<Park | undefined> {
@@ -206,6 +223,63 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.bathrooms) {
       conditions.push(eq(lots.bathrooms, filters.bathrooms));
+    }
+
+    return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
+  }
+
+  async getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string }): Promise<any[]> {
+    let query = db.select({
+      id: lots.id,
+      nameOrNumber: lots.nameOrNumber,
+      status: lots.status,
+      price: lots.price,
+      description: lots.description,
+      bedrooms: lots.bedrooms,
+      bathrooms: lots.bathrooms,
+      sqFt: lots.sqFt,
+      isActive: lots.isActive,
+      parkId: lots.parkId,
+      park: {
+        id: parks.id,
+        name: parks.name,
+        city: parks.city,
+        state: parks.state
+      }
+    }).from(lots)
+      .innerJoin(parks, eq(lots.parkId, parks.id));
+    
+    const conditions = [eq(lots.isActive, true)];
+
+    if (filters?.parkId) {
+      conditions.push(eq(lots.parkId, filters.parkId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(lots.status, filters.status as any));
+    }
+    if (filters?.minPrice) {
+      conditions.push(gte(lots.price, filters.minPrice.toString()));
+    }
+    if (filters?.maxPrice) {
+      conditions.push(lte(lots.price, filters.maxPrice.toString()));
+    }
+    if (filters?.bedrooms) {
+      conditions.push(eq(lots.bedrooms, filters.bedrooms));
+    }
+    if (filters?.bathrooms) {
+      conditions.push(eq(lots.bathrooms, filters.bathrooms));
+    }
+    if (filters?.state) {
+      conditions.push(eq(parks.state, filters.state));
+    }
+    if (filters?.q) {
+      conditions.push(
+        or(
+          like(lots.nameOrNumber, `%${filters.q}%`),
+          like(lots.description, `%${filters.q}%`),
+          like(parks.name, `%${filters.q}%`)
+        )
+      );
     }
 
     return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));

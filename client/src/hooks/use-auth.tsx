@@ -42,6 +42,8 @@ export function useAuth() {
       AuthManager.clearAuth();
       queryClient.removeQueries({ queryKey: ["/api/auth/me"] });
       queryClient.clear();
+      // Force a page reload to clear all state and redirect to home
+      window.location.href = "/";
     },
   });
 

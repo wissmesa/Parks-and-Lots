@@ -18,12 +18,21 @@ export default function Login() {
     e.preventDefault();
     
     try {
-      await login({ email, password });
+      const response = await login({ email, password });
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
-      window.location.href = "/";
+      
+      // Redirect based on user role
+      const userData = response.user || response;
+      if (userData.role === 'ADMIN') {
+        window.location.href = "/admin";
+      } else if (userData.role === 'MANAGER') {
+        window.location.href = "/manager";
+      } else {
+        window.location.href = "/";
+      }
     } catch (error) {
       toast({
         title: "Login Failed",
