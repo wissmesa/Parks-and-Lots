@@ -9,8 +9,6 @@ import { useAuth } from "@/hooks/use-auth";
 // Import pages
 import Home from "@/pages/home";
 import Properties from "@/pages/properties";
-import Parks from "@/pages/parks";
-import Lots from "@/pages/lots";
 import ParkDetail from "@/pages/park-detail";
 import LotDetail from "@/pages/lot-detail";
 import Login from "@/pages/login";
@@ -29,8 +27,8 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/properties" component={Properties} />
-        <Route path="/parks" component={Parks} />
-        <Route path="/lots" component={Lots} />
+        <Route path="/parks" component={() => { window.location.href = '/properties'; return null; }} />
+        <Route path="/lots" component={() => { window.location.href = '/properties'; return null; }} />
         <Route path="/parks/:id" component={ParkDetail} />
         <Route path="/lots/:id" component={LotDetail} />
         <Route path="/login" component={Login} />
