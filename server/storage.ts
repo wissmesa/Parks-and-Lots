@@ -166,11 +166,12 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(parks.state, filters.state));
     }
     if (filters?.q) {
+      const searchTerm = filters.q.toLowerCase();
       conditions.push(
         or(
-          like(parks.name, `%${filters.q}%`),
-          like(parks.description, `%${filters.q}%`),
-          like(parks.address, `%${filters.q}%`)
+          sql`LOWER(${parks.name}) LIKE ${`%${searchTerm}%`}`,
+          sql`LOWER(${parks.description}) LIKE ${`%${searchTerm}%`}`,
+          sql`LOWER(${parks.address}) LIKE ${`%${searchTerm}%`}`
         )
       );
     }
@@ -273,11 +274,12 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(parks.state, filters.state));
     }
     if (filters?.q) {
+      const searchTerm = filters.q.toLowerCase();
       conditions.push(
         or(
-          like(lots.nameOrNumber, `%${filters.q}%`),
-          like(lots.description, `%${filters.q}%`),
-          like(parks.name, `%${filters.q}%`)
+          sql`LOWER(${lots.nameOrNumber}) LIKE ${`%${searchTerm}%`}`,
+          sql`LOWER(${lots.description}) LIKE ${`%${searchTerm}%`}`,
+          sql`LOWER(${parks.name}) LIKE ${`%${searchTerm}%`}`
         )
       );
     }

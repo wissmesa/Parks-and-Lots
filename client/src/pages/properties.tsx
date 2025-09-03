@@ -128,6 +128,10 @@ export default function Properties() {
   const lots = (lotsData?.lots || []) as Lot[];
 
   const handleSearch = () => {
+    // Update search query immediately to trigger API calls
+    setSearchQuery(searchInput.trim());
+    
+    // Also update the URL for consistency
     const params = new URLSearchParams();
     if (searchInput.trim()) params.set('q', searchInput.trim());
     if (selectedState && selectedState !== 'all') params.set('state', selectedState);
@@ -135,7 +139,7 @@ export default function Properties() {
     if (priceRange && priceRange !== 'all') params.set('price', priceRange);
     
     const queryString = params.toString();
-    window.location.href = `/properties${queryString ? `?${queryString}` : ''}`;
+    window.history.pushState(null, '', `/properties${queryString ? `?${queryString}` : ''}`);
   };
 
   const clearFilters = () => {
@@ -144,7 +148,7 @@ export default function Properties() {
     setSelectedState("");
     setSelectedStatus("");
     setPriceRange("");
-    window.location.href = `/properties`;
+    window.history.pushState(null, '', `/properties`);
   };
 
   const isLoading = parksLoading || lotsLoading;
