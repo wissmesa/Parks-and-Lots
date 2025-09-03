@@ -54,18 +54,22 @@ export default function Properties() {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [priceRange, setPriceRange] = useState("");
 
-  // Parse URL parameters
+  // Parse URL parameters and set search immediately
   useEffect(() => {
     const params = new URLSearchParams(location.split('?')[1] || '');
     const urlSearchQuery = params.get('q') || '';
+    const urlState = params.get('state') || '';
+    const urlStatus = params.get('status') || '';
+    const urlPrice = params.get('price') || '';
+    
     setSearchInput(urlSearchQuery);
-    setSearchQuery(urlSearchQuery);
-    setSelectedState(params.get('state') || '');
-    setSelectedStatus(params.get('status') || '');
-    setPriceRange(params.get('price') || '');
+    setSearchQuery(urlSearchQuery); // Set immediately for URL params
+    setSelectedState(urlState);
+    setSelectedStatus(urlStatus);
+    setPriceRange(urlPrice);
   }, [location]);
 
-  // Debounced search function
+  // Debounced search function - only for manual input changes
   const debouncedSearch = useCallback(() => {
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
@@ -73,11 +77,18 @@ export default function Properties() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Trigger debounced search when input changes
+  // Trigger debounced search when input changes (but not on initial URL load)
   useEffect(() => {
-    const cleanup = debouncedSearch();
-    return cleanup;
-  }, [debouncedSearch]);
+    // Skip debounced search if this is initial load from URL
+    const params = new URLSearchParams(location.split('?')[1] || '');
+    const urlSearchQuery = params.get('q') || '';
+    
+    // Only debounce if the input differs from URL params (manual user input)
+    if (searchInput !== urlSearchQuery) {
+      const cleanup = debouncedSearch();
+      return cleanup;
+    }
+  }, [searchInput, debouncedSearch, location]);
 
   // Parks data
   const { data: parksData, isLoading: parksLoading } = useQuery({
