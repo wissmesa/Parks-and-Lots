@@ -866,6 +866,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Additional admin endpoints
+  
+  // Get all bookings for admin
+  app.get('/api/admin/bookings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const { status } = req.query;
+      const showings = await storage.getShowings();
+      
+      let filteredShowings = showings;
+      if (status && status !== 'all') {
+        filteredShowings = showings.filter(showing => showing.status === status);
+      }
+      
+      res.json({ bookings: filteredShowings });
+    } catch (error) {
+      console.error('Admin bookings error:', error);
+      res.status(500).json({ message: 'Failed to fetch bookings' });
+    }
+  });
+
+  // Update booking status
+  app.put('/api/admin/bookings/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const { status } = req.body;
+      const showing = await storage.updateShowing(req.params.id, { status });
+      res.json(showing);
+    } catch (error) {
+      console.error('Update booking status error:', error);
+      res.status(500).json({ message: 'Failed to update booking status' });
+    }
+  });
+
+  // Get manager assignments for admin
+  app.get('/api/admin/manager-assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const assignments = await storage.getAllManagerAssignments();
+      res.json(assignments);
+    } catch (error) {
+      console.error('Manager assignments error:', error);
+      res.status(500).json({ message: 'Failed to fetch manager assignments' });
+    }
+  });
+
+  // Create manager assignment
+  app.post('/api/admin/manager-assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const { userId, parkId } = req.body;
+      await storage.assignManagerToPark(userId, parkId);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Create manager assignment error:', error);
+      res.status(500).json({ message: 'Failed to create assignment' });
+    }
+  });
+
+  // Remove all assignments for a manager
+  app.delete('/api/admin/managers/:id/assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      await storage.removeManagerAssignments(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Remove manager assignments error:', error);
+      res.status(500).json({ message: 'Failed to remove assignments' });
+    }
+  });
+
+  // Delete/remove manager
+  app.delete('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      await storage.deleteUser(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete manager error:', error);
+      res.status(500).json({ message: 'Failed to delete manager' });
+    }
+  });
+
+  // Get all invites
+  app.get('/api/auth/invites', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const invites = await storage.getInvites();
+      res.json({ invites });
+    } catch (error) {
+      console.error('Get invites error:', error);
+      res.status(500).json({ message: 'Failed to fetch invites' });
+    }
+  });
+
+  // Delete invite
+  app.delete('/api/auth/invites/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      await storage.deleteInvite(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete invite error:', error);
+      res.status(500).json({ message: 'Failed to delete invite' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

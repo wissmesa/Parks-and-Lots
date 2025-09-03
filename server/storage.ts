@@ -82,6 +82,11 @@ export interface IStorage {
   getInviteByToken(token: string): Promise<Invite | undefined>;
   createInvite(invite: InsertInvite): Promise<Invite>;
   acceptInvite(token: string): Promise<Invite>;
+  getInvites(): Promise<Invite[]>;
+  deleteInvite(id: string): Promise<void>;
+  deleteUser(id: string): Promise<void>;
+  getAllManagerAssignments(): Promise<any[]>;
+  removeManagerAssignments(userId: string): Promise<void>;
   
   // Manager assignments
   getManagerAssignments(userId?: string, parkId?: string): Promise<any[]>;
@@ -452,6 +457,26 @@ export class DatabaseStorage implements IStorage {
   async removeManagerFromPark(userId: string, parkId: string): Promise<void> {
     await db.delete(managerAssignments)
       .where(and(eq(managerAssignments.userId, userId), eq(managerAssignments.parkId, parkId)));
+  }
+
+  async getAllManagerAssignments(): Promise<any[]> {
+    return await this.getManagerAssignments();
+  }
+
+  async removeManagerAssignments(userId: string): Promise<void> {
+    await db.delete(managerAssignments)
+      .where(eq(managerAssignments.userId, userId));
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    // First remove any manager assignments
+    await this.removeManagerAssignments(id);
+    // Then delete the user
+    await db.delete(users).where(eq(users.id, id));
+  }
+
+  async deleteInvite(id: string): Promise<void> {
+    await db.delete(invites).where(eq(invites.id, id));
   }
 
   async getOAuthAccount(userId: string, provider: string): Promise<OAuthAccount | undefined> {

@@ -230,15 +230,7 @@ export default function Properties() {
                 </Select>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  onClick={handleSearch} 
-                  className="flex-1 sm:flex-none bg-accent text-accent-foreground hover:bg-accent/90"
-                  data-testid="button-search"
-                >
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
-                </Button>
+              <div className="flex justify-end">
                 <Button 
                   variant="outline" 
                   onClick={clearFilters}

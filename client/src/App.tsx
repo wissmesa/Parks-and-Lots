@@ -13,6 +13,12 @@ import LotDetail from "@/pages/lot-detail";
 import Login from "@/pages/login";
 import AcceptInvite from "@/pages/accept-invite";
 import AdminDashboard from "@/pages/admin-dashboard";
+import AdminCompanies from "@/pages/admin-companies";
+import AdminParks from "@/pages/admin-parks";
+import AdminLots from "@/pages/admin-lots";
+import AdminManagers from "@/pages/admin-managers";
+import AdminBookings from "@/pages/admin-bookings";
+import AdminInvites from "@/pages/admin-invites";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import ManagerLots from "@/pages/manager-lots";
 import NotFound from "@/pages/not-found";
@@ -35,7 +41,15 @@ function Router() {
         
         {/* Protected admin routes */}
         {isAuthenticated && user?.role === 'ADMIN' && (
-          <Route path="/admin" component={AdminDashboard} />
+          <>
+            <Route path="/admin" component={AdminDashboard} />
+            <Route path="/admin/companies" component={AdminCompanies} />
+            <Route path="/admin/parks" component={AdminParks} />
+            <Route path="/admin/lots" component={AdminLots} />
+            <Route path="/admin/managers" component={AdminManagers} />
+            <Route path="/admin/bookings" component={AdminBookings} />
+            <Route path="/admin/invites" component={AdminInvites} />
+          </>
         )}
         
         {/* Protected manager routes */}
