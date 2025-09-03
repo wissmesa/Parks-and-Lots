@@ -71,6 +71,13 @@ export default function Properties() {
 
   // Debounced search function - only for manual input changes
   const debouncedSearch = useCallback(() => {
+    // If search input is empty, clear immediately (no delay)
+    if (searchInput.trim() === '') {
+      setSearchQuery('');
+      return () => {};
+    }
+    
+    // Otherwise, debounce the search
     const timer = setTimeout(() => {
       setSearchQuery(searchInput);
     }, 500);
