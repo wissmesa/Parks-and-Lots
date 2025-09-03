@@ -275,10 +275,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(parks.state, filters.state));
     }
     if (filters?.q) {
-      const searchTerm = filters.q.toLowerCase();
-      const nameSearch = sql`LOWER(${lots.nameOrNumber}) LIKE '%${searchTerm}%'`;
-      const descSearch = sql`LOWER(${lots.description}) LIKE '%${searchTerm}%'`;
-      const parkSearch = sql`LOWER(${parks.name}) LIKE '%${searchTerm}%'`;
+      const searchTerm = `%${filters.q.toLowerCase()}%`;
+      const nameSearch = sql`LOWER(${lots.nameOrNumber}) LIKE ${searchTerm}`;
+      const descSearch = sql`LOWER(${lots.description}) LIKE ${searchTerm}`;
+      const parkSearch = sql`LOWER(${parks.name}) LIKE ${searchTerm}`;
       conditions.push(or(nameSearch, descSearch, parkSearch));
     }
 
@@ -406,7 +406,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInvite(invite: InsertInvite & { token?: string }): Promise<Invite> {
-    const [newInvite] = await db.insert(invites).values([invite]).returning();
+    const [newInvite] = await db.insert(invites).values(invite).returning();
     return newInvite;
   }
 
