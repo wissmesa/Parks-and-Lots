@@ -18,9 +18,7 @@ export function Navigation() {
     }
   };
 
-  const navigationItems = [
-    { href: "/properties", label: "Browse Properties", public: true },
-  ];
+  const navigationItems: { href: string; label: string; public: boolean }[] = [];
 
   const NavLinks = ({ mobile = false, onClose = () => {} }) => (
     <>

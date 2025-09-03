@@ -7,7 +7,6 @@ import { Navigation } from "@/components/ui/navigation";
 import { useAuth } from "@/hooks/use-auth";
 
 // Import pages
-import Home from "@/pages/home";
 import Properties from "@/pages/properties";
 import ParkDetail from "@/pages/park-detail";
 import LotDetail from "@/pages/lot-detail";
@@ -25,10 +24,10 @@ function Router() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/properties" component={Properties} />
-        <Route path="/parks" component={() => { window.location.href = '/properties'; return null; }} />
-        <Route path="/lots" component={() => { window.location.href = '/properties'; return null; }} />
+        <Route path="/" component={Properties} />
+        <Route path="/properties" component={() => { window.location.href = '/'; return null; }} />
+        <Route path="/parks" component={() => { window.location.href = '/'; return null; }} />
+        <Route path="/lots" component={() => { window.location.href = '/'; return null; }} />
         <Route path="/parks/:id" component={ParkDetail} />
         <Route path="/lots/:id" component={LotDetail} />
         <Route path="/login" component={Login} />
