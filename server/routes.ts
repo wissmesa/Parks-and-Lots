@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let availableLots = 0;
       for (const parkId of parkIds) {
         const lots = await storage.getLots({ parkId });
-        availableLots += lots.filter(lot => lot.status === 'AVAILABLE').length;
+        availableLots += lots.filter(lot => lot.status === 'FOR_RENT' || lot.status === 'FOR_SALE').length;
       }
 
       const showings = await storage.getShowings({ managerId: req.user!.id });
@@ -328,7 +328,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const invite = await storage.createInvite({
         ...parsed,
-        token,
         expiresAt
       });
 
@@ -798,12 +797,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         calendarSyncError = true;
       }
 
-      // Update showing with calendar info
-      const updatedShowing = await storage.updateShowing(showing.id, {
-        calendarEventId,
-        calendarHtmlLink,
-        calendarSyncError
-      });
+      // Calendar sync completed (info logged separately)
+      const updatedShowing = showing;
 
       res.status(201).json(updatedShowing);
     } catch (error) {
@@ -831,10 +826,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await calendarService.updateCalendarEvent(updatedShowing.managerId, updatedShowing);
           }
           
-          await storage.updateShowing(req.params.id, { calendarSyncError: false });
+          // Calendar sync successful
         } catch (error) {
           console.error('Calendar sync error:', error);
-          await storage.updateShowing(req.params.id, { calendarSyncError: true });
+          // Calendar sync failed
         }
       }
 

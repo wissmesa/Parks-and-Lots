@@ -123,7 +123,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      return await query.where(and(...conditions)).orderBy(asc(users.fullName));
     }
 
     return await query.orderBy(asc(users.fullName));
@@ -177,7 +177,8 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      const parksResult = await query.where(and(...conditions)).orderBy(asc(parks.name));
+      return { parks: parksResult };
     }
 
     const parksResult = await query.orderBy(asc(parks.name));
@@ -275,13 +276,10 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.q) {
       const searchTerm = filters.q.toLowerCase();
-      conditions.push(
-        or(
-          sql`LOWER(${lots.nameOrNumber}) LIKE ${`%${searchTerm}%`}`,
-          sql`LOWER(${lots.description}) LIKE ${`%${searchTerm}%`}`,
-          sql`LOWER(${parks.name}) LIKE ${`%${searchTerm}%`}`
-        )
-      );
+      const nameSearch = sql`LOWER(${lots.nameOrNumber}) LIKE '%${searchTerm}%'`;
+      const descSearch = sql`LOWER(${lots.description}) LIKE '%${searchTerm}%'`;
+      const parkSearch = sql`LOWER(${parks.name}) LIKE '%${searchTerm}%'`;
+      conditions.push(or(nameSearch, descSearch, parkSearch));
     }
 
     return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
@@ -321,7 +319,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      return await query.where(and(...conditions)).orderBy(desc(showings.startDt));
     }
 
     return await query.orderBy(desc(showings.startDt));
@@ -407,8 +405,8 @@ export class DatabaseStorage implements IStorage {
     return invite;
   }
 
-  async createInvite(invite: InsertInvite): Promise<Invite> {
-    const [newInvite] = await db.insert(invites).values(invite).returning();
+  async createInvite(invite: InsertInvite & { token?: string }): Promise<Invite> {
+    const [newInvite] = await db.insert(invites).values([invite]).returning();
     return newInvite;
   }
 
@@ -441,7 +439,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      return await query.where(and(...conditions));
     }
 
     return await query;
