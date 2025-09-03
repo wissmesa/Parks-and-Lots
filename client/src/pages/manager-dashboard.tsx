@@ -58,7 +58,7 @@ export default function ManagerDashboard() {
 
   if (user?.role !== 'MANAGER') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-16">
         <Card>
           <CardContent className="p-8 text-center">
             <h2 className="text-xl font-semibold mb-2">Access Denied</h2>

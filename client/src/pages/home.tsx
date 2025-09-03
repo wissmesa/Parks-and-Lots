@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ interface Park {
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
 
   const { data: parksData } = useQuery({
     queryKey: ["/api/parks", "limit-6"],
@@ -31,7 +32,7 @@ export default function Home() {
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
-      window.location.href = `/properties?q=${encodeURIComponent(searchQuery)}`;
+      setLocation(`/properties?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
