@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,7 +48,8 @@ interface Lot {
 
 export default function Properties() {
   const [location] = useLocation();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // Input field state
+  const [searchQuery, setSearchQuery] = useState(""); // Actual search query for API
   const [selectedState, setSelectedState] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [priceRange, setPriceRange] = useState("");
@@ -56,11 +57,27 @@ export default function Properties() {
   // Parse URL parameters
   useEffect(() => {
     const params = new URLSearchParams(location.split('?')[1] || '');
-    setSearchQuery(params.get('q') || '');
+    const urlSearchQuery = params.get('q') || '';
+    setSearchInput(urlSearchQuery);
+    setSearchQuery(urlSearchQuery);
     setSelectedState(params.get('state') || '');
     setSelectedStatus(params.get('status') || '');
     setPriceRange(params.get('price') || '');
   }, [location]);
+
+  // Debounced search function
+  const debouncedSearch = useCallback(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Trigger debounced search when input changes
+  useEffect(() => {
+    const cleanup = debouncedSearch();
+    return cleanup;
+  }, [debouncedSearch]);
 
   // Parks data
   const { data: parksData, isLoading: parksLoading } = useQuery({
@@ -101,16 +118,17 @@ export default function Properties() {
 
   const handleSearch = () => {
     const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (selectedState) params.set('state', selectedState);
-    if (selectedStatus) params.set('status', selectedStatus);
-    if (priceRange) params.set('price', priceRange);
+    if (searchInput.trim()) params.set('q', searchInput.trim());
+    if (selectedState && selectedState !== 'all') params.set('state', selectedState);
+    if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
+    if (priceRange && priceRange !== 'all') params.set('price', priceRange);
     
     const queryString = params.toString();
     window.location.href = `/properties${queryString ? `?${queryString}` : ''}`;
   };
 
   const clearFilters = () => {
+    setSearchInput("");
     setSearchQuery("");
     setSelectedState("");
     setSelectedStatus("");
@@ -150,8 +168,8 @@ export default function Properties() {
                 <div className="lg:col-span-2">
                   <Input
                     placeholder="Search parks and lots..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     data-testid="input-properties-search"
                   />
