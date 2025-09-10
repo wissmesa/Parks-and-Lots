@@ -84,18 +84,11 @@ export default function Properties() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Trigger debounced search when input changes (but not on initial URL load)
+  // Trigger debounced search when input changes
   useEffect(() => {
-    // Skip debounced search if this is initial load from URL
-    const params = new URLSearchParams(location.split('?')[1] || '');
-    const urlSearchQuery = params.get('q') || '';
-    
-    // Only debounce if the input differs from URL params (manual user input)
-    if (searchInput !== urlSearchQuery) {
-      const cleanup = debouncedSearch();
-      return cleanup;
-    }
-  }, [searchInput, debouncedSearch, location]);
+    const cleanup = debouncedSearch();
+    return cleanup;
+  }, [searchInput, debouncedSearch]);
 
   // Parks data
   const { data: parksData, isLoading: parksLoading } = useQuery({
