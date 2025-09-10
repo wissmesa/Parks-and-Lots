@@ -52,6 +52,11 @@ export default function AdminCompanies() {
     enabled: user?.role === 'ADMIN',
   });
 
+  const { data: parks } = useQuery({
+    queryKey: ["/api/parks"],
+    enabled: user?.role === 'ADMIN',
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       return apiRequest("POST", "/api/companies", data);
@@ -150,7 +155,8 @@ export default function AdminCompanies() {
     }
   };
 
-  const companiesList = companies?.companies || companies || [];
+  const companiesList = companies || [];
+  const parksList = (parks && parks.parks) ? parks.parks : [];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -277,6 +283,7 @@ export default function AdminCompanies() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Location</TableHead>
+                    <TableHead>Parks</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
@@ -292,6 +299,14 @@ export default function AdminCompanies() {
                       <TableCell>
                         <div>{company.city}, {company.state}</div>
                         {company.zipCode && <div className="text-sm text-muted-foreground">{company.zipCode}</div>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {parksList.filter((park: any) => park.companyId === company.id).length} Parks
+                        </Badge>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {parksList.filter((park: any) => park.companyId === company.id).map((park: any) => park.name).join(', ') || 'No parks'}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div>{company.phone}</div>

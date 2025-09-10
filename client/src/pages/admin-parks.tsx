@@ -165,8 +165,8 @@ export default function AdminParks() {
     }
   };
 
-  const parksList = parks?.parks || parks || [];
-  const companiesList = companies?.companies || companies || [];
+  const parksList = (parks && parks.parks) ? parks.parks : [];
+  const companiesList = companies ? companies : [];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -211,7 +211,7 @@ export default function AdminParks() {
                         <SelectValue placeholder="Select a company" />
                       </SelectTrigger>
                       <SelectContent>
-                        {companiesList.map((company: Company) => (
+                        {companiesList.map((company: any) => (
                           <SelectItem key={company.id} value={company.id}>
                             {company.name}
                           </SelectItem>

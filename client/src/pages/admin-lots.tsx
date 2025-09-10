@@ -45,7 +45,7 @@ export default function AdminLots() {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [formData, setFormData] = useState({
     nameOrNumber: "",
-    status: "FOR_RENT" as const,
+    status: "FOR_RENT" as 'FOR_RENT' | 'FOR_SALE',
     price: "",
     description: "",
     bedrooms: "",
@@ -67,6 +67,11 @@ export default function AdminLots() {
 
   const { data: parks } = useQuery({
     queryKey: ["/api/parks"],
+    enabled: user?.role === 'ADMIN',
+  });
+
+  const { data: companies } = useQuery({
+    queryKey: ["/api/companies"],
     enabled: user?.role === 'ADMIN',
   });
 
@@ -183,8 +188,9 @@ export default function AdminLots() {
     }
   };
 
-  const lotsList = lots?.lots || lots || [];
-  const parksList = parks?.parks || parks || [];
+  const lotsList = (lots && lots.lots) ? lots.lots : [];
+  const parksList = (parks && parks.parks) ? parks.parks : [];
+  const companiesList = companies ? companies : [];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -334,6 +340,7 @@ export default function AdminLots() {
                   <TableRow>
                     <TableHead>Lot</TableHead>
                     <TableHead>Park</TableHead>
+                    <TableHead>Company</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
@@ -350,6 +357,15 @@ export default function AdminLots() {
                       <TableCell>
                         <Badge variant="secondary">
                           {lot.park?.name || 'Unknown'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {(() => {
+                            const park = parksList.find((p: any) => p.id === lot.parkId);
+                            const company = companiesList.find((c: any) => c.id === park?.companyId);
+                            return company?.name || 'Unknown';
+                          })()}
                         </Badge>
                       </TableCell>
                       <TableCell>
