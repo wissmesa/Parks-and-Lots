@@ -60,17 +60,17 @@ export default function AdminLots() {
     return null;
   }
 
-  const { data: lots, isLoading } = useQuery({
+  const { data: lots, isLoading } = useQuery<{ lots: Lot[] }>({
     queryKey: ["/api/lots"],
     enabled: user?.role === 'ADMIN',
   });
 
-  const { data: parks } = useQuery({
+  const { data: parks } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
     enabled: user?.role === 'ADMIN',
   });
 
-  const { data: companies } = useQuery({
+  const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
     enabled: user?.role === 'ADMIN',
   });
@@ -188,9 +188,13 @@ export default function AdminLots() {
     }
   };
 
-  const lotsList = (lots && lots.lots) ? lots.lots : [];
-  const parksList = (parks && parks.parks) ? parks.parks : [];
-  const companiesList = companies ? companies : [];
+  const lotsList = lots?.lots ?? [];
+  const parksList = parks?.parks ?? [];
+  const companiesList = companies ?? [];
+  
+  // Create efficient lookup maps for relationships
+  const parkById = new Map(parksList.map(p => [p.id, p]));
+  const companyById = new Map(companiesList.map(c => [c.id, c]));
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -362,8 +366,8 @@ export default function AdminLots() {
                       <TableCell>
                         <Badge variant="outline">
                           {(() => {
-                            const park = parksList.find((p: any) => p.id === lot.parkId);
-                            const company = companiesList.find((c: any) => c.id === park?.companyId);
+                            const park = parkById.get(lot.parkId);
+                            const company = companyById.get(park?.companyId);
                             return company?.name || 'Unknown';
                           })()}
                         </Badge>

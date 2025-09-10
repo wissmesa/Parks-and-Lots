@@ -47,12 +47,12 @@ export default function AdminCompanies() {
     return null;
   }
 
-  const { data: companies, isLoading } = useQuery({
+  const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
     enabled: user?.role === 'ADMIN',
   });
 
-  const { data: parks } = useQuery({
+  const { data: parks } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
     enabled: user?.role === 'ADMIN',
   });
@@ -155,8 +155,17 @@ export default function AdminCompanies() {
     }
   };
 
-  const companiesList = companies || [];
-  const parksList = (parks && parks.parks) ? parks.parks : [];
+  const companiesList = companies ?? [];
+  const parksList = parks?.parks ?? [];
+  
+  // Create efficient lookup maps for relationships
+  const parksByCompanyId = new Map<string, Park[]>();
+  parksList.forEach(park => {
+    if (!parksByCompanyId.has(park.companyId)) {
+      parksByCompanyId.set(park.companyId, []);
+    }
+    parksByCompanyId.get(park.companyId)!.push(park);
+  });
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -302,10 +311,10 @@ export default function AdminCompanies() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {parksList.filter((park: any) => park.companyId === company.id).length} Parks
+                          {parksByCompanyId.get(company.id)?.length || 0} Parks
                         </Badge>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {parksList.filter((park: any) => park.companyId === company.id).map((park: any) => park.name).join(', ') || 'No parks'}
+                          {parksByCompanyId.get(company.id)?.map(park => park.name).join(', ') || 'No parks'}
                         </div>
                       </TableCell>
                       <TableCell>

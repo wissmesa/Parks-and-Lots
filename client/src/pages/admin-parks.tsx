@@ -57,12 +57,12 @@ export default function AdminParks() {
     return null;
   }
 
-  const { data: parks, isLoading } = useQuery({
+  const { data: parks, isLoading } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
     enabled: user?.role === 'ADMIN',
   });
 
-  const { data: companies } = useQuery({
+  const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
     enabled: user?.role === 'ADMIN',
   });
@@ -165,8 +165,11 @@ export default function AdminParks() {
     }
   };
 
-  const parksList = (parks && parks.parks) ? parks.parks : [];
-  const companiesList = companies ? companies : [];
+  const parksList = parks?.parks ?? [];
+  const companiesList = companies ?? [];
+  
+  // Create efficient lookup map for companies
+  const companyById = new Map(companiesList.map(c => [c.id, c]));
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -314,7 +317,7 @@ export default function AdminParks() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {park.company?.name || 'Unknown'}
+                          {companyById.get(park.companyId)?.name ?? park.company?.name ?? 'Unknown'}
                         </Badge>
                       </TableCell>
                       <TableCell>
