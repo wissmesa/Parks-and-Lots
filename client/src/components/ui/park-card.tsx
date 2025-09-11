@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, ArrowRight, TreePine } from "lucide-react";
+import { ArrowRight, TreePine } from "lucide-react";
 
 interface Park {
   id: string;
@@ -26,12 +26,8 @@ export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
         </div>
       </div>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2">
           <h3 className="text-lg font-semibold text-foreground">{park.name}</h3>
-          <div className="flex items-center text-yellow-500">
-            <Star className="w-4 h-4 fill-current" />
-            <span className="ml-1 text-sm text-muted-foreground">4.8</span>
-          </div>
         </div>
         <p className="text-muted-foreground text-sm mb-3">
           {park.city}, {park.state}

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { 
   ChevronRight, 
   Home, 
-  Star, 
+ 
   MapPin, 
   Bed, 
   Bath, 
@@ -127,15 +127,8 @@ export default function ParkDetail() {
 
         {/* Park Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h1 className="text-3xl font-bold text-foreground">{(park as Park)?.name || 'Unknown Park'}</h1>
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center text-yellow-500">
-                <Star className="w-5 h-5 fill-current" />
-                <span className="ml-1 font-medium">4.8</span>
-              </div>
-              <span className="text-muted-foreground">(24 reviews)</span>
-            </div>
           </div>
           <p className="text-muted-foreground flex items-center">
             <MapPin className="w-4 h-4 mr-2" />

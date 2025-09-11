@@ -12,7 +12,7 @@ import {
   Ruler, 
   DollarSign, 
   Search, 
-  Star, 
+ 
   MapPin, 
   Home,
   ArrowRight,
@@ -261,12 +261,8 @@ export default function Properties() {
                     </div>
                   </div>
                   <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2">
                       <h3 className="text-lg font-semibold text-foreground">{park.name}</h3>
-                      <div className="flex items-center text-yellow-500">
-                        <Star className="w-4 h-4 fill-current" />
-                        <span className="ml-1 text-sm text-muted-foreground">4.8</span>
-                      </div>
                     </div>
                     <p className="text-muted-foreground text-sm mb-3 flex items-center">
                       <MapPin className="w-4 h-4 mr-1" />
