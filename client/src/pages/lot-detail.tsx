@@ -55,6 +55,21 @@ interface Availability {
   note?: string;
 }
 
+interface TimeSlot {
+  hour: number;
+  time: string;
+  isBlocked: boolean;
+  hasShowing: boolean;
+  isAvailable: boolean;
+}
+
+interface DaySchedule {
+  date: Date;
+  dayName: string;
+  dayNumber: number;
+  slots: TimeSlot[];
+}
+
 export default function LotDetail() {
   const { id } = useParams();
   const { toast } = useToast();
@@ -116,44 +131,66 @@ export default function LotDetail() {
   const availabilityRules = Array.isArray(availability) ? availability : [];
   const lotShowings = showings || [];
 
-  // Generate calendar days for simple availability display
-  const generateCalendarDays = () => {
-    const days = [];
+  // Generate weekly schedule from 9am to 7pm for this week
+  const generateWeeklySchedule = (): DaySchedule[] => {
+    const schedule: DaySchedule[] = [];
     const today = new Date();
-    for (let i = 0; i < 14; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      
-      // Check if day has any blockages or showings
-      const dayStart = new Date(date);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(date);
-      dayEnd.setHours(23, 59, 59, 999);
-      
-      const hasBlockage = availabilityRules.some((rule: Availability) => 
-        rule.ruleType === 'BLOCKED' && 
-        new Date(rule.startDt) <= dayEnd && 
-        new Date(rule.endDt) >= dayStart
-      );
-      
-      const hasShowing = lotShowings.some((showing: Showing) =>
-        showing.status === 'SCHEDULED' &&
-        new Date(showing.startDt) <= dayEnd && 
-        new Date(showing.endDt) >= dayStart
-      );
-
-      days.push({
-        date,
-        number: date.getDate(),
-        isBlocked: hasBlockage,
-        hasShowing,
-        isAvailable: !hasBlockage && !hasShowing
-      });
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Start from Sunday
+    
+    const timeSlots = [];
+    for (let hour = 9; hour <= 19; hour++) { // 9am to 7pm
+      timeSlots.push(hour);
     }
-    return days;
+    
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + dayOffset);
+      
+      const daySchedule: DaySchedule = {
+        date,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayNumber: date.getDate(),
+        slots: []
+      };
+      
+      for (const hour of timeSlots) {
+        const slotStart = new Date(date);
+        slotStart.setHours(hour, 0, 0, 0);
+        const slotEnd = new Date(date);
+        slotEnd.setHours(hour, 59, 59, 999);
+        
+        // Check if this time slot has any blockages or showings
+        const hasBlockage = availabilityRules.some((rule: Availability) => 
+          rule.ruleType === 'BLOCKED' && 
+          new Date(rule.startDt) <= slotEnd && 
+          new Date(rule.endDt) >= slotStart
+        );
+        
+        const hasShowing = lotShowings.some((showing: Showing) =>
+          showing.status === 'SCHEDULED' &&
+          new Date(showing.startDt) <= slotEnd && 
+          new Date(showing.endDt) >= slotStart
+        );
+        
+        const slot: TimeSlot = {
+          hour,
+          time: `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`,
+          isBlocked: hasBlockage,
+          hasShowing,
+          isAvailable: !hasBlockage && !hasShowing
+        };
+        
+        daySchedule.slots.push(slot);
+      }
+      
+      schedule.push(daySchedule);
+    }
+    
+    return schedule;
   };
 
-  const calendarDays = generateCalendarDays();
+  const weeklySchedule = generateWeeklySchedule();
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -263,54 +300,80 @@ export default function LotDetail() {
               </CardContent>
             </Card>
 
-            {/* Availability Calendar Preview */}
+            {/* Weekly Schedule Availability */}
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">Showing Availability</h3>
                 <div className="text-sm text-muted-foreground mb-4">
-                  Available time slots for the next two weeks
+                  Weekly schedule from 9am to 7pm
                 </div>
                 
-                <div className="grid grid-cols-7 gap-1 text-center text-xs mb-4">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                    <div key={day} className="font-medium text-muted-foreground py-2">{day}</div>
-                  ))}
-                  
-                  {calendarDays.map((day, index) => (
-                    <div 
-                      key={index}
-                      className={`py-2 px-1 rounded text-sm ${
-                        day.isBlocked 
-                          ? 'bg-destructive/20 text-destructive cursor-not-allowed' 
-                          : day.hasShowing
-                          ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed'
-                          : 'hover:bg-muted cursor-pointer'
-                      }`}
-                      title={
-                        day.isBlocked 
-                          ? 'Blocked' 
-                          : day.hasShowing 
-                          ? 'Has showing' 
-                          : 'Available'
-                      }
-                    >
-                      {day.number}
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <div className="grid grid-cols-8 gap-1 text-center text-xs mb-4 min-w-[600px]">
+                    {/* Time column header */}
+                    <div className="font-medium text-muted-foreground py-2">Time</div>
+                    
+                    {/* Day headers */}
+                    {weeklySchedule.map(day => (
+                      <div key={day.dayName} className="font-medium text-muted-foreground py-2">
+                        <div>{day.dayName}</div>
+                        <div className="text-xs opacity-70">{day.dayNumber}</div>
+                      </div>
+                    ))}
+                    
+                    {/* Time slots */}
+                    {Array.from({length: 11}, (_, hourIndex) => {
+                      const hour = 9 + hourIndex;
+                      const timeDisplay = `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`;
+                      
+                      return [
+                        <div key={`time-${hour}`} className="py-1 text-xs font-medium text-muted-foreground">
+                          {timeDisplay}
+                        </div>,
+                        ...weeklySchedule.map(day => {
+                          const slot = day.slots.find(s => s.hour === hour);
+                          if (!slot) return null;
+                          
+                          return (
+                            <div 
+                              key={`${day.dayName}-${hour}`}
+                              data-testid={`slot-${day.dayName}-${hour}`}
+                              className={`py-1 px-1 rounded text-xs ${
+                                slot.isBlocked 
+                                  ? 'bg-destructive/20 text-destructive cursor-not-allowed' 
+                                  : slot.hasShowing
+                                  ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed'
+                                  : 'hover:bg-muted cursor-pointer bg-green-50 border border-green-200'
+                              }`}
+                              title={
+                                slot.isBlocked 
+                                  ? 'Blocked' 
+                                  : slot.hasShowing 
+                                  ? 'Has showing' 
+                                  : 'Available'
+                              }
+                            >
+                              {slot.isAvailable ? '✓' : slot.hasShowing ? '●' : '✗'}
+                            </div>
+                          );
+                        })
+                      ];
+                    }).flat()}
+                  </div>
                 </div>
                 
                 <div className="flex items-center space-x-4 text-xs">
                   <div className="flex items-center">
-                    <div className="w-3 h-3 bg-muted rounded mr-2"></div>
-                    Available
+                    <div className="w-3 h-3 bg-green-50 border border-green-200 rounded mr-2"></div>
+                    Available (✓)
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-yellow-100 rounded mr-2"></div>
-                    Has Showing
+                    Has Showing (●)
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-destructive/20 rounded mr-2"></div>
-                    Blocked
+                    Blocked (✗)
                   </div>
                 </div>
               </CardContent>
