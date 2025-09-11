@@ -9,6 +9,7 @@ import {
   invites,
   managerAssignments,
   oauthAccounts,
+  googleCalendarTokens,
   type User, 
   type InsertUser,
   type Company,
@@ -25,6 +26,8 @@ import {
   type InsertPhoto,
   type Invite,
   type InsertInvite,
+  type GoogleCalendarToken,
+  type InsertGoogleCalendarToken,
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
@@ -96,6 +99,11 @@ export interface IStorage {
   // OAuth operations
   getOAuthAccount(userId: string, provider: string): Promise<OAuthAccount | undefined>;
   createOrUpdateOAuthAccount(userId: string, data: Partial<OAuthAccount>): Promise<OAuthAccount>;
+  
+  // Google Calendar token operations
+  getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined>;
+  createOrUpdateGoogleCalendarToken(userId: string, token: InsertGoogleCalendarToken): Promise<GoogleCalendarToken>;
+  deleteGoogleCalendarToken(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -552,6 +560,34 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return account;
     }
+  }
+
+  async getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined> {
+    const [token] = await db.select().from(googleCalendarTokens)
+      .where(eq(googleCalendarTokens.userId, userId));
+    return token;
+  }
+
+  async createOrUpdateGoogleCalendarToken(userId: string, tokenData: InsertGoogleCalendarToken): Promise<GoogleCalendarToken> {
+    const existing = await this.getGoogleCalendarToken(userId);
+    
+    if (existing) {
+      const [token] = await db.update(googleCalendarTokens)
+        .set({ ...tokenData, updatedAt: new Date() })
+        .where(eq(googleCalendarTokens.userId, userId))
+        .returning();
+      return token;
+    } else {
+      const [token] = await db.insert(googleCalendarTokens)
+        .values({ userId, ...tokenData })
+        .returning();
+      return token;
+    }
+  }
+
+  async deleteGoogleCalendarToken(userId: string): Promise<void> {
+    await db.delete(googleCalendarTokens)
+      .where(eq(googleCalendarTokens.userId, userId));
   }
 }
 

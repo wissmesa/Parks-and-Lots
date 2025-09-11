@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
+import { CalendarConnection } from "@/components/ui/calendar-connection";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar,
@@ -14,12 +15,11 @@ import {
   X,
   ExternalLink
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isCalendarConnected, setIsCalendarConnected] = useState(false);
 
   // Redirect if not manager
   useEffect(() => {
@@ -43,9 +43,6 @@ export default function ManagerDashboard() {
     enabled: user?.role === 'MANAGER',
   });
 
-  const handleCalendarConnect = () => {
-    window.location.href = '/api/oauth/google/start';
-  };
 
   const managerStats = stats || {
     todayShowings: 0,
@@ -87,21 +84,11 @@ export default function ManagerDashboard() {
               </p>
             </div>
             
-            {/* Google Calendar Sync */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm">
-                <div className={`w-2 h-2 rounded-full ${isCalendarConnected ? 'bg-accent' : 'bg-destructive'}`}></div>
-                <span className="text-muted-foreground">
-                  Calendar {isCalendarConnected ? 'connected' : 'disconnected'}
-                </span>
-              </div>
-              {!isCalendarConnected && (
-                <Button onClick={handleCalendarConnect} className="bg-accent text-accent-foreground hover:bg-accent/90" data-testid="button-connect-calendar">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Connect Calendar
-                </Button>
-              )}
-            </div>
+          </div>
+
+          {/* Calendar Connection */}
+          <div className="mb-8">
+            <CalendarConnection />
           </div>
 
           {/* Quick Stats */}

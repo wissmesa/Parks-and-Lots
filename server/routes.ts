@@ -15,6 +15,7 @@ import {
   type AuthRequest 
 } from "./auth";
 import { calendarService } from "./calendar";
+import { googleCalendarService } from "./google-calendar";
 import { 
   insertUserSchema,
   insertCompanySchema, 
@@ -300,6 +301,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/logout', (req, res) => {
     // For JWT, logout is handled client-side by removing tokens
     res.json({ message: 'Logged out successfully' });
+  });
+
+  // Google Calendar OAuth routes
+  app.get('/api/auth/google/connect', authenticateToken, requireRole('MANAGER'), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const state = `${user.id}:${randomBytes(16).toString('hex')}`;
+      const authUrl = googleCalendarService.generateAuthUrl(state);
+      
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Google Calendar auth URL generation error:', error);
+      res.status(500).json({ message: 'Failed to generate authorization URL' });
+    }
+  });
+
+  app.get('/api/auth/google/callback', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const { code, state } = req.query;
+      const user = req.user!;
+      
+      if (!code || !state) {
+        return res.status(400).send('Missing authorization code or state');
+      }
+
+      // Extract and validate user ID from state
+      const stateStr = state as string;
+      const [stateUserId, stateNonce] = stateStr.split(':');
+      
+      if (!stateUserId || !stateNonce) {
+        return res.status(400).send('Invalid state parameter format');
+      }
+      
+      // Critical security check: ensure the state user ID matches the authenticated user
+      if (stateUserId !== user.id) {
+        return res.status(403).send('State parameter user ID does not match authenticated user');
+      }
+
+      // Exchange code for tokens
+      const tokens = await googleCalendarService.exchangeCodeForTokens(code as string);
+      
+      // Store tokens for the authenticated user (not the one from state)
+      await googleCalendarService.storeTokens(user.id, tokens);
+      
+      res.redirect('/manager?calendar=connected');
+    } catch (error) {
+      console.error('Google Calendar OAuth callback error:', error);
+      res.redirect('/manager?calendar=error');
+    }
+  });
+
+  app.get('/api/auth/google/status', authenticateToken, requireRole('MANAGER'), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const isConnected = await googleCalendarService.isCalendarConnected(user.id);
+      res.json({ connected: isConnected });
+    } catch (error) {
+      console.error('Google Calendar status check error:', error);
+      res.status(500).json({ message: 'Failed to check calendar connection status' });
+    }
+  });
+
+  app.post('/api/auth/google/disconnect', authenticateToken, requireRole('MANAGER'), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      await googleCalendarService.disconnectCalendar(user.id);
+      res.json({ message: 'Calendar disconnected successfully' });
+    } catch (error) {
+      console.error('Google Calendar disconnect error:', error);
+      res.status(500).json({ message: 'Failed to disconnect calendar' });
+    }
   });
 
   app.get('/api/auth/me', authenticateToken, (req: AuthRequest, res) => {

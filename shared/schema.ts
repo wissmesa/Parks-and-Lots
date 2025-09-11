@@ -75,6 +75,19 @@ export const managerAssignments = pgTable("manager_assignments", {
   uniqueAssignment: unique().on(table.userId, table.parkId),
 }));
 
+// Google Calendar integration for managers
+export const googleCalendarTokens = pgTable("google_calendar_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at").notNull(),
+  scope: text("scope").notNull(),
+  tokenType: varchar("token_type").default("Bearer").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Lots table
 export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -262,6 +275,12 @@ export const insertInviteSchema = createInsertSchema(invites).omit({
   createdAt: true,
 });
 
+export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendarTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const bookingSchema = z.object({
   clientName: z.string().min(1),
   clientEmail: z.string().email(),
@@ -287,5 +306,7 @@ export type Photo = typeof photos.$inferSelect;
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type Invite = typeof invites.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
+export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
+export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type BookingRequest = z.infer<typeof bookingSchema>;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
