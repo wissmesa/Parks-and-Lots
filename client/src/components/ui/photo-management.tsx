@@ -202,7 +202,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                 Add Photo
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Upload Photo for {entityName}</DialogTitle>
               </DialogHeader>
@@ -224,11 +224,11 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                 {selectedFiles.length > 0 && (
                   <div className="space-y-3 max-h-60 overflow-y-auto">
                     <h4 className="font-semibold text-sm">Selected Files ({selectedFiles.length})</h4>
-                    {selectedFiles.map((file) => (
-                      <div key={file.name} className="flex items-start gap-3 p-3 border rounded-lg">
-                        <div className="flex-1">
+                    {selectedFiles.map((file, index) => (
+                      <div key={file.name} className="flex items-start gap-2 p-3 border rounded-lg">
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate" title={file.name}>
-                            {file.name}
+                            {file.name.length > 25 ? `${file.name.substring(0, 22)}...` : file.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {(file.size / 1024 / 1024).toFixed(1)}MB
@@ -246,6 +246,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                           variant="outline"
                           onClick={() => removeFile(file.name)}
                           data-testid={`button-remove-${file.name}`}
+                          className="flex-shrink-0"
                         >
                           ×
                         </Button>

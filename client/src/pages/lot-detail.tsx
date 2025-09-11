@@ -113,7 +113,7 @@ export default function LotDetail() {
   }
 
   const lotPhotos = photos || [];
-  const availabilityRules = availability || [];
+  const availabilityRules = Array.isArray(availability) ? availability : [];
   const lotShowings = showings || [];
 
   // Generate calendar days for simple availability display
