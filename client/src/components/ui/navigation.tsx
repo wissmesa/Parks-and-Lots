@@ -77,7 +77,7 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
-                <Button onClick={handleLogout} variant="outline" size="sm">
+                <Button onClick={handleLogout} variant="outline" size="sm" data-testid="button-sign-out">
                   Sign Out
                 </Button>
               </div>

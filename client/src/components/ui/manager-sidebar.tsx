@@ -3,8 +3,7 @@ import {
   LayoutDashboard,
   Home,
   Calendar,
-  Images,
-  Clock,
+  TreePine,
   UserCog
 } from "lucide-react";
 
@@ -13,10 +12,9 @@ export function ManagerSidebar() {
 
   const navigationItems = [
     { href: "/manager", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/manager/parks", icon: TreePine, label: "My Parks" },
     { href: "/manager/lots", icon: Home, label: "My Lots" },
-    { href: "/manager/showings", icon: Calendar, label: "Showings" },
-    { href: "/manager/photos", icon: Images, label: "Photos" },
-    { href: "/manager/availability", icon: Clock, label: "Availability" },
+    { href: "/manager/bookings", icon: Calendar, label: "Bookings" },
   ];
 
   return (

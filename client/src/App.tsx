@@ -20,7 +20,9 @@ import AdminManagers from "@/pages/admin-managers";
 import AdminBookings from "@/pages/admin-bookings";
 import AdminInvites from "@/pages/admin-invites";
 import ManagerDashboard from "@/pages/manager-dashboard";
+import ManagerParks from "@/pages/manager-parks";
 import ManagerLots from "@/pages/manager-lots";
+import ManagerBookings from "@/pages/manager-bookings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -56,7 +58,9 @@ function Router() {
         {isAuthenticated && user?.role === 'MANAGER' && (
           <>
             <Route path="/manager" component={ManagerDashboard} />
+            <Route path="/manager/parks" component={ManagerParks} />
             <Route path="/manager/lots" component={ManagerLots} />
+            <Route path="/manager/bookings" component={ManagerBookings} />
           </>
         )}
         
