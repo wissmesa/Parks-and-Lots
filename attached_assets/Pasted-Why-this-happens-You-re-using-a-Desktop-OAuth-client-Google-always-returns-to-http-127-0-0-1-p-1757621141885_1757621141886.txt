@@ -1,0 +1,56 @@
+Why this happens
+
+You’re using a Desktop OAuth client → Google always returns to http://127.0.0.1:<port>/… or http://localhost:<port>/….
+
+Or your app/config/env vars still have http://localhost:xxxx/<callback> as the redirect.
+
+Either way, the browser tries to open localhost on your machine, not your Replit URL, so it fails.
+
+Fix it (pick the one that matches your setup)
+A) Web server on Replit (most common)
+
+In Google Cloud → Credentials, create/use OAuth client type = Web application.
+
+Set:
+
+Authorized redirect URIs:
+https://<your-repl>.replit.dev/<your-callback-path>
+(exact path your app handles)
+
+(Optional) Authorized JavaScript origins:
+https://<your-repl>.replit.dev
+
+In your app config, change the redirect/callback URL from localhost to the full Replit URL.
+
+Express/Passport:
+
+new GoogleStrategy({
+  callbackURL: "https://<your-repl>.replit.dev/auth/google/callback",
+  // ...
+})
+
+
+NextAuth: set
+NEXTAUTH_URL=https://<your-repl>.replit.dev
+and add the provider; NextAuth will use
+https://<your-repl>.replit.dev/api/auth/callback/google.
+
+Django/Flask/etc.: make the route match what you authorized.
+
+Make sure your server actually listens on that callback path and can complete the token exchange.
+
+B) Desktop/loopback flow (only if you truly want local auth)
+
+Run the app on your local machine and keep the redirect as http://localhost:<port>/<callback>. This doesn’t fit Replit deployment.
+
+Quick checklist
+
+Confirm the OAuth client type ≠ Desktop; it should be Web application.
+
+Search your code/env for localhost and replace with your Replit domain where appropriate (BASE_URL, REDIRECT_URI, NEXTAUTH_URL, GOOGLE_CALLBACK_URL, etc.).
+
+The callback path in the URL you authorized must exactly match what your server handles (watch the trailing slash).
+
+Replit dev URLs are temporary; if it changes, you must update both Google Console and your env/config.
+
+If you paste the current redirect_uri your code sends (or the URL you see in the browser’s address bar on that error page), I’ll tell you the exact value to authorize and where to update it in your stack.

@@ -3,8 +3,8 @@ import { storage } from './storage';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.NODE_ENV === 'production' 
-  ? `${process.env.REPLIT_DOMAINS}/api/auth/google/callback`
+const REDIRECT_URI = process.env.REPLIT_DOMAINS 
+  ? `https://${process.env.REPLIT_DOMAINS}/api/auth/google/callback`
   : 'http://localhost:5000/api/auth/google/callback';
 
 const SCOPES = [
