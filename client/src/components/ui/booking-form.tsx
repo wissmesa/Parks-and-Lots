@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,17 +11,28 @@ import { CalendarPlus } from "lucide-react";
 
 interface BookingFormProps {
   lotId: string;
+  selectedSlot?: { date: string; time: string } | null;
+  onSlotUsed?: () => void;
   onSuccess?: () => void;
 }
 
-export function BookingForm({ lotId, onSuccess }: BookingFormProps) {
+export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: BookingFormProps) {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedTime, setSelectedTime] = useState("");
+  const [selectedDate, setSelectedDate] = useState(selectedSlot?.date || "");
+  const [selectedTime, setSelectedTime] = useState(selectedSlot?.time || "");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Update form fields when a time slot is selected
+  useEffect(() => {
+    if (selectedSlot) {
+      setSelectedDate(selectedSlot.date);
+      setSelectedTime(selectedSlot.time);
+      onSlotUsed?.(); // Clear the selected slot after using it
+    }
+  }, [selectedSlot, onSlotUsed]);
 
   const bookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
@@ -95,10 +106,10 @@ export function BookingForm({ lotId, onSuccess }: BookingFormProps) {
     await bookingMutation.mutateAsync(bookingData);
   };
 
-  // Generate available time slots
+  // Generate available time slots (9am to 7pm hourly to match availability grid)
   const timeSlots = [
-    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"
+    "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", 
+    "15:00", "16:00", "17:00", "18:00", "19:00"
   ];
 
   return (

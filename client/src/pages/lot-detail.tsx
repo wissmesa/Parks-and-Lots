@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,9 +59,7 @@ interface Availability {
 interface TimeSlot {
   hour: number;
   time: string;
-  isBlocked: boolean;
-  hasShowing: boolean;
-  isManagerBusy: boolean;
+  date: Date;
   isAvailable: boolean;
 }
 
@@ -75,6 +74,9 @@ export default function LotDetail() {
   const { id } = useParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // State for selected time slot to pass to booking form
+  const [selectedSlot, setSelectedSlot] = useState<{date: string, time: string} | null>(null);
 
   const { data: lot, isLoading: lotLoading } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
@@ -193,9 +195,7 @@ export default function LotDetail() {
         const slot: TimeSlot = {
           hour,
           time: `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`,
-          isBlocked: hasBlockage,
-          hasShowing,
-          isManagerBusy,
+          date: new Date(date),
           isAvailable: !hasBlockage && !hasShowing && !isManagerBusy
         };
         
@@ -357,30 +357,27 @@ export default function LotDetail() {
                           const slot = day.slots.find(s => s.hour === hour);
                           if (!slot) return null;
                           
+                          const handleSlotClick = () => {
+                            if (slot.isAvailable) {
+                              const selectedDate = slot.date.toISOString().split('T')[0];
+                              const selectedTime = `${hour.toString().padStart(2, '0')}:00`;
+                              setSelectedSlot({ date: selectedDate, time: selectedTime });
+                            }
+                          };
+                          
                           return (
                             <div 
                               key={`${day.dayName}-${hour}`}
                               data-testid={`slot-${day.dayName}-${hour}`}
-                              className={`py-1 px-1 rounded text-xs ${
-                                slot.isBlocked 
-                                  ? 'bg-destructive/20 text-destructive cursor-not-allowed' 
-                                  : slot.hasShowing
-                                  ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed'
-                                  : slot.isManagerBusy
-                                  ? 'bg-blue-100 text-blue-800 cursor-not-allowed'
-                                  : 'hover:bg-muted cursor-pointer bg-green-50 border border-green-200'
+                              onClick={handleSlotClick}
+                              className={`py-1 px-1 rounded text-xs transition-all ${
+                                slot.isAvailable 
+                                  ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer' 
+                                  : 'bg-gray-100 text-gray-600 cursor-not-allowed'
                               }`}
-                              title={
-                                slot.isBlocked 
-                                  ? 'Blocked' 
-                                  : slot.hasShowing 
-                                  ? 'Has showing' 
-                                  : slot.isManagerBusy
-                                  ? 'Manager unavailable'
-                                  : 'Available'
-                              }
+                              title={slot.isAvailable ? 'Available - Click to book' : 'Busy'}
                             >
-                              {slot.isAvailable ? '✓' : slot.hasShowing ? '●' : slot.isManagerBusy ? '◐' : '✗'}
+                              {slot.isAvailable ? '✓' : '●'}
                             </div>
                           );
                         })
@@ -389,22 +386,14 @@ export default function LotDetail() {
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4 text-xs">
+                <div className="flex items-center space-x-6 text-xs">
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-green-50 border border-green-200 rounded mr-2"></div>
-                    Available (✓)
+                    Available (✓) - Click to book
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 bg-yellow-100 rounded mr-2"></div>
-                    Has Showing (●)
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-blue-100 rounded mr-2"></div>
-                    Manager Busy (◐)
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-destructive/20 rounded mr-2"></div>
-                    Blocked (✗)
+                    <div className="w-3 h-3 bg-gray-100 rounded mr-2"></div>
+                    Busy (●)
                   </div>
                 </div>
               </CardContent>
@@ -414,13 +403,19 @@ export default function LotDetail() {
           {/* Booking Form Sidebar */}
           <div className="lg:col-span-1">
             <div className="sticky top-24">
-              <BookingForm lotId={lot.id} onSuccess={() => {
-                toast({
-                  title: "Showing Requested",
-                  description: "Your showing request has been submitted successfully.",
-                });
-                queryClient.invalidateQueries({ queryKey: ["/api/lots", id, "showings"] });
-              }} />
+              <BookingForm 
+                lotId={lot.id} 
+                selectedSlot={selectedSlot}
+                onSlotUsed={() => setSelectedSlot(null)}
+                onSuccess={() => {
+                  toast({
+                    title: "Showing Requested", 
+                    description: "Your showing request has been submitted successfully.",
+                  });
+                  queryClient.invalidateQueries({ queryKey: ["/api/lots", id, "showings"] });
+                  setSelectedSlot(null);
+                }} 
+              />
             </div>
           </div>
         </div>
