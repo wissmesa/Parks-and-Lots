@@ -15,7 +15,8 @@ import {
   Star, 
   MapPin, 
   Home,
-  ArrowRight 
+  ArrowRight,
+  TreePine 
 } from "lucide-react";
 
 interface Park {
@@ -253,8 +254,11 @@ export default function Properties() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {parks.map((park: Park) => (
                 <Card key={park.id} className="overflow-hidden hover:shadow-xl transition-shadow">
-                  <div className="h-48 bg-muted flex items-center justify-center">
-                    <span className="text-muted-foreground">No image available</span>
+                  <div className="h-48 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">
+                    <div className="text-center">
+                      <TreePine className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                      <span className="text-green-700 dark:text-green-300 font-medium text-sm">Park Community</span>
+                    </div>
                   </div>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
@@ -298,8 +302,11 @@ export default function Properties() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
                 <Card key={lot.id} className="hover:shadow-lg transition-shadow">
-                  <div className="h-48 bg-muted flex items-center justify-center">
-                    <span className="text-muted-foreground">No image available</span>
+                  <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
+                    <div className="text-center">
+                      <Home className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+                      <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Lot Details</span>
+                    </div>
                   </div>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
