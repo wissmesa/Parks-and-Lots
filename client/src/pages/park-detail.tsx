@@ -167,8 +167,14 @@ export default function ParkDetail() {
             </div>
           </div>
         ) : (
-          <div className="mb-8 h-64 bg-muted rounded-xl flex items-center justify-center">
-            <p className="text-muted-foreground">No photos available</p>
+          <div className="mb-8 h-64 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-xl flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-600/20 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                <TreePine className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <p className="text-green-700 dark:text-green-300 font-medium">Beautiful Park Community</p>
+              <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">Photos coming soon</p>
+            </div>
           </div>
         )}
 
@@ -226,60 +232,60 @@ export default function ParkDetail() {
                 ) : (
                   <div className="space-y-4">
                     {filteredLots.map((lot: Lot) => (
-                      <div key={lot.id} className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow" data-testid={`card-lot-${lot.id}`}>
-                        <div className="flex">
-                          {/* Preview Image */}
-                          <div className="w-48 h-32 bg-muted flex items-center justify-center flex-shrink-0">
-                            <span className="text-muted-foreground text-sm">No image</span>
-                          </div>
-                          
-                          {/* Lot Details */}
-                          <div className="flex-1 p-4">
-                            <div className="flex items-start justify-between h-full">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-3 mb-2">
-                                  <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
-                                  <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'secondary'}>
-                                    {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
-                                  </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
-                                  {lot.bedrooms && (
-                                    <div className="flex items-center">
-                                      <Bed className="w-4 h-4 mr-2" />
-                                      {lot.bedrooms} bed
-                                    </div>
-                                  )}
-                                  {lot.bathrooms && (
-                                    <div className="flex items-center">
-                                      <Bath className="w-4 h-4 mr-2" />
-                                      {lot.bathrooms} bath
-                                    </div>
-                                  )}
-                                  {lot.sqFt && (
-                                    <div className="flex items-center">
-                                      <Ruler className="w-4 h-4 mr-2" />
-                                      {lot.sqFt.toLocaleString()} sq ft
-                                    </div>
-                                  )}
-                                  <div className="flex items-center">
-                                    <DollarSign className="w-4 h-4 mr-2" />
-                                    ${parseFloat(lot.price).toLocaleString()}{lot.status === 'FOR_RENT' ? '/mo' : ''}
-                                  </div>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                  {lot.description || "Spacious unit with modern amenities"}
-                                </p>
+                      <Link key={lot.id} href={`/lots/${lot.id}`} className="block" data-testid={`link-lot-${lot.id}`}>
+                        <div className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-lot-${lot.id}`}>
+                          <div className="flex">
+                            {/* Preview Image */}
+                            <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0">
+                              <div className="text-center">
+                                <Home className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
+                                <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">Lot Preview</span>
                               </div>
-                              <Link href={`/lots/${lot.id}`}>
-                                <Button className="ml-4" data-testid={`button-book-showing-${lot.id}`}>
-                                  Book Showing
-                                </Button>
-                              </Link>
+                            </div>
+                            
+                            {/* Lot Details */}
+                            <div className="flex-1 p-4">
+                              <div className="flex items-start justify-between h-full">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3 mb-2">
+                                    <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
+                                    <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'secondary'}>
+                                      {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
+                                    {lot.bedrooms && (
+                                      <div className="flex items-center">
+                                        <Bed className="w-4 h-4 mr-2" />
+                                        {lot.bedrooms} bed
+                                      </div>
+                                    )}
+                                    {lot.bathrooms && (
+                                      <div className="flex items-center">
+                                        <Bath className="w-4 h-4 mr-2" />
+                                        {lot.bathrooms} bath
+                                      </div>
+                                    )}
+                                    {lot.sqFt && (
+                                      <div className="flex items-center">
+                                        <Ruler className="w-4 h-4 mr-2" />
+                                        {lot.sqFt.toLocaleString()} sq ft
+                                      </div>
+                                    )}
+                                    <div className="flex items-center">
+                                      <DollarSign className="w-4 h-4 mr-2" />
+                                      ${parseFloat(lot.price).toLocaleString()}{lot.status === 'FOR_RENT' ? '/mo' : ''}
+                                    </div>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {lot.description || "Spacious unit with modern amenities"}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}

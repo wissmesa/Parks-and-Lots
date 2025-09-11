@@ -13,8 +13,10 @@ import {
   DollarSign,
   Calendar,
   Clock,
-  MapPin
+  MapPin,
+  Home
 } from "lucide-react";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 interface Lot {
   id: string;
@@ -58,17 +60,17 @@ export default function LotDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: lot, isLoading: lotLoading } = useQuery({
+  const { data: lot, isLoading: lotLoading } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
     enabled: !!id,
   });
 
-  const { data: park } = useQuery({
+  const { data: park } = useQuery<Park>({
     queryKey: ["/api/parks", lot?.parkId],
     enabled: !!lot?.parkId,
   });
 
-  const { data: photos } = useQuery({
+  const { data: photos = [] } = useQuery<any[]>({
     queryKey: ["/api/lots", id, "photos"],
     enabled: !!id,
   });
@@ -78,7 +80,7 @@ export default function LotDetail() {
     enabled: !!id,
   });
 
-  const { data: showings } = useQuery({
+  const { data: showings = [] } = useQuery<Showing[]>({
     queryKey: ["/api/lots", id, "showings"],
     enabled: !!id,
   });
@@ -176,22 +178,40 @@ export default function LotDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Lot Photos */}
+            {/* Lot Photos Carousel */}
             <div className="mb-8">
-              {lotPhotos.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {lotPhotos.slice(0, 2).map((photo: any) => (
-                    <img 
-                      key={photo.id}
-                      src={photo.urlOrPath} 
-                      alt={photo.caption || "Lot photo"}
-                      className="w-full h-64 object-cover rounded-lg" 
-                    />
-                  ))}
-                </div>
+              {photos.length > 0 ? (
+                <Carousel className="w-full">
+                  <CarouselContent>
+                    {photos.map((photo: any, index: number) => (
+                      <CarouselItem key={photo.id || index}>
+                        <div className="relative">
+                          <img 
+                            src={photo.urlOrPath || photo.url} 
+                            alt={photo.caption || `Lot photo ${index + 1}`}
+                            className="w-full h-64 md:h-96 object-cover rounded-lg" 
+                          />
+                          {photo.caption && (
+                            <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                              {photo.caption}
+                            </div>
+                          )}
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious />
+                  <CarouselNext />
+                </Carousel>
               ) : (
-                <div className="h-64 bg-muted rounded-lg flex items-center justify-center">
-                  <p className="text-muted-foreground">No photos available</p>
+                <div className="h-64 bg-muted rounded-lg flex items-center justify-center relative">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-muted-foreground/20 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                      <Home className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground">No photos available</p>
+                    <p className="text-xs text-muted-foreground mt-1">Contact us for current photos</p>
+                  </div>
                 </div>
               )}
             </div>

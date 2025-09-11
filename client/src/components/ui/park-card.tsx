@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, ArrowRight } from "lucide-react";
+import { Star, ArrowRight, TreePine } from "lucide-react";
 
 interface Park {
   id: string;
@@ -19,8 +19,11 @@ interface ParkCardProps {
 export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-xl transition-shadow" data-testid={`card-park-${park.id}`}>
-      <div className="h-48 bg-muted flex items-center justify-center">
-        <span className="text-muted-foreground">No image available</span>
+      <div className="h-48 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">
+        <div className="text-center">
+          <TreePine className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-2" />
+          <span className="text-green-700 dark:text-green-300 font-medium text-sm">Park Community</span>
+        </div>
       </div>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-2">
