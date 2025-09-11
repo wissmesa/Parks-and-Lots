@@ -50,9 +50,18 @@ export function BookingForm({ lotId, onSuccess }: BookingFormProps) {
       onSuccess?.();
     },
     onError: (error) => {
+      // Parse error message to extract meaningful content
+      let errorMessage = error.message;
+      
+      // Handle API error format: "409: {"message":"..."}"
+      const match = errorMessage.match(/^\d+:\s*\{.*"message"\s*:\s*"([^"]+)"/);
+      if (match) {
+        errorMessage = match[1];
+      }
+      
       toast({
         title: "Booking Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },

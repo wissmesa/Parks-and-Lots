@@ -426,8 +426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get manager availability for a specific lot (used for availability checking)
-  // Requires authentication and only returns busy time ranges without personal details
-  app.get('/api/lots/:id/manager-availability', authenticateToken, async (req, res) => {
+  // Public endpoint that only returns busy time ranges without personal details
+  app.get('/api/lots/:id/manager-availability', async (req, res) => {
     try {
       const lotId = req.params.id;
       
@@ -977,10 +977,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Showing routes
-  app.get('/api/lots/:id/showings', authenticateToken, requireLotAccess, async (req, res) => {
+  app.get('/api/lots/:id/showings', async (req, res) => {
     try {
       const showings = await storage.getShowings({ lotId: req.params.id });
-      res.json(showings);
+      
+      // Remove PII from public showings - only return time/status info needed for availability display
+      const publicShowings = showings.map(showing => ({
+        id: showing.id,
+        startDt: showing.startDt,
+        endDt: showing.endDt,
+        status: showing.status
+      }));
+      
+      res.json(publicShowings);
     } catch (error) {
       console.error('Get showings error:', error);
       res.status(500).json({ message: 'Internal server error' });

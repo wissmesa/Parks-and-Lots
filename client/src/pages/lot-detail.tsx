@@ -60,6 +60,7 @@ interface TimeSlot {
   time: string;
   isBlocked: boolean;
   hasShowing: boolean;
+  isManagerBusy: boolean;
   isAvailable: boolean;
 }
 
@@ -100,6 +101,15 @@ export default function LotDetail() {
     enabled: !!id,
   });
 
+  // Fetch manager calendar availability
+  const { data: managerAvailability } = useQuery<{
+    busySlots: Array<{ start: string; end: string }>;
+    managerConnected: boolean;
+  }>({
+    queryKey: ["/api/lots", id, "manager-availability"],
+    enabled: !!id,
+  });
+
   if (lotLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -130,6 +140,7 @@ export default function LotDetail() {
   const lotPhotos = photos || [];
   const availabilityRules = Array.isArray(availability) ? availability : [];
   const lotShowings = showings || [];
+  const managerBusySlots = managerAvailability?.busySlots || [];
 
   // Generate weekly schedule from 9am to 7pm for this week
   const generateWeeklySchedule = (): DaySchedule[] => {
@@ -173,12 +184,19 @@ export default function LotDetail() {
           new Date(showing.endDt) >= slotStart
         );
         
+        // Check if manager is busy during this time slot
+        const isManagerBusy = managerBusySlots.some(busySlot => 
+          new Date(busySlot.start) <= slotEnd && 
+          new Date(busySlot.end) >= slotStart
+        );
+        
         const slot: TimeSlot = {
           hour,
           time: `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`,
           isBlocked: hasBlockage,
           hasShowing,
-          isAvailable: !hasBlockage && !hasShowing
+          isManagerBusy,
+          isAvailable: !hasBlockage && !hasShowing && !isManagerBusy
         };
         
         daySchedule.slots.push(slot);
@@ -306,6 +324,11 @@ export default function LotDetail() {
                 <h3 className="text-lg font-semibold mb-4">Showing Availability</h3>
                 <div className="text-sm text-muted-foreground mb-4">
                   Weekly schedule from 9am to 7pm
+                  {managerAvailability?.managerConnected && (
+                    <span className="block mt-1 text-blue-600">
+                      ✓ Manager's calendar is synchronized
+                    </span>
+                  )}
                 </div>
                 
                 <div className="overflow-x-auto">
@@ -343,6 +366,8 @@ export default function LotDetail() {
                                   ? 'bg-destructive/20 text-destructive cursor-not-allowed' 
                                   : slot.hasShowing
                                   ? 'bg-yellow-100 text-yellow-800 cursor-not-allowed'
+                                  : slot.isManagerBusy
+                                  ? 'bg-blue-100 text-blue-800 cursor-not-allowed'
                                   : 'hover:bg-muted cursor-pointer bg-green-50 border border-green-200'
                               }`}
                               title={
@@ -350,10 +375,12 @@ export default function LotDetail() {
                                   ? 'Blocked' 
                                   : slot.hasShowing 
                                   ? 'Has showing' 
+                                  : slot.isManagerBusy
+                                  ? 'Manager unavailable'
                                   : 'Available'
                               }
                             >
-                              {slot.isAvailable ? '✓' : slot.hasShowing ? '●' : '✗'}
+                              {slot.isAvailable ? '✓' : slot.hasShowing ? '●' : slot.isManagerBusy ? '◐' : '✗'}
                             </div>
                           );
                         })
@@ -370,6 +397,10 @@ export default function LotDetail() {
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-yellow-100 rounded mr-2"></div>
                     Has Showing (●)
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-blue-100 rounded mr-2"></div>
+                    Manager Busy (◐)
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-destructive/20 rounded mr-2"></div>
