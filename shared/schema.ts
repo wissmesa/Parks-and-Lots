@@ -19,7 +19,7 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
-export const entityTypeEnum = pgEnum('entity_type', ['PARK', 'LOT']);
+export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
 export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'BLOCKED']);
 
 // Users table

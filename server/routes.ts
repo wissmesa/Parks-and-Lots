@@ -453,6 +453,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company photos
+  app.get('/api/companies/:id/photos', async (req, res) => {
+    try {
+      const photos = await storage.getPhotos('COMPANY', req.params.id);
+      res.json(photos);
+    } catch (error) {
+      console.error('Get company photos error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/companies/:id/photos', authenticateToken, requireRole('ADMIN'), upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Photo file required' });
+      }
+
+      const photo = await storage.createPhoto({
+        entityType: 'COMPANY',
+        entityId: req.params.id,
+        urlOrPath: `/static/uploads/${req.file.filename}`,
+        caption: req.body.caption || '',
+        sortOrder: parseInt(req.body.sortOrder) || 0
+      });
+
+      res.status(201).json(photo);
+    } catch (error) {
+      console.error('Upload company photo error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Park routes (public and protected)
   app.get('/api/parks', async (req, res) => {
     try {
@@ -962,6 +994,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete invite error:', error);
       res.status(500).json({ message: 'Failed to delete invite' });
+    }
+  });
+
+  // Delete photo (works for all entity types)
+  app.delete('/api/photos/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      await storage.deletePhoto(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete photo error:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 

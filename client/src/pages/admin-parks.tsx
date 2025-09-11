@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { PhotoManagement } from "@/components/ui/photo-management";
 import { useToast } from "@/hooks/use-toast";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Plus, Edit, Trash2, MapPin } from "lucide-react";
+import { TreePine, Plus, Edit, Trash2, MapPin, Camera } from "lucide-react";
 
 interface Park {
   id: string;
@@ -50,6 +51,7 @@ export default function AdminParks() {
     zipCode: "",
     companyId: ""
   });
+  const [showPhotos, setShowPhotos] = useState<string | null>(null);
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -343,6 +345,14 @@ export default function AdminParks() {
                           </Button>
                           <Button
                             size="sm"
+                            variant="outline"
+                            onClick={() => setShowPhotos(park.id)}
+                            title="Manage Photos"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="destructive"
                             onClick={() => {
                               if (confirm("Are you sure you want to delete this park?")) {
@@ -448,6 +458,24 @@ export default function AdminParks() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Photo Management Dialog */}
+        <Dialog open={!!showPhotos} onOpenChange={(open) => !open && setShowPhotos(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Manage Photos - {parksList.find(p => p.id === showPhotos)?.name}
+              </DialogTitle>
+            </DialogHeader>
+            {showPhotos && (
+              <PhotoManagement 
+                entityType="PARK"
+                entityId={showPhotos}
+                entityName={parksList.find(p => p.id === showPhotos)?.name || 'Park'}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
