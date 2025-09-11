@@ -317,10 +317,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/auth/google/callback', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/auth/google/callback', async (req, res) => {
     try {
       const { code, state } = req.query;
-      const user = req.user!;
       
       if (!code || !state) {
         return res.status(400).send('Missing authorization code or state');
@@ -334,16 +333,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send('Invalid state parameter format');
       }
       
-      // Critical security check: ensure the state user ID matches the authenticated user
-      if (stateUserId !== user.id) {
-        return res.status(403).send('State parameter user ID does not match authenticated user');
+      // Validate that the user exists and is a manager
+      const user = await storage.getUserById(stateUserId);
+      if (!user || user.role !== 'MANAGER') {
+        return res.status(403).send('Invalid user or insufficient permissions');
       }
 
       // Exchange code for tokens
       const tokens = await googleCalendarService.exchangeCodeForTokens(code as string);
       
-      // Store tokens for the authenticated user (not the one from state)
-      await googleCalendarService.storeTokens(user.id, tokens);
+      // Store tokens for the user from state
+      await googleCalendarService.storeTokens(stateUserId, tokens);
       
       res.redirect('/manager?calendar=connected');
     } catch (error) {
