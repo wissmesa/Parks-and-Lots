@@ -84,6 +84,9 @@ export class GoogleCalendarService {
     if (new Date() >= new Date(tokenData.expiresAt)) {
       try {
         // Try to refresh token
+        if (!tokenData.refreshToken) {
+          throw new Error('No refresh token available for token refresh');
+        }
         const newTokens = await this.refreshTokens(tokenData.refreshToken);
         await this.storeTokens(userId, newTokens);
         return newTokens.access_token;
@@ -165,6 +168,48 @@ export class GoogleCalendarService {
 
   async disconnectCalendar(userId: string): Promise<void> {
     await storage.deleteGoogleCalendarToken(userId);
+  }
+
+  async checkCalendarConflicts(userId: string, startTime: Date, endTime: Date): Promise<boolean> {
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      const response = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: startTime.toISOString(),
+        timeMax: endTime.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
+
+      const events = response.data.items || [];
+      
+      // Check for any events during the requested time slot
+      return events.length > 0;
+    } catch (error) {
+      console.error('Error checking calendar conflicts:', error);
+      // If calendar check fails, assume no conflicts to allow booking
+      return false;
+    }
+  }
+
+  async getManagerCalendarEvents(userId: string, startDate: Date, endDate: Date) {
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      const response = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: startDate.toISOString(),
+        timeMax: endDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
+
+      return response.data.items || [];
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      return [];
+    }
   }
 }
 

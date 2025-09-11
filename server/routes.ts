@@ -425,6 +425,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get manager availability for a specific lot (used for availability checking)
+  // Requires authentication and only returns busy time ranges without personal details
+  app.get('/api/lots/:id/manager-availability', authenticateToken, async (req, res) => {
+    try {
+      const lotId = req.params.id;
+      
+      const lot = await storage.getLot(lotId);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+
+      // Get assigned manager
+      const assignments = await storage.getManagerAssignments(undefined, lot.parkId);
+      if (assignments.length === 0) {
+        return res.json({ busySlots: [], managerConnected: false });
+      }
+      
+      const managerId = assignments[0].userId;
+      
+      // Check if manager has calendar connected
+      if (!(await googleCalendarService.isCalendarConnected(managerId))) {
+        return res.json({ busySlots: [], managerConnected: false });
+      }
+
+      // Get calendar events for the next 7 days
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + 7);
+
+      const events = await googleCalendarService.getManagerCalendarEvents(managerId, startDate, endDate);
+      
+      // Only return busy time ranges without any personal information
+      const busySlots = events
+        .filter(event => event.status !== 'cancelled')
+        .map(event => ({
+          start: event.start,
+          end: event.end
+        }));
+      
+      res.json({ 
+        busySlots,
+        managerConnected: true 
+      });
+    } catch (error) {
+      console.error('Manager availability error:', error);
+      res.status(500).json({ message: 'Failed to fetch manager availability' });
+    }
+  });
+
   app.get('/api/auth/me', authenticateToken, (req: AuthRequest, res) => {
     res.json({
       id: req.user!.id,
@@ -959,10 +1008,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDt = new Date(bookingData.startDt);
       const endDt = new Date(bookingData.endDt);
 
-      // Check for overlaps
+      // Check for overlaps with existing showings
       const hasOverlap = await storage.checkShowingOverlap(lotId, startDt, endDt);
       if (hasOverlap) {
-        return res.status(409).json({ message: 'Time slot is not available' });
+        return res.status(409).json({ message: 'Time slot is not available due to existing booking' });
+      }
+
+      // Check for manager's Google Calendar conflicts
+      try {
+        if (await googleCalendarService.isCalendarConnected(managerId)) {
+          const hasCalendarConflict = await googleCalendarService.checkCalendarConflicts(managerId, startDt, endDt);
+          if (hasCalendarConflict) {
+            return res.status(409).json({ message: 'Time slot is not available - manager has a calendar conflict' });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking calendar conflicts:', error);
+        // Continue with booking if calendar check fails
       }
 
       // Create showing
@@ -977,22 +1039,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'SCHEDULED'
       });
 
-      // Try to sync with calendar
+      // Try to sync with Google Calendar
       let calendarEventId: string | null = null;
       let calendarHtmlLink: string | null = null;
       let calendarSyncError = false;
 
       try {
-        const calendarResult = await calendarService.createCalendarEvent(managerId, showing);
-        calendarEventId = calendarResult.eventId;
-        calendarHtmlLink = calendarResult.htmlLink;
+        // Check if manager has Google Calendar connected
+        if (await googleCalendarService.isCalendarConnected(managerId)) {
+          const event = {
+            summary: `Property Showing - ${bookingData.clientName}`,
+            description: `Property showing for lot ${lot.id}\n\nClient: ${bookingData.clientName}\nEmail: ${bookingData.clientEmail}\nPhone: ${bookingData.clientPhone || 'N/A'}`,
+            start: {
+              dateTime: startDt.toISOString(),
+              timeZone: 'UTC',
+            },
+            end: {
+              dateTime: endDt.toISOString(),
+              timeZone: 'UTC',
+            },
+            attendees: [
+              { email: bookingData.clientEmail, displayName: bookingData.clientName }
+            ]
+          };
+
+          const calendarEvent = await googleCalendarService.createCalendarEvent(managerId, event);
+          calendarEventId = calendarEvent.id || null;
+          calendarHtmlLink = calendarEvent.htmlLink || null;
+          
+          console.log(`Calendar event created: ${calendarEventId}`);
+          
+          // Update the showing record with calendar information
+          if (calendarEventId) {
+            await storage.updateShowing(showing.id, {
+              calendarEventId,
+              calendarHtmlLink,
+              calendarSyncError: false
+            } as any);
+          }
+        }
       } catch (error) {
         console.error('Calendar sync error:', error);
         calendarSyncError = true;
+        
+        // Update showing with sync error
+        await storage.updateShowing(showing.id, {
+          calendarSyncError: true
+        } as any);
       }
 
-      // Calendar sync completed (info logged separately)
-      const updatedShowing = showing;
+      // Fetch the updated showing with calendar information
+      const updatedShowing = await storage.getShowing(showing.id) || showing;
 
       res.status(201).json(updatedShowing);
     } catch (error) {
@@ -1015,15 +1112,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updates.status || updates.startDt || updates.endDt) {
         try {
           if (updates.status === 'CANCELED' && updatedShowing.calendarEventId) {
-            await calendarService.deleteCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId);
+            await googleCalendarService.deleteCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId);
           } else if (updatedShowing.calendarEventId) {
-            await calendarService.updateCalendarEvent(updatedShowing.managerId, updatedShowing);
+            const event = {
+              summary: `Property Showing - ${updatedShowing.clientName}`,
+              description: `Property showing for lot ${updatedShowing.lotId}\n\nClient: ${updatedShowing.clientName}\nEmail: ${updatedShowing.clientEmail}\nPhone: ${updatedShowing.clientPhone}`,
+              start: {
+                dateTime: updatedShowing.startDt.toISOString(),
+                timeZone: 'UTC',
+              },
+              end: {
+                dateTime: updatedShowing.endDt.toISOString(),
+                timeZone: 'UTC',
+              },
+              status: updatedShowing.status === 'CANCELED' ? 'cancelled' : 'confirmed'
+            };
+            await googleCalendarService.updateCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId, event);
           }
           
-          // Calendar sync successful
+          console.log('Calendar sync successful for showing update');
         } catch (error) {
           console.error('Calendar sync error:', error);
-          // Calendar sync failed
+          // Update showing with sync error
+          await storage.updateShowing(req.params.id, { calendarSyncError: true } as any);
         }
       }
 
