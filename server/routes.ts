@@ -464,23 +464,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:id/photos', authenticateToken, requireRole('ADMIN'), upload.single('photo'), async (req, res) => {
+  app.post('/api/companies/:id/photos', authenticateToken, requireRole('ADMIN'), upload.fields([
+    { name: 'photos', maxCount: 10 },
+    { name: 'photo', maxCount: 1 }
+  ]), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'Photo file required' });
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const allFiles = [...(files?.photos || []), ...(files?.photo || [])];
+      
+      if (allFiles.length === 0) {
+        return res.status(400).json({ message: 'At least one photo file required' });
       }
 
-      const photo = await storage.createPhoto({
-        entityType: 'COMPANY',
-        entityId: req.params.id,
-        urlOrPath: `/static/uploads/${req.file.filename}`,
-        caption: req.body.caption || '',
-        sortOrder: parseInt(req.body.sortOrder) || 0
-      });
+      const photos = [];
+      const currentPhotoCount = (await storage.getPhotos('COMPANY', req.params.id)).length;
 
-      res.status(201).json(photo);
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
+        const photo = await storage.createPhoto({
+          entityType: 'COMPANY',
+          entityId: req.params.id,
+          urlOrPath: `/static/uploads/${file.filename}`,
+          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          sortOrder: currentPhotoCount + i
+        });
+        photos.push(photo);
+      }
+
+      res.status(201).json(allFiles.length === 1 ? photos[0] : photos);
     } catch (error) {
-      console.error('Upload company photo error:', error);
+      console.error('Upload company photos error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
@@ -573,23 +586,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/parks/:id/photos', authenticateToken, requireParkAccess, upload.single('photo'), async (req, res) => {
+  app.post('/api/parks/:id/photos', authenticateToken, requireParkAccess, upload.fields([
+    { name: 'photos', maxCount: 10 },
+    { name: 'photo', maxCount: 1 }
+  ]), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'Photo file required' });
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const allFiles = [...(files?.photos || []), ...(files?.photo || [])];
+      
+      if (allFiles.length === 0) {
+        return res.status(400).json({ message: 'At least one photo file required' });
       }
 
-      const photo = await storage.createPhoto({
-        entityType: 'PARK',
-        entityId: req.params.id,
-        urlOrPath: `/static/uploads/${req.file.filename}`,
-        caption: req.body.caption || '',
-        sortOrder: parseInt(req.body.sortOrder) || 0
-      });
+      const photos = [];
+      const currentPhotoCount = (await storage.getPhotos('PARK', req.params.id)).length;
 
-      res.status(201).json(photo);
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
+        const photo = await storage.createPhoto({
+          entityType: 'PARK',
+          entityId: req.params.id,
+          urlOrPath: `/static/uploads/${file.filename}`,
+          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          sortOrder: currentPhotoCount + i
+        });
+        photos.push(photo);
+      }
+
+      res.status(201).json(allFiles.length === 1 ? photos[0] : photos);
     } catch (error) {
-      console.error('Upload park photo error:', error);
+      console.error('Upload park photos error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
@@ -709,23 +735,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/lots/:id/photos', authenticateToken, requireLotAccess, upload.single('photo'), async (req, res) => {
+  app.post('/api/lots/:id/photos', authenticateToken, requireLotAccess, upload.fields([
+    { name: 'photos', maxCount: 10 },
+    { name: 'photo', maxCount: 1 }
+  ]), async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'Photo file required' });
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const allFiles = [...(files?.photos || []), ...(files?.photo || [])];
+      
+      if (allFiles.length === 0) {
+        return res.status(400).json({ message: 'At least one photo file required' });
       }
 
-      const photo = await storage.createPhoto({
-        entityType: 'LOT',
-        entityId: req.params.id,
-        urlOrPath: `/static/uploads/${req.file.filename}`,
-        caption: req.body.caption || '',
-        sortOrder: parseInt(req.body.sortOrder) || 0
-      });
+      const photos = [];
+      const currentPhotoCount = (await storage.getPhotos('LOT', req.params.id)).length;
 
-      res.status(201).json(photo);
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
+        const photo = await storage.createPhoto({
+          entityType: 'LOT',
+          entityId: req.params.id,
+          urlOrPath: `/static/uploads/${file.filename}`,
+          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          sortOrder: currentPhotoCount + i
+        });
+        photos.push(photo);
+      }
+
+      res.status(201).json(allFiles.length === 1 ? photos[0] : photos);
     } catch (error) {
-      console.error('Upload lot photo error:', error);
+      console.error('Upload lot photos error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

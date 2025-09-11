@@ -27,8 +27,8 @@ interface PhotoManagementProps {
 export function PhotoManagement({ entityType, entityId, entityName }: PhotoManagementProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [caption, setCaption] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [captions, setCaptions] = useState<{[fileName: string]: string}>({});
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -42,11 +42,19 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
   // Upload mutation
   const uploadMutation = useMutation({
-    mutationFn: async ({ file, caption }: { file: File; caption: string }) => {
+    mutationFn: async ({ files, captions: fileCaptions }: { files: File[]; captions: {[fileName: string]: string} }) => {
       const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('caption', caption);
-      formData.append('sortOrder', String(photos.length));
+      
+      // Append each file
+      files.forEach(file => {
+        formData.append('photos', file);
+      });
+      
+      // Append captions as an array in the same order as files
+      const captionArray = files.map(file => fileCaptions[file.name] || '');
+      captionArray.forEach(caption => {
+        formData.append('captions', caption);
+      });
 
       const response = await fetch(`/api/${endpointBase}/${entityId}/photos`, {
         method: 'POST',
@@ -62,20 +70,20 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/${endpointBase}`, entityId, 'photos'] });
-      setSelectedFile(null);
-      setCaption("");
+      setSelectedFiles([]);
+      setCaptions({});
       setIsUploadOpen(false);
       toast({
         title: "Success",
-        description: "Photo uploaded successfully",
+        description: `${Array.isArray(data) ? data.length : 1} photo(s) uploaded successfully`,
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to upload photo",
+        description: "Failed to upload photos",
         variant: "destructive",
       });
     },
@@ -103,31 +111,58 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    const validFiles: File[] = [];
+    
+    for (const file of files) {
       if (file.size > 10 * 1024 * 1024) {
         toast({
           title: "Error",
-          description: "File size must be less than 10MB",
+          description: `${file.name} is larger than 10MB`,
           variant: "destructive",
         });
-        return;
+        continue;
       }
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Error",
-          description: "Please select an image file",
+          description: `${file.name} is not an image file`,
           variant: "destructive",
         });
-        return;
+        continue;
       }
-      setSelectedFile(file);
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length > 0) {
+      setSelectedFiles(validFiles);
+      // Initialize captions for new files
+      const newCaptions: {[fileName: string]: string} = {};
+      validFiles.forEach(file => {
+        if (!captions[file.name]) {
+          newCaptions[file.name] = '';
+        }
+      });
+      setCaptions(prev => ({ ...prev, ...newCaptions }));
     }
   };
 
   const handleUpload = () => {
-    if (!selectedFile) return;
-    uploadMutation.mutate({ file: selectedFile, caption });
+    if (selectedFiles.length === 0) return;
+    uploadMutation.mutate({ files: selectedFiles, captions });
+  };
+  
+  const updateCaption = (fileName: string, caption: string) => {
+    setCaptions(prev => ({ ...prev, [fileName]: caption }));
+  };
+  
+  const removeFile = (fileName: string) => {
+    setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
+    setCaptions(prev => {
+      const newCaptions = { ...prev };
+      delete newCaptions[fileName];
+      return newCaptions;
+    });
   };
 
   const handleDelete = (photoId: string) => {
@@ -173,30 +208,51 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="photo-file">Select Image</Label>
+                  <Label htmlFor="photo-files">Select Images</Label>
                   <Input
-                    id="photo-file"
+                    id="photo-files"
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleFileSelect}
-                    data-testid="input-photo-file"
+                    data-testid="input-photo-files"
                   />
-                  {selectedFile && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Selected: {selectedFile.name}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can select multiple images at once
+                  </p>
                 </div>
-                <div>
-                  <Label htmlFor="photo-caption">Caption (Optional)</Label>
-                  <Input
-                    id="photo-caption"
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    placeholder="Enter a caption for this photo"
-                    data-testid="input-photo-caption"
-                  />
-                </div>
+                {selectedFiles.length > 0 && (
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    <h4 className="font-semibold text-sm">Selected Files ({selectedFiles.length})</h4>
+                    {selectedFiles.map((file) => (
+                      <div key={file.name} className="flex items-start gap-3 p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium truncate" title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {(file.size / 1024 / 1024).toFixed(1)}MB
+                          </p>
+                          <Input
+                            placeholder="Enter caption (optional)"
+                            value={captions[file.name] || ''}
+                            onChange={(e) => updateCaption(file.name, e.target.value)}
+                            className="mt-2"
+                            data-testid={`input-caption-${file.name}`}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => removeFile(file.name)}
+                          data-testid={`button-remove-${file.name}`}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-end space-x-2">
                   <Button 
                     type="button" 
@@ -208,10 +264,12 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                   </Button>
                   <Button 
                     onClick={handleUpload}
-                    disabled={!selectedFile || uploadMutation.isPending}
-                    data-testid="button-upload-photo"
+                    disabled={selectedFiles.length === 0 || uploadMutation.isPending}
+                    data-testid="button-upload-photos"
                   >
-                    {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                    {uploadMutation.isPending 
+                      ? `Uploading ${selectedFiles.length} photo(s)...` 
+                      : `Upload ${selectedFiles.length} photo(s)`}
                   </Button>
                 </div>
               </div>
