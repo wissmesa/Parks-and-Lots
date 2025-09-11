@@ -334,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate that the user exists and is a manager
-      const user = await storage.getUserById(stateUserId);
+      const user = await storage.getUser(stateUserId);
       if (!user || user.role !== 'MANAGER') {
         return res.status(403).send('Invalid user or insufficient permissions');
       }
