@@ -27,31 +27,45 @@ export function CalendarConnection() {
     onSuccess: (data) => {
       if (data.authUrl) {
         setIsConnecting(true);
-        window.open(data.authUrl, '_blank', 'width=500,height=600');
+        const popup = window.open(data.authUrl, '_blank', 'width=500,height=600');
         
-        // Poll for connection status
-        const checkConnection = setInterval(async () => {
-          try {
-            await queryClient.invalidateQueries({ queryKey: ["/api/auth/google/status"] });
-            const newStatus = await queryClient.fetchQuery({ queryKey: ["/api/auth/google/status"] });
-            if ((newStatus as CalendarStatus).connected) {
-              clearInterval(checkConnection);
-              setIsConnecting(false);
+        // Listen for postMessage from popup
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
+            setIsConnecting(false);
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/google/status"] });
+            
+            if (event.data.success) {
               toast({
                 title: "Calendar Connected",
-                description: "Your Google Calendar has been successfully connected.",
+                description: "Your Google Calendar has been connected successfully.",
+              });
+            } else {
+              toast({
+                title: "Connection Failed",
+                description: "Failed to connect to Google Calendar. Please try again.",
+                variant: "destructive",
               });
             }
-          } catch (error) {
-            console.error('Error checking connection status:', error);
+            
+            // Cleanup
+            window.removeEventListener('message', handleMessage);
+            if (popup && !popup.closed) {
+              popup.close();
+            }
           }
-        }, 2000);
-
-        // Stop polling after 2 minutes
-        setTimeout(() => {
-          clearInterval(checkConnection);
-          setIsConnecting(false);
-        }, 120000);
+        };
+        
+        window.addEventListener('message', handleMessage);
+        
+        // Check if popup was closed manually (fallback)
+        const checkClosed = setInterval(() => {
+          if (popup && popup.closed) {
+            setIsConnecting(false);
+            window.removeEventListener('message', handleMessage);
+            clearInterval(checkClosed);
+          }
+        }, 1000);
       }
     },
     onError: (error) => {

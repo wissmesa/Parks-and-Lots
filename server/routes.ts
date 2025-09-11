@@ -345,10 +345,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store tokens for the user from state
       await googleCalendarService.storeTokens(stateUserId, tokens);
       
-      res.redirect('/manager?calendar=connected');
+      // Return success page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Calendar Connected</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .success { color: #059669; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="success">✅ Google Calendar Connected Successfully!</div>
+          <div class="message">You can close this window now.</div>
+          <script>
+            // Notify parent window that connection was successful
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: true }, '*');
+            }
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+        </html>
+      `);
     } catch (error) {
       console.error('Google Calendar OAuth callback error:', error);
-      res.redirect('/manager?calendar=error');
+      
+      // Return error page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .error { color: #dc2626; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="error">❌ Connection Failed</div>
+          <div class="message">Please try again or close this window.</div>
+          <script>
+            // Notify parent window that connection failed
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: false }, '*');
+            }
+            // Auto-close after 3 seconds
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
     }
   });
 
