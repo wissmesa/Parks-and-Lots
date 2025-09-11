@@ -52,7 +52,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
         }
       });
 
