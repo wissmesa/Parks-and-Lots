@@ -433,19 +433,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lot = await storage.getLot(lotId);
       if (!lot) {
+        console.log(`[Manager Availability] Lot not found: ${lotId}`);
         return res.status(404).json({ message: 'Lot not found' });
       }
 
+      console.log(`[Manager Availability] Checking lot ${lotId} in park ${lot.parkId}`);
+
       // Get assigned manager
       const assignments = await storage.getManagerAssignments(undefined, lot.parkId);
+      console.log(`[Manager Availability] Found ${assignments.length} manager assignments for park ${lot.parkId}`);
+      
       if (assignments.length === 0) {
+        console.log(`[Manager Availability] No managers assigned to park ${lot.parkId}`);
         return res.json({ busySlots: [], managerConnected: false });
       }
       
       const managerId = assignments[0].userId;
+      console.log(`[Manager Availability] Using manager ${managerId} for lot ${lotId}`);
       
       // Check if manager has calendar connected
-      if (!(await googleCalendarService.isCalendarConnected(managerId))) {
+      const isConnected = await googleCalendarService.isCalendarConnected(managerId);
+      console.log(`[Manager Availability] Manager ${managerId} calendar connected: ${isConnected}`);
+      
+      if (!isConnected) {
         return res.json({ busySlots: [], managerConnected: false });
       }
 
@@ -454,22 +464,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = new Date();
       endDate.setDate(startDate.getDate() + 7);
 
-      const events = await googleCalendarService.getManagerCalendarEvents(managerId, startDate, endDate);
+      console.log(`[Manager Availability] Fetching busy slots for manager ${managerId} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+      // Use the new FreeBusy API method
+      const busySlots = await googleCalendarService.getManagerBusySlots(managerId, startDate, endDate);
       
-      // Only return busy time ranges without any personal information
-      const busySlots = events
-        .filter(event => event.status !== 'cancelled')
-        .map(event => ({
-          start: event.start,
-          end: event.end
-        }));
+      console.log(`[Manager Availability] Found ${busySlots.length} busy slots for manager ${managerId}:`, busySlots);
       
       res.json({ 
         busySlots,
         managerConnected: true 
       });
     } catch (error) {
-      console.error('Manager availability error:', error);
+      console.error(`[Manager Availability] Error for lot ${req.params.id}:`, error);
       res.status(500).json({ message: 'Failed to fetch manager availability' });
     }
   });

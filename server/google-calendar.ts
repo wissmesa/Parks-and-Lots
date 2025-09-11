@@ -211,6 +211,74 @@ export class GoogleCalendarService {
       return [];
     }
   }
+
+  async getManagerBusySlots(userId: string, startDate: Date, endDate: Date): Promise<Array<{ start: string; end: string }>> {
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      // Use FreeBusy API for more reliable availability data
+      const response = await calendar.freebusy.query({
+        requestBody: {
+          timeMin: startDate.toISOString(),
+          timeMax: endDate.toISOString(),
+          items: [{ id: 'primary' }]
+        }
+      });
+
+      const busySlots = response.data.calendars?.['primary']?.busy || [];
+      
+      return busySlots.map(slot => ({
+        start: slot.start!,
+        end: slot.end!
+      }));
+    } catch (error) {
+      console.error('Error fetching manager busy slots:', error);
+      // Fallback to events.list with better filtering
+      return this.getManagerBusySlotsFromEvents(userId, startDate, endDate);
+    }
+  }
+
+  private async getManagerBusySlotsFromEvents(userId: string, startDate: Date, endDate: Date): Promise<Array<{ start: string; end: string }>> {
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      const response = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin: startDate.toISOString(),
+        timeMax: endDate.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime'
+      });
+
+      const events = response.data.items || [];
+      
+      // Better filtering for events
+      const busySlots = events
+        .filter(event => {
+          // Include only confirmed and tentative events
+          if (!['confirmed', 'tentative'].includes(event.status || '')) {
+            return false;
+          }
+          
+          // Exclude transparent events (they don't block time)
+          if (event.transparency === 'transparent') {
+            return false;
+          }
+          
+          // Must have valid start and end times
+          return event.start?.dateTime && event.end?.dateTime;
+        })
+        .map(event => ({
+          start: event.start!.dateTime!,
+          end: event.end!.dateTime!
+        }));
+      
+      return busySlots;
+    } catch (error) {
+      console.error('Error fetching events as fallback:', error);
+      return [];
+    }
+  }
 }
 
 export const googleCalendarService = new GoogleCalendarService();
