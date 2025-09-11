@@ -32,11 +32,11 @@ interface Showing {
 
 interface Assignment {
   id: string;
+  userId: string;
   parkId: string;
-  park: {
-    id: string;
-    name: string;
-  };
+  userName: string;
+  userEmail: string;
+  parkName: string;
 }
 
 export default function ManagerBookings() {
@@ -68,11 +68,11 @@ export default function ManagerBookings() {
   const filteredShowings = showings.filter(showing => {
     const matchesSearch = 
       showing.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      showing.lot.nameOrNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      showing.lot.park.name.toLowerCase().includes(searchTerm.toLowerCase());
+      showing.lot?.nameOrNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      showing.lot?.park?.name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || showing.status === statusFilter;
-    const matchesPark = parkFilter === "all" || showing.lot.park.id === parkFilter;
+    const matchesPark = parkFilter === "all" || showing.lot?.park?.id === parkFilter;
     
     return matchesSearch && matchesStatus && matchesPark;
   });
@@ -184,8 +184,8 @@ export default function ManagerBookings() {
                   <SelectContent>
                     <SelectItem value="all">All Parks</SelectItem>
                     {assignments?.map((assignment) => (
-                      <SelectItem key={assignment.park.id} value={assignment.park.id}>
-                        {assignment.park.name}
+                      <SelectItem key={assignment.parkId} value={assignment.parkId}>
+                        {assignment.parkName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -246,10 +246,10 @@ export default function ManagerBookings() {
                           </TableCell>
                           <TableCell>
                             <div>
-                              <div className="font-medium">{showing.lot.nameOrNumber}</div>
+                              <div className="font-medium">{showing.lot?.nameOrNumber || 'Unknown Lot'}</div>
                               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 <MapPin className="w-3 h-3" />
-                                {showing.lot.park.name}
+                                {showing.lot?.park?.name || 'Unknown Park'}
                               </div>
                             </div>
                           </TableCell>

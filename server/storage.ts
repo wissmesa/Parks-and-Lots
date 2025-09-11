@@ -309,8 +309,24 @@ export class DatabaseStorage implements IStorage {
     await db.delete(lots).where(eq(lots.id, id));
   }
 
-  async getShowings(filters?: { lotId?: string; managerId?: string; status?: string }): Promise<Showing[]> {
-    let query = db.select().from(showings);
+  async getShowings(filters?: { lotId?: string; managerId?: string; status?: string }): Promise<any[]> {
+    let query = db.select({
+      id: showings.id,
+      startDt: showings.startDt,
+      endDt: showings.endDt,
+      status: showings.status,
+      clientName: showings.clientName,
+      clientEmail: showings.clientEmail,
+      clientPhone: showings.clientPhone,
+      createdAt: showings.createdAt,
+      lotId: lots.id,
+      lotNameOrNumber: lots.nameOrNumber,
+      parkId: parks.id,
+      parkName: parks.name,
+    }).from(showings)
+      .leftJoin(lots, eq(showings.lotId, lots.id))
+      .leftJoin(parks, eq(lots.parkId, parks.id));
+      
     const conditions = [];
 
     if (filters?.lotId) {
@@ -324,10 +340,46 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      return await query.where(and(...conditions)).orderBy(desc(showings.startDt));
+      const results = await query.where(and(...conditions)).orderBy(desc(showings.startDt));
+      return results.map(row => ({
+        id: row.id,
+        startDt: row.startDt,
+        endDt: row.endDt,
+        status: row.status,
+        clientName: row.clientName,
+        clientEmail: row.clientEmail,
+        clientPhone: row.clientPhone,
+        createdAt: row.createdAt,
+        lot: {
+          id: row.lotId,
+          nameOrNumber: row.lotNameOrNumber,
+          park: {
+            id: row.parkId,
+            name: row.parkName,
+          },
+        },
+      }));
     }
 
-    return await query.orderBy(desc(showings.startDt));
+    const results = await query.orderBy(desc(showings.startDt));
+    return results.map(row => ({
+      id: row.id,
+      startDt: row.startDt,
+      endDt: row.endDt,
+      status: row.status,
+      clientName: row.clientName,
+      clientEmail: row.clientEmail,
+      clientPhone: row.clientPhone,
+      createdAt: row.createdAt,
+      lot: {
+        id: row.lotId,
+        nameOrNumber: row.lotNameOrNumber,
+        park: {
+          id: row.parkId,
+          name: row.parkName,
+        },
+      },
+    }));
   }
 
   async getShowing(id: string): Promise<Showing | undefined> {
