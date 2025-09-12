@@ -149,7 +149,9 @@ export default function LotDetail() {
     const schedule: DaySchedule[] = [];
     const today = new Date();
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay()); // Start from Sunday
+    // Get the start of the current week (Sunday) - don't go backwards if we're already past the current week
+    const currentWeekStart = today.getDate() - today.getDay();
+    startOfWeek.setDate(currentWeekStart); // Start from Sunday of current week
     
     console.log(`[DEBUG] Generating memoized schedule with ${managerBusySlots.length} manager busy slots:`, managerBusySlots);
     console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
@@ -399,7 +401,13 @@ export default function LotDetail() {
                             if (slot.isAvailable) {
                               const selectedDate = slot.date.toISOString().split('T')[0];
                               const selectedTime = `${hour.toString().padStart(2, '0')}:00`;
-                              setSelectedSlot({ date: selectedDate, time: selectedTime });
+                              
+                              // If clicking the same slot, deselect it, otherwise select it
+                              if (selectedSlot && selectedSlot.date === selectedDate && selectedSlot.time === selectedTime) {
+                                setSelectedSlot(null);
+                              } else {
+                                setSelectedSlot({ date: selectedDate, time: selectedTime });
+                              }
                             }
                           };
                           
