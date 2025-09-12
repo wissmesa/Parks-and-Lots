@@ -216,21 +216,50 @@ export class GoogleCalendarService {
     try {
       const calendar = await this.createCalendarClient(userId);
       
+      console.log(`[Google Calendar] Fetching busy slots for user ${userId} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      
+      // First, let's see what calendars this user has access to
+      const calendarListResponse = await calendar.calendarList.list();
+      const calendars = calendarListResponse.data.items || [];
+      console.log(`[Google Calendar] Found ${calendars.length} calendars for user ${userId}:`, 
+        calendars.map(cal => ({ id: cal.id, summary: cal.summary, primary: cal.primary })));
+      
+      // Query all calendars the user has access to, not just primary
+      const calendarIds = calendars
+        .filter(cal => cal.accessRole === 'owner' || cal.accessRole === 'reader')
+        .map(cal => ({ id: cal.id! }));
+      
+      console.log(`[Google Calendar] Querying ${calendarIds.length} calendars for busy times`);
+      
       // Use FreeBusy API for more reliable availability data
       const response = await calendar.freebusy.query({
         requestBody: {
           timeMin: startDate.toISOString(),
           timeMax: endDate.toISOString(),
-          items: [{ id: 'primary' }]
+          items: calendarIds.length > 0 ? calendarIds : [{ id: 'primary' }]
         }
       });
 
-      const busySlots = response.data.calendars?.['primary']?.busy || [];
+      console.log(`[Google Calendar] FreeBusy API response:`, JSON.stringify(response.data, null, 2));
       
-      return busySlots.map(slot => ({
-        start: slot.start!,
-        end: slot.end!
-      }));
+      // Collect busy slots from all calendars
+      const allBusySlots: Array<{ start: string; end: string }> = [];
+      
+      if (response.data.calendars) {
+        for (const [calendarId, calendarData] of Object.entries(response.data.calendars)) {
+          const busySlots = calendarData.busy || [];
+          console.log(`[Google Calendar] Calendar ${calendarId} has ${busySlots.length} busy slots:`, busySlots);
+          
+          allBusySlots.push(...busySlots.map(slot => ({
+            start: slot.start!,
+            end: slot.end!
+          })));
+        }
+      }
+      
+      console.log(`[Google Calendar] Total busy slots found: ${allBusySlots.length}`, allBusySlots);
+      return allBusySlots;
+      
     } catch (error) {
       console.error('Error fetching manager busy slots:', error);
       // Fallback to events.list with better filtering
@@ -242,38 +271,70 @@ export class GoogleCalendarService {
     try {
       const calendar = await this.createCalendarClient(userId);
       
-      const response = await calendar.events.list({
-        calendarId: 'primary',
-        timeMin: startDate.toISOString(),
-        timeMax: endDate.toISOString(),
-        singleEvents: true,
-        orderBy: 'startTime'
-      });
+      console.log(`[Google Calendar Fallback] Fetching events directly for user ${userId}`);
+      
+      // Get calendar list for fallback method too
+      const calendarListResponse = await calendar.calendarList.list();
+      const calendars = calendarListResponse.data.items || [];
+      
+      const allBusySlots: Array<{ start: string; end: string }> = [];
+      
+      // Query events from all accessible calendars
+      for (const cal of calendars) {
+        if (cal.accessRole === 'owner' || cal.accessRole === 'reader') {
+          try {
+            console.log(`[Google Calendar Fallback] Querying calendar ${cal.id} (${cal.summary})`);
+            
+            const response = await calendar.events.list({
+              calendarId: cal.id!,
+              timeMin: startDate.toISOString(),
+              timeMax: endDate.toISOString(),
+              singleEvents: true,
+              orderBy: 'startTime'
+            });
 
-      const events = response.data.items || [];
-      
-      // Better filtering for events
-      const busySlots = events
-        .filter(event => {
-          // Include only confirmed and tentative events
-          if (!['confirmed', 'tentative'].includes(event.status || '')) {
-            return false;
+            const events = response.data.items || [];
+            console.log(`[Google Calendar Fallback] Found ${events.length} events in calendar ${cal.summary}:`, 
+              events.map(e => ({ summary: e.summary, start: e.start?.dateTime || e.start?.date, end: e.end?.dateTime || e.end?.date, status: e.status, transparency: e.transparency })));
+            
+            // Better filtering for events
+            const calendarBusySlots = events
+              .filter(event => {
+                // Include only confirmed and tentative events
+                if (!['confirmed', 'tentative'].includes(event.status || '')) {
+                  console.log(`[Google Calendar Fallback] Skipping event ${event.summary} - status: ${event.status}`);
+                  return false;
+                }
+                
+                // Exclude transparent events (they don't block time)
+                if (event.transparency === 'transparent') {
+                  console.log(`[Google Calendar Fallback] Skipping event ${event.summary} - transparent`);
+                  return false;
+                }
+                
+                // Must have valid start and end times (dateTime not date for all-day events)
+                if (!event.start?.dateTime || !event.end?.dateTime) {
+                  console.log(`[Google Calendar Fallback] Skipping event ${event.summary} - no dateTime (might be all-day)`);
+                  return false;
+                }
+                
+                console.log(`[Google Calendar Fallback] Including event ${event.summary} as busy slot`);
+                return true;
+              })
+              .map(event => ({
+                start: event.start!.dateTime!,
+                end: event.end!.dateTime!
+              }));
+            
+            allBusySlots.push(...calendarBusySlots);
+          } catch (calError) {
+            console.error(`[Google Calendar Fallback] Error fetching events from calendar ${cal.id}:`, calError);
           }
-          
-          // Exclude transparent events (they don't block time)
-          if (event.transparency === 'transparent') {
-            return false;
-          }
-          
-          // Must have valid start and end times
-          return event.start?.dateTime && event.end?.dateTime;
-        })
-        .map(event => ({
-          start: event.start!.dateTime!,
-          end: event.end!.dateTime!
-        }));
+        }
+      }
       
-      return busySlots;
+      console.log(`[Google Calendar Fallback] Total busy slots from all calendars: ${allBusySlots.length}`, allBusySlots);
+      return allBusySlots;
     } catch (error) {
       console.error('Error fetching events as fallback:', error);
       return [];

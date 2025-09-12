@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -151,6 +151,37 @@ export default function LotDetail() {
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay()); // Start from Sunday
     
+    console.log(`[DEBUG] Generating memoized schedule with ${managerBusySlots.length} manager busy slots:`, managerBusySlots);
+    console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
+    console.log(`[DEBUG] Start of week:`, startOfWeek.toString(), `UTC:`, startOfWeek.toISOString());
+    
+    // Pre-normalize busy hours for faster comparison
+    const busyHourSet = new Set<string>();
+    managerBusySlots.forEach(busySlot => {
+      const busyStart = new Date(busySlot.start);
+      const busyEnd = new Date(busySlot.end);
+      
+      // Convert to local time and mark busy hours
+      const startHour = busyStart.getHours();
+      const endHour = busyEnd.getHours();
+      const startDay = busyStart.toDateString();
+      const endDay = busyEnd.toDateString();
+      
+      // Mark each hour as busy
+      for (let hour = startHour; hour <= endHour; hour++) {
+        const hourKey = `${startDay}:${hour}`;
+        busyHourSet.add(hourKey);
+        
+        // If the busy period spans multiple days, handle that too
+        if (endDay !== startDay && hour === endHour) {
+          const endDayKey = `${endDay}:${hour}`;
+          busyHourSet.add(endDayKey);
+        }
+      }
+    });
+    
+    console.log(`[DEBUG] Created busy hour set with ${busyHourSet.size} entries:`, Array.from(busyHourSet));
+    
     const timeSlots = [];
     for (let hour = 9; hour <= 19; hour++) { // 9am to 7pm
       timeSlots.push(hour);
@@ -168,10 +199,9 @@ export default function LotDetail() {
       };
       
       for (const hour of timeSlots) {
-        const slotStart = new Date(date);
-        slotStart.setHours(hour, 0, 0, 0);
-        const slotEnd = new Date(date);
-        slotEnd.setHours(hour, 59, 59, 999);
+        // Create slot times in user's local timezone
+        const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
+        const slotEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 59, 59, 999);
         
         // Check if this time slot has any blockages or showings
         const hasBlockage = availabilityRules.some((rule: Availability) => 
@@ -186,11 +216,21 @@ export default function LotDetail() {
           new Date(showing.endDt) >= slotStart
         );
         
-        // Check if manager is busy during this time slot
-        const isManagerBusy = managerBusySlots.some(busySlot => 
-          new Date(busySlot.start) <= slotEnd && 
-          new Date(busySlot.end) >= slotStart
-        );
+        // Check if manager is busy using normalized busy hour set
+        const hourKey = `${date.toDateString()}:${hour}`;
+        const isManagerBusy = busyHourSet.has(hourKey);
+        
+        // DEBUG: Special logging for Saturday 10-12 and 1pm slots
+        if ((date.getDay() === 6 && (hour === 10 || hour === 11)) || (hour === 13)) {
+          console.log(`[DEBUG] ${daySchedule.dayName} ${hour}:00 slot check:`, {
+            hourKey,
+            isManagerBusy,
+            busyHourSet: Array.from(busyHourSet).filter(k => k.includes(date.toDateString())),
+            hasBlockage,
+            hasShowing,
+            finalAvailable: !hasBlockage && !hasShowing && !isManagerBusy
+          });
+        }
         
         const slot: TimeSlot = {
           hour,
