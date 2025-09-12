@@ -130,7 +130,7 @@ export function CalendarConnection() {
               <h3 className="font-medium">Google Calendar</h3>
               <p className="text-sm text-muted-foreground">
                 {status?.connected 
-                  ? 'Connected - Your calendar availability is synced'
+                  ? 'Connected'
                   : 'Connect your calendar to sync availability'
                 }
               </p>
