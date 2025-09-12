@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus } from "lucide-react";
 
 interface Park {
   id: string;
@@ -25,6 +25,7 @@ interface Park {
   zipCode: string;
   companyId: string;
   createdAt: string;
+  amenities?: string[];
   company?: {
     name: string;
   };
@@ -50,8 +51,10 @@ export default function ManagerParks() {
     address: "",
     city: "",
     state: "",
-    zipCode: ""
+    zipCode: "",
+    amenities: [] as string[]
   });
+  const [newAmenity, setNewAmenity] = useState('');
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
 
   // Redirect if not manager
@@ -105,8 +108,10 @@ export default function ManagerParks() {
       address: "",
       city: "",
       state: "",
-      zipCode: ""
+      zipCode: "",
+      amenities: []
     });
+    setNewAmenity('');
   };
 
   const handleEdit = (park: Park) => {
@@ -117,8 +122,10 @@ export default function ManagerParks() {
       address: park.address,
       city: park.city,
       state: park.state,
-      zipCode: park.zipCode
+      zipCode: park.zipCode,
+      amenities: park.amenities || []
     });
+    setNewAmenity('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -299,6 +306,80 @@ export default function ManagerParks() {
                     />
                   </div>
                 </div>
+                
+                {/* Amenities Section */}
+                <div>
+                  <Label>Amenities</Label>
+                  <div className="space-y-3 mt-2">
+                    <div className="grid grid-cols-1 gap-2">
+                      {formData.amenities.map((amenity, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input 
+                            value={amenity}
+                            onChange={(e) => {
+                              const newAmenities = [...formData.amenities];
+                              newAmenities[index] = e.target.value;
+                              setFormData({ ...formData, amenities: newAmenities });
+                            }}
+                            data-testid={`input-amenity-${index}`}
+                          />
+                          <Button 
+                            type="button"
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              const newAmenities = formData.amenities.filter((_, i) => i !== index);
+                              setFormData({ ...formData, amenities: newAmenities });
+                            }}
+                            data-testid={`button-remove-amenity-${index}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Add new amenity..."
+                        value={newAmenity}
+                        onChange={(e) => setNewAmenity(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newAmenity.trim()) {
+                              setFormData({ 
+                                ...formData, 
+                                amenities: [...formData.amenities, newAmenity.trim()] 
+                              });
+                              setNewAmenity('');
+                            }
+                          }
+                        }}
+                        data-testid="input-new-amenity"
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          if (newAmenity.trim()) {
+                            setFormData({ 
+                              ...formData, 
+                              amenities: [...formData.amenities, newAmenity.trim()] 
+                            });
+                            setNewAmenity('');
+                          }
+                        }}
+                        disabled={!newAmenity.trim()}
+                        data-testid="button-add-amenity"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="flex justify-end space-x-2">
                   <Button
                     type="button"

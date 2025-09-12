@@ -18,6 +18,42 @@ import {
   ArrowRight,
   TreePine 
 } from "lucide-react";
+import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
+
+// Lot preview image component for card layout
+function LotPreviewImageCard({ lotId }: { lotId: string }) {
+  const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
+  
+  if (isLoading) {
+    return (
+      <div className="h-48 bg-muted flex items-center justify-center">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (hasPhotos && firstPhoto) {
+    return (
+      <div className="h-48 overflow-hidden">
+        <img 
+          src={firstPhoto.urlOrPath || firstPhoto.url}
+          alt="Lot preview"
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
+  
+  // Fallback placeholder when no photos
+  return (
+    <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
+      <div className="text-center">
+        <Home className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+        <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Lot Details</span>
+      </div>
+    </div>
+  );
+}
 
 interface Park {
   id: string;
@@ -298,12 +334,7 @@ export default function Properties() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
                 <Card key={lot.id} className="hover:shadow-lg transition-shadow">
-                  <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
-                    <div className="text-center">
-                      <Home className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-                      <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Lot Details</span>
-                    </div>
-                  </div>
+                  <LotPreviewImageCard lotId={lot.id} />
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold">{lot.nameOrNumber}</h3>

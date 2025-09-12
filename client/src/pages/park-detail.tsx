@@ -32,7 +32,43 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
 import type { Park } from "@shared/schema";
+
+// Lot preview image component
+function LotPreviewImage({ lotId }: { lotId: string }) {
+  const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
+  
+  if (isLoading) {
+    return (
+      <div className="w-48 h-32 bg-muted flex items-center justify-center flex-shrink-0">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (hasPhotos && firstPhoto) {
+    return (
+      <div className="w-48 h-32 flex-shrink-0 overflow-hidden">
+        <img 
+          src={firstPhoto.urlOrPath || firstPhoto.url}
+          alt="Lot preview"
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  }
+  
+  // Fallback placeholder when no photos
+  return (
+    <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0">
+      <div className="text-center">
+        <Home className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
+        <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">Lot Preview</span>
+      </div>
+    </div>
+  );
+}
 
 
 interface Lot {
@@ -57,12 +93,6 @@ const amenityIcons: Record<string, any> = {
 };
 
 function AmenitiesCard({ park }: { park: Park | undefined }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [amenities, setAmenities] = useState(park?.amenities || []);
-  const [newAmenity, setNewAmenity] = useState('');
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
   // Early return if park is not loaded
   if (!park || !park.id) {
     return (
@@ -75,159 +105,28 @@ function AmenitiesCard({ park }: { park: Park | undefined }) {
     );
   }
   
-  const canEdit = user && ['ADMIN', 'MANAGER'].includes(user.role);
-  
-  const updateAmenitiesMutation = useMutation({
-    mutationFn: async (newAmenities: string[]) => {
-      return apiRequest('PATCH', `/api/parks/${park.id}`, {
-        amenities: newAmenities
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Amenities updated successfully"
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/parks", park?.id] });
-      setIsEditing(false);
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update amenities",
-        variant: "destructive"
-      });
-    }
-  });
-  
-  const handleSave = () => {
-    updateAmenitiesMutation.mutate(amenities);
-  };
-  
-  const handleAddAmenity = () => {
-    if (newAmenity.trim()) {
-      setAmenities([...amenities, newAmenity.trim()]);
-      setNewAmenity('');
-    }
-  };
-  
-  const handleRemoveAmenity = (index: number) => {
-    setAmenities(amenities.filter((_, i) => i !== index));
-  };
-  
-  const handleCancel = () => {
-    setAmenities(park?.amenities || []);
-    setNewAmenity('');
-    setIsEditing(false);
-  };
-  
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Amenities</h3>
-          {canEdit && !isEditing && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsEditing(true)}
-              data-testid="button-edit-amenities"
-            >
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-          )}
-          {isEditing && (
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleCancel}
-                disabled={updateAmenitiesMutation.isPending}
-                data-testid="button-cancel-amenities"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={handleSave}
-                disabled={updateAmenitiesMutation.isPending}
-                data-testid="button-save-amenities"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </Button>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          {park.amenities && park.amenities.length > 0 ? park.amenities.map((amenity, index) => {
+            const IconComponent = amenityIcons[amenity] || Check;
+            return (
+              <div key={index} className="flex items-center text-sm" data-testid={`amenity-${index}`}>
+                <IconComponent className="w-4 h-4 mr-2 text-primary" />
+                {amenity}
+              </div>
+            );
+          }) : (
+            <div className="col-span-2 text-center text-muted-foreground py-4">
+              No amenities listed
             </div>
           )}
         </div>
-        
-        {isEditing ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-2">
-              {amenities.map((amenity, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input 
-                    value={amenity}
-                    onChange={(e) => {
-                      const newAmenities = [...amenities];
-                      newAmenities[index] = e.target.value;
-                      setAmenities(newAmenities);
-                    }}
-                    data-testid={`input-amenity-${index}`}
-                  />
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleRemoveAmenity(index)}
-                    data-testid={`button-remove-amenity-${index}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex gap-2">
-              <Input 
-                placeholder="Add new amenity..."
-                value={newAmenity}
-                onChange={(e) => setNewAmenity(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddAmenity();
-                  }
-                }}
-                data-testid="input-new-amenity"
-              />
-              <Button 
-                variant="outline" 
-                onClick={handleAddAmenity}
-                disabled={!newAmenity.trim()}
-                data-testid="button-add-amenity"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {amenities.length > 0 ? amenities.map((amenity, index) => {
-              const IconComponent = amenityIcons[amenity] || Check;
-              return (
-                <div key={index} className="flex items-center text-sm" data-testid={`amenity-${index}`}>
-                  <IconComponent className="w-4 h-4 mr-2 text-primary" />
-                  {amenity}
-                </div>
-              );
-            }) : (
-              <div className="col-span-2 text-center text-muted-foreground py-4">
-                No amenities listed
-              </div>
-            )}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -417,12 +316,7 @@ export default function ParkDetail() {
                         <div className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-lot-${lot.id}`}>
                           <div className="flex">
                             {/* Preview Image */}
-                            <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0">
-                              <div className="text-center">
-                                <Home className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
-                                <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">Lot Preview</span>
-                              </div>
-                            </div>
+                            <LotPreviewImage lotId={lot.id} />
                             
                             {/* Lot Details */}
                             <div className="flex-1 p-4">
