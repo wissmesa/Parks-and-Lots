@@ -70,6 +70,12 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
         errorMessage = match[1];
       }
       
+      // Check if this is a calendar conflict error - refresh availability
+      if (errorMessage.includes('no longer available') || errorMessage.includes('manager has scheduled another event')) {
+        // Refresh availability data to show updated slots
+        queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId, "manager-availability"] });
+      }
+      
       toast({
         title: "Booking Failed",
         description: errorMessage,

@@ -1094,11 +1094,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } as any);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Calendar sync error:', error);
-        calendarSyncError = true;
         
-        // Update showing with sync error
+        // Check if this is a calendar conflict error (race condition)
+        if (error.message === 'CALENDAR_CONFLICT') {
+          // This means the manager created an event in their calendar after our initial check
+          // Delete the showing we just created and return a conflict error
+          await storage.deleteShowing(showing.id);
+          return res.status(409).json({ 
+            message: 'Time slot is no longer available - the manager has scheduled another event. Please select a different time.' 
+          });
+        }
+        
+        // For other calendar errors, mark as sync error but keep the booking
+        calendarSyncError = true;
         await storage.updateShowing(showing.id, {
           calendarSyncError: true
         } as any);

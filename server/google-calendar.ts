@@ -192,12 +192,23 @@ export class GoogleCalendarService {
   async createCalendarEvent(userId: string, event: any) {
     const calendar = await this.createCalendarClient(userId);
     
-    const response = await calendar.events.insert({
-      calendarId: 'primary',
-      requestBody: event
-    });
+    try {
+      const response = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: event
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error: any) {
+      // Check if this is a calendar conflict error
+      if (error.code === 409 || 
+          (error.message && error.message.toLowerCase().includes('conflict')) ||
+          (error.message && error.message.toLowerCase().includes('busy'))) {
+        throw new Error('CALENDAR_CONFLICT');
+      }
+      // Re-throw other errors as-is
+      throw error;
+    }
   }
 
   async updateCalendarEvent(userId: string, eventId: string, event: any) {
