@@ -1,9 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { 
   ChevronRight, 
   Home, 
@@ -20,19 +21,19 @@ import {
   Shield,
   Users,
   Phone,
-  Mail
+  Mail,
+  Edit,
+  Plus,
+  X,
+  Save,
+  Check
 } from "lucide-react";
 import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import type { Park } from "@shared/schema";
 
-interface Park {
-  id: string;
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  description?: string;
-}
 
 interface Lot {
   id: string;
@@ -45,12 +46,199 @@ interface Lot {
   sqFt?: number;
 }
 
+// Icon mapping for common amenities
+const amenityIcons: Record<string, any> = {
+  'Swimming Pool': Waves,
+  'Fitness Center': Dumbbell,
+  'Walking Trails': TreePine,
+  'Playground': Home,
+  'Parking': Car,
+  'Security': Shield,
+};
+
+function AmenitiesCard({ park }: { park: Park | undefined }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [amenities, setAmenities] = useState(park?.amenities || []);
+  const [newAmenity, setNewAmenity] = useState('');
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Early return if park is not loaded
+  if (!park || !park.id) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Amenities</h3>
+          <div className="text-muted-foreground">Loading...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  const canEdit = user && ['ADMIN', 'MANAGER'].includes(user.role);
+  
+  const updateAmenitiesMutation = useMutation({
+    mutationFn: async (newAmenities: string[]) => {
+      return apiRequest('PATCH', `/api/parks/${park.id}`, {
+        amenities: newAmenities
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Amenities updated successfully"
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/parks", park?.id] });
+      setIsEditing(false);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update amenities",
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const handleSave = () => {
+    updateAmenitiesMutation.mutate(amenities);
+  };
+  
+  const handleAddAmenity = () => {
+    if (newAmenity.trim()) {
+      setAmenities([...amenities, newAmenity.trim()]);
+      setNewAmenity('');
+    }
+  };
+  
+  const handleRemoveAmenity = (index: number) => {
+    setAmenities(amenities.filter((_, i) => i !== index));
+  };
+  
+  const handleCancel = () => {
+    setAmenities(park?.amenities || []);
+    setNewAmenity('');
+    setIsEditing(false);
+  };
+  
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Amenities</h3>
+          {canEdit && !isEditing && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsEditing(true)}
+              data-testid="button-edit-amenities"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          )}
+          {isEditing && (
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleCancel}
+                disabled={updateAmenitiesMutation.isPending}
+                data-testid="button-cancel-amenities"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={handleSave}
+                disabled={updateAmenitiesMutation.isPending}
+                data-testid="button-save-amenities"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {isEditing ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-2">
+              {amenities.map((amenity, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input 
+                    value={amenity}
+                    onChange={(e) => {
+                      const newAmenities = [...amenities];
+                      newAmenities[index] = e.target.value;
+                      setAmenities(newAmenities);
+                    }}
+                    data-testid={`input-amenity-${index}`}
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleRemoveAmenity(index)}
+                    data-testid={`button-remove-amenity-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Add new amenity..."
+                value={newAmenity}
+                onChange={(e) => setNewAmenity(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddAmenity();
+                  }
+                }}
+                data-testid="input-new-amenity"
+              />
+              <Button 
+                variant="outline" 
+                onClick={handleAddAmenity}
+                disabled={!newAmenity.trim()}
+                data-testid="button-add-amenity"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {amenities.length > 0 ? amenities.map((amenity, index) => {
+              const IconComponent = amenityIcons[amenity] || Check;
+              return (
+                <div key={index} className="flex items-center text-sm" data-testid={`amenity-${index}`}>
+                  <IconComponent className="w-4 h-4 mr-2 text-primary" />
+                  {amenity}
+                </div>
+              );
+            }) : (
+              <div className="col-span-2 text-center text-muted-foreground py-4">
+                No amenities listed
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ParkDetail() {
   const { id } = useParams();
   const [statusFilter, setStatusFilter] = useState("");
   const [sizeFilter, setSizeFilter] = useState("");
 
-  const { data: park, isLoading: parkLoading } = useQuery({
+  const { data: park, isLoading: parkLoading } = useQuery<Park>({
     queryKey: ["/api/parks", id],
     enabled: !!id,
   });
@@ -289,37 +477,7 @@ export default function ParkDetail() {
           {/* Park Information Sidebar */}
           <div className="space-y-6">
             {/* Amenities */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Amenities</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center text-sm">
-                    <Waves className="w-4 h-4 mr-2 text-primary" />
-                    Swimming Pool
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Dumbbell className="w-4 h-4 mr-2 text-primary" />
-                    Fitness Center
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <TreePine className="w-4 h-4 mr-2 text-primary" />
-                    Walking Trails
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Home className="w-4 h-4 mr-2 text-primary" />
-                    Playground
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Car className="w-4 h-4 mr-2 text-primary" />
-                    Parking
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Shield className="w-4 h-4 mr-2 text-primary" />
-                    Security
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <AmenitiesCard park={park} />
 
             {/* Contact Information */}
             <Card>
