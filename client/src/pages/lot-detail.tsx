@@ -364,11 +364,6 @@ export default function LotDetail() {
                 <h3 className="text-lg font-semibold mb-4">Showing Availability</h3>
                 <div className="text-sm text-muted-foreground mb-4">
                   Weekly schedule from 9am to 7pm
-                  {managerAvailability?.managerConnected && (
-                    <span className="block mt-1 text-blue-600">
-                      ✓ Manager's calendar is synchronized
-                    </span>
-                  )}
                 </div>
                 
                 <div className="overflow-x-auto">

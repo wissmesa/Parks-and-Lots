@@ -51,7 +51,16 @@ export class GoogleCalendarService {
   }
 
   async storeTokens(userId: string, tokens: any) {
-    const expiresAt = new Date(tokens.expiry_date || Date.now() + 3600 * 1000);
+    // Handle both expiry_date (ms timestamp) and expires_in (seconds from now)
+    let expiresAt: Date;
+    if (tokens.expiry_date) {
+      expiresAt = new Date(tokens.expiry_date);
+    } else if (tokens.expires_in) {
+      expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+    } else {
+      // Default to 1 hour from now
+      expiresAt = new Date(Date.now() + 3600 * 1000);
+    }
     
     // Get existing token data to preserve refresh token if new one isn't provided
     const existingToken = await storage.getGoogleCalendarToken(userId);
