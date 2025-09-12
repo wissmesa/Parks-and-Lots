@@ -73,32 +73,74 @@ export class GoogleCalendarService {
     });
   }
 
-  async getValidAccessToken(userId: string): Promise<string | null> {
+  async getValidAccessToken(userId: string, retryCount = 0): Promise<string | null> {
     const tokenData = await storage.getGoogleCalendarToken(userId);
     
     if (!tokenData) {
       return null;
     }
 
-    // Check if token is expired
-    if (new Date() >= new Date(tokenData.expiresAt)) {
-      try {
-        // Try to refresh token
-        if (!tokenData.refreshToken) {
-          throw new Error('No refresh token available for token refresh');
-        }
-        const newTokens = await this.refreshTokens(tokenData.refreshToken);
-        await this.storeTokens(userId, newTokens);
-        return newTokens.access_token;
-      } catch (error) {
-        console.error('Failed to refresh Google Calendar token:', error);
-        // Remove invalid token
-        await storage.deleteGoogleCalendarToken(userId);
-        return null;
-      }
+    // If token is not expired, return it
+    if (new Date() < new Date(tokenData.expiresAt)) {
+      return tokenData.accessToken;
     }
 
-    return tokenData.accessToken;
+    // Token is expired, attempt refresh with retry logic
+    if (retryCount >= 2) {
+      console.error('Max refresh retries exceeded for user', userId);
+      return null;
+    }
+
+    try {
+      // Try to refresh token
+      if (!tokenData.refreshToken) {
+        throw new Error('No refresh token available for token refresh');
+      }
+      console.log(`Refreshing expired token for user ${userId} (attempt ${retryCount + 1}/2)`);
+      const newTokens = await this.refreshTokens(tokenData.refreshToken);
+      await this.storeTokens(userId, newTokens);
+      console.log(`Successfully refreshed token for user ${userId}`);
+      return newTokens.access_token;
+    } catch (error: any) {
+        console.error('Failed to refresh Google Calendar token:', error);
+        
+        // Only delete tokens if the refresh token itself is invalid
+        // Don't delete on network errors or temporary API failures
+        const data = error?.response?.data || {};
+        const errStr = [data.error, data.error_description, error?.message].filter(Boolean).join(' ').toLowerCase();
+        const isInvalidRefreshToken = 
+          data.error === 'invalid_grant' ||
+          data.error === 'invalid_request' ||
+          errStr.includes('invalid_grant') || 
+          errStr.includes('invalid_request') || 
+          errStr.includes('token has been expired') || 
+          errStr.includes('revoked') ||
+          (error?.status === 400 && errStr.includes('expired or revoked'));
+          
+        // Log sanitized error info for debugging (without tokens)
+        console.log('Token refresh error analysis:', {
+          userId: userId.substring(0, 8) + '...',
+          errorType: data.error || 'unknown',
+          isInvalid: isInvalidRefreshToken,
+          retryCount
+        });
+          
+        if (isInvalidRefreshToken) {
+          console.log('Refresh token is invalid, removing token data');
+          await storage.deleteGoogleCalendarToken(userId);
+        } else {
+          console.log('Temporary error refreshing token, keeping token data for retry');
+        }
+        
+        // For temporary failures, retry once more
+        if (!isInvalidRefreshToken && retryCount === 0) {
+          console.log(`Retrying token refresh for user ${userId} after temporary error`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          return this.getValidAccessToken(userId, retryCount + 1);
+        }
+        
+        return null;
+      }
   }
 
   async createCalendarClient(userId: string) {
@@ -162,8 +204,10 @@ export class GoogleCalendarService {
   }
 
   async isCalendarConnected(userId: string): Promise<boolean> {
-    const accessToken = await this.getValidAccessToken(userId);
-    return accessToken !== null;
+    // Check if a refresh token exists in storage (indicates connection status)
+    // Don't rely on live refresh attempts to avoid false negatives during temporary failures
+    const tokenData = await storage.getGoogleCalendarToken(userId);
+    return !!(tokenData && tokenData.refreshToken);
   }
 
   async disconnectCalendar(userId: string): Promise<void> {
