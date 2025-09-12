@@ -370,7 +370,7 @@ export default function LotDetail() {
                   Weekly schedule from 9am to 7pm
                 </div>
                 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" style={{ touchAction: 'manipulation' }}>
                   <div className="grid grid-cols-8 gap-1 text-center text-xs mb-4 min-w-[600px]">
                     {/* Time column header */}
                     <div className="font-medium text-muted-foreground py-2">Time</div>
@@ -401,19 +401,12 @@ export default function LotDetail() {
                               const selectedDate = slot.date.toISOString().split('T')[0];
                               const selectedTime = `${hour.toString().padStart(2, '0')}:00`;
                               
-                              console.log('[SLOT CLICK] Clicked slot:', day.dayName, hour, 'Date:', selectedDate, 'Time:', selectedTime);
-                              console.log('[SLOT CLICK] Current selectedSlot:', selectedSlot);
-                              
                               // Use functional update to get the current state value
                               setSelectedSlot(currentSelectedSlot => {
-                                console.log('[SLOT CLICK] Current state in updater:', currentSelectedSlot);
-                                
                                 // If clicking the same slot, deselect it, otherwise select it
                                 if (currentSelectedSlot && currentSelectedSlot.date === selectedDate && currentSelectedSlot.time === selectedTime) {
-                                  console.log('[SLOT CLICK] Deselecting slot');
                                   return null;
                                 } else {
-                                  console.log('[SLOT CLICK] Selecting slot');
                                   return { date: selectedDate, time: selectedTime };
                                 }
                               });
@@ -426,15 +419,27 @@ export default function LotDetail() {
                           const isSelected = selectedSlot && selectedSlot.date === slotDate && selectedSlot.time === slotTime;
                           
                           return (
-                            <div 
+                            <button 
                               key={`${day.dayName}-${hour}`}
+                              type="button"
                               data-testid={`slot-${day.dayName}-${hour}`}
-                              onClick={handleSlotClick}
-                              className={`py-1 px-1 rounded text-xs transition-all ${
+                              onPointerUp={(e) => {
+                                e.preventDefault();
+                                handleSlotClick();
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  handleSlotClick();
+                                }
+                              }}
+                              disabled={!slot.isAvailable}
+                              aria-pressed={slot.isAvailable ? (isSelected ? "true" : "false") : undefined}
+                              className={`py-1 px-1 rounded text-xs transition-all pointer-events-auto ${
                                 !slot.isAvailable 
                                   ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
                                   : isSelected
-                                    ? 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-pointer shadow-sm'
+                                    ? 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-pointer shadow-sm hover:bg-blue-200'
                                     : 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer'
                               }`}
                               title={
@@ -446,7 +451,7 @@ export default function LotDetail() {
                               }
                             >
                               {!slot.isAvailable ? '●' : isSelected ? '★' : '✓'}
-                            </div>
+                            </button>
                           );
                         })
                       ];
