@@ -46,11 +46,19 @@ export class GoogleCalendarService {
       refresh_token: refreshToken
     });
     
-    const { tokens } = await this.oauth2Client.refreshAccessToken();
-    return tokens;
+    const res = await this.oauth2Client.refreshAccessToken();
+    return res.credentials; // Tokens are under 'credentials', not 'tokens'
   }
 
   async storeTokens(userId: string, tokens: any) {
+    if (!tokens) {
+      throw new Error('No tokens provided to storeTokens function');
+    }
+    
+    if (!tokens.access_token) {
+      throw new Error('Invalid tokens: missing access_token');
+    }
+    
     // Handle both expiry_date (ms timestamp) and expires_in (seconds from now)
     let expiresAt: Date;
     if (tokens.expiry_date) {
@@ -59,6 +67,7 @@ export class GoogleCalendarService {
       expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
     } else {
       // Default to 1 hour from now
+      console.log('No expiry info found in tokens, using default 1 hour');
       expiresAt = new Date(Date.now() + 3600 * 1000);
     }
     
