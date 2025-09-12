@@ -109,7 +109,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
       endDt: endDt.toISOString(),
     };
 
-    await bookingMutation.mutateAsync(bookingData);
+    bookingMutation.mutate(bookingData);
   };
 
   // Generate available time slots (9am to 7pm hourly to match availability grid)
