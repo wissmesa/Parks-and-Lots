@@ -70,10 +70,15 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
         errorMessage = match[1];
       }
       
-      // Check if this is a calendar conflict error - refresh availability
-      if (errorMessage.includes('no longer available') || errorMessage.includes('manager has scheduled another event')) {
-        // Refresh availability data to show updated slots
+      // Check if this is a calendar conflict error - refresh all availability data
+      if (errorMessage.includes('no longer available') || 
+          errorMessage.includes('manager has scheduled another event') ||
+          errorMessage.includes('manager has a calendar conflict') ||
+          errorMessage.includes('not available')) {
+        // Refresh all availability data to show updated slots
         queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId, "manager-availability"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId, "availability"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId] });
       }
       
       toast({

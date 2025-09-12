@@ -167,8 +167,11 @@ export default function LotDetail() {
       const startDay = busyStart.toDateString();
       const endDay = busyEnd.toDateString();
       
-      // Mark each hour as busy
-      for (let hour = startHour; hour <= endHour; hour++) {
+      // Mark each hour as busy, but don't mark the end hour if event ends exactly at the hour start
+      const endMinutes = busyEnd.getMinutes();
+      const shouldIncludeEndHour = endMinutes > 0; // Only mark end hour busy if event extends into it
+      
+      for (let hour = startHour; hour < endHour || (hour === endHour && shouldIncludeEndHour); hour++) {
         const hourKey = `${startDay}:${hour}`;
         busyHourSet.add(hourKey);
         
