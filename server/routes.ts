@@ -84,11 +84,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/recent-bookings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
       const showings = await storage.getShowings();
+      
+      // Filter for valid bookings and sort by most recent first
       const recentBookings = showings
+        .filter(showing => ['SCHEDULED', 'CONFIRMED', 'COMPLETED'].includes(showing.status))
+        .sort((a, b) => new Date(b.createdAt || b.startDt).getTime() - new Date(a.createdAt || a.startDt).getTime())
         .slice(0, 10)
         .map(showing => ({
           ...showing,
-          lotName: showing.lotId
+          lotName: showing.lot?.nameOrNumber || `Lot ${showing.lotId.slice(0, 8)}...`,
+          parkName: showing.lot?.park?.name || 'Unknown Park'
         }));
       
       res.json(recentBookings);
