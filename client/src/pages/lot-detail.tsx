@@ -403,19 +403,32 @@ export default function LotDetail() {
                             }
                           };
                           
+                          // Check if this slot is currently selected
+                          const slotDate = slot.date.toISOString().split('T')[0];
+                          const slotTime = `${hour.toString().padStart(2, '0')}:00`;
+                          const isSelected = selectedSlot && selectedSlot.date === slotDate && selectedSlot.time === slotTime;
+                          
                           return (
                             <div 
                               key={`${day.dayName}-${hour}`}
                               data-testid={`slot-${day.dayName}-${hour}`}
                               onClick={handleSlotClick}
                               className={`py-1 px-1 rounded text-xs transition-all ${
-                                slot.isAvailable 
-                                  ? 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer' 
-                                  : 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                                !slot.isAvailable 
+                                  ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-pointer shadow-sm'
+                                    : 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer'
                               }`}
-                              title={slot.isAvailable ? 'Available - Click to book' : 'Busy'}
+                              title={
+                                !slot.isAvailable 
+                                  ? 'Busy' 
+                                  : isSelected 
+                                    ? 'Selected - Click to deselect' 
+                                    : 'Available - Click to book'
+                              }
                             >
-                              {slot.isAvailable ? '✓' : '●'}
+                              {!slot.isAvailable ? '●' : isSelected ? '★' : '✓'}
                             </div>
                           );
                         })
@@ -428,6 +441,10 @@ export default function LotDetail() {
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-green-50 border border-green-200 rounded mr-2"></div>
                     Available (✓) - Click to book
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-blue-100 border-2 border-blue-400 rounded mr-2"></div>
+                    Selected (★) - Ready to book
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-gray-100 rounded mr-2"></div>
