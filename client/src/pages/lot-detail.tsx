@@ -149,9 +149,8 @@ export default function LotDetail() {
     const schedule: DaySchedule[] = [];
     const today = new Date();
     const startOfWeek = new Date(today);
-    // Get the start of the current week (Sunday) - don't go backwards if we're already past the current week
-    const currentWeekStart = today.getDate() - today.getDay();
-    startOfWeek.setDate(currentWeekStart); // Start from Sunday of current week
+    // Show the week starting from today forward (current week forward view)
+    // This ensures we show the current date and coming days where bookings are most relevant
     
     console.log(`[DEBUG] Generating memoized schedule with ${managerBusySlots.length} manager busy slots:`, managerBusySlots);
     console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
@@ -402,12 +401,22 @@ export default function LotDetail() {
                               const selectedDate = slot.date.toISOString().split('T')[0];
                               const selectedTime = `${hour.toString().padStart(2, '0')}:00`;
                               
-                              // If clicking the same slot, deselect it, otherwise select it
-                              if (selectedSlot && selectedSlot.date === selectedDate && selectedSlot.time === selectedTime) {
-                                setSelectedSlot(null);
-                              } else {
-                                setSelectedSlot({ date: selectedDate, time: selectedTime });
-                              }
+                              console.log('[SLOT CLICK] Clicked slot:', day.dayName, hour, 'Date:', selectedDate, 'Time:', selectedTime);
+                              console.log('[SLOT CLICK] Current selectedSlot:', selectedSlot);
+                              
+                              // Use functional update to get the current state value
+                              setSelectedSlot(currentSelectedSlot => {
+                                console.log('[SLOT CLICK] Current state in updater:', currentSelectedSlot);
+                                
+                                // If clicking the same slot, deselect it, otherwise select it
+                                if (currentSelectedSlot && currentSelectedSlot.date === selectedDate && currentSelectedSlot.time === selectedTime) {
+                                  console.log('[SLOT CLICK] Deselecting slot');
+                                  return null;
+                                } else {
+                                  console.log('[SLOT CLICK] Selecting slot');
+                                  return { date: selectedDate, time: selectedTime };
+                                }
+                              });
                             }
                           };
                           
