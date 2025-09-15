@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,14 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Clock, MapPin, User, Search } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Search, X } from "lucide-react";
 import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface Showing {
   id: string;
   startDt: string;
   endDt: string;
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELED';
   clientName: string;
   clientEmail: string;
   clientPhone?: string;
@@ -44,6 +46,7 @@ export default function ManagerBookings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [parkFilter, setParkFilter] = useState<string>("all");
+  const { toast } = useToast();
 
   // Redirect if not manager
   if (user?.role !== 'MANAGER') {
@@ -59,6 +62,27 @@ export default function ManagerBookings() {
   const { data: todayShowings } = useQuery<Showing[]>({
     queryKey: ["/api/manager/showings/today"],
     enabled: user?.role === 'MANAGER',
+  });
+
+  // Mutation to cancel a showing
+  const cancelShowingMutation = useMutation({
+    mutationFn: async (showingId: string) => {
+      return apiRequest('PATCH', `/api/showings/${showingId}`, { status: 'CANCELED' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/showings/today"] });
+      toast({
+        title: "Meeting Cancelled",
+        description: "The showing has been successfully cancelled and removed from the calendar.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancellation Failed", 
+        description: error?.message || "Failed to cancel the showing. Please try again.",
+        variant: "destructive",
+      });
+    }
   });
 
   // For this implementation, we'll show today's showings
@@ -81,7 +105,7 @@ export default function ManagerBookings() {
     switch (status) {
       case 'SCHEDULED': return 'default';
       case 'COMPLETED': return 'success';
-      case 'CANCELLED': return 'destructive';
+      case 'CANCELED': return 'destructive';
       default: return 'secondary';
     }
   };
@@ -174,7 +198,7 @@ export default function ManagerBookings() {
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="SCHEDULED">Scheduled</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
-                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                    <SelectItem value="CANCELED">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={parkFilter} onValueChange={setParkFilter}>
@@ -275,6 +299,22 @@ export default function ManagerBookings() {
                               >
                                 View Details
                               </Button>
+                              {showing.status === 'SCHEDULED' && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to cancel this showing? This action cannot be undone.')) {
+                                      cancelShowingMutation.mutate(showing.id);
+                                    }
+                                  }}
+                                  disabled={cancelShowingMutation.isPending}
+                                  data-testid={`button-cancel-showing-${showing.id}`}
+                                >
+                                  <X className="w-4 h-4 mr-1" />
+                                  {cancelShowingMutation.isPending ? 'Cancelling...' : 'Cancel'}
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
