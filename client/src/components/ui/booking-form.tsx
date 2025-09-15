@@ -120,9 +120,9 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
     bookingMutation.mutate(bookingData);
   };
 
-  // Generate available time slots (9am to 7pm in 30-minute intervals to match availability grid)
+  // Generate available time slots (8am to 7pm in 30-minute intervals to match availability grid)
   const timeSlots = [];
-  for (let hour = 9; hour <= 19; hour++) {
+  for (let hour = 8; hour <= 19; hour++) {
     timeSlots.push(`${hour.toString().padStart(2, '0')}:00`); // Top of hour
     if (hour < 19) { // Don't add 7:30pm, end at 7:00pm
       timeSlots.push(`${hour.toString().padStart(2, '0')}:30`); // Half hour

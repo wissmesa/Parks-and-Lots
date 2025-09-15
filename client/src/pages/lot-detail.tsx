@@ -389,7 +389,7 @@ export default function LotDetail() {
                 </div>
                 
                 <div className="overflow-x-auto" style={{ touchAction: 'manipulation' }}>
-                  <div className="grid grid-cols-8 gap-1 text-center text-xs mb-4 min-w-[600px]">
+                  <div className="grid grid-cols-6 gap-1 text-center text-xs mb-4 min-w-[600px]">
                     {/* Time column header */}
                     <div className="font-medium text-muted-foreground py-2">Time</div>
                     
