@@ -17,16 +17,27 @@ interface EmailParams {
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   try {
-    await mailService.send({
+    const emailData: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
-      text: params.text || undefined,
-      html: params.html || undefined,
-    });
+    };
+    
+    if (params.text) {
+      emailData.text = params.text;
+    }
+    
+    if (params.html) {
+      emailData.html = params.html;
+    }
+    
+    await mailService.send(emailData);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('SendGrid email error:', error);
+    if (error.response && error.response.body && error.response.body.errors) {
+      console.error('SendGrid error details:', error.response.body.errors);
+    }
     return false;
   }
 }
@@ -35,7 +46,7 @@ export async function sendInviteEmail(
   inviteEmail: string,
   inviteUrl: string,
   invitedByName: string,
-  fromEmail: string = 'noreply@yourdomain.com'
+  fromEmail: string = 'support@bluepaperclip.com'
 ): Promise<boolean> {
   const subject = 'You\'re invited to join Parks & Lots Booking System';
   
