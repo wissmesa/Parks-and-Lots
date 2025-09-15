@@ -515,6 +515,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invite routes
+  app.get('/api/auth/invites/validate/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const invite = await storage.getInviteByToken(token);
+      if (!invite) {
+        return res.status(404).json({ message: 'Invalid invite token' });
+      }
+
+      if (invite.acceptedAt) {
+        return res.status(409).json({ message: 'Invite already accepted' });
+      }
+
+      if (invite.expiresAt < new Date()) {
+        return res.status(410).json({ message: 'Invite has expired' });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(invite.email);
+      if (existingUser) {
+        return res.status(409).json({ message: 'User already exists' });
+      }
+
+      res.json({ 
+        email: invite.email,
+        role: invite.role,
+        valid: true 
+      });
+    } catch (error) {
+      console.error('Validate invite error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   app.post('/api/auth/invites', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       const parsed = insertInviteSchema.parse({
