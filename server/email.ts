@@ -1,0 +1,94 @@
+import { MailService } from '@sendgrid/mail';
+
+if (!process.env.SENDGRID_API_KEY) {
+  throw new Error("SENDGRID_API_KEY environment variable must be set");
+}
+
+const mailService = new MailService();
+mailService.setApiKey(process.env.SENDGRID_API_KEY);
+
+interface EmailParams {
+  to: string;
+  from: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}
+
+export async function sendEmail(params: EmailParams): Promise<boolean> {
+  try {
+    await mailService.send({
+      to: params.to,
+      from: params.from,
+      subject: params.subject,
+      text: params.text || undefined,
+      html: params.html || undefined,
+    });
+    return true;
+  } catch (error) {
+    console.error('SendGrid email error:', error);
+    return false;
+  }
+}
+
+export async function sendInviteEmail(
+  inviteEmail: string,
+  inviteUrl: string,
+  invitedByName: string,
+  fromEmail: string = 'noreply@yourdomain.com'
+): Promise<boolean> {
+  const subject = 'You\'re invited to join Parks & Lots Booking System';
+  
+  const text = `
+Hello,
+
+You've been invited by ${invitedByName} to join the Parks & Lots Booking System as a manager.
+
+Click the link below to accept your invitation and set up your account:
+${inviteUrl}
+
+This invitation will expire in 7 days.
+
+Best regards,
+Parks & Lots Team
+  `;
+
+  const html = `
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #333;">You're invited to Parks & Lots!</h2>
+      
+      <p>Hello,</p>
+      
+      <p>You've been invited by <strong>${invitedByName}</strong> to join the Parks & Lots Booking System as a manager.</p>
+      
+      <div style="margin: 30px 0; text-align: center;">
+        <a href="${inviteUrl}" 
+           style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+          Accept Invitation
+        </a>
+      </div>
+      
+      <p>Or copy and paste this link into your browser:</p>
+      <p style="word-break: break-all; color: #666;">${inviteUrl}</p>
+      
+      <p style="color: #666; font-size: 14px;">
+        <em>This invitation will expire in 7 days.</em>
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+      
+      <p style="color: #999; font-size: 12px;">
+        Best regards,<br>
+        Parks & Lots Team
+      </p>
+    </div>
+  `;
+
+  return await sendEmail({
+    to: inviteEmail,
+    from: fromEmail,
+    subject,
+    text,
+    html
+  });
+}

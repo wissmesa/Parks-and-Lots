@@ -28,6 +28,7 @@ import {
   bookingSchema
 } from "@shared/schema";
 import { randomBytes } from "crypto";
+import { sendInviteEmail } from "./email";
 
 // Configure multer for file uploads
 const upload = multer({
@@ -534,9 +535,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt
       } as any);
 
+      // Send invite email
+      const inviteUrl = `${req.protocol}://${req.get('host')}/accept-invite?token=${token}`;
+      const emailSent = await sendInviteEmail(
+        invite.email,
+        inviteUrl,
+        req.user!.fullName
+      );
+
+      if (!emailSent) {
+        console.error('Failed to send invite email to:', invite.email);
+      }
+
       res.status(201).json({ 
         ...invite,
-        inviteUrl: `${req.protocol}://${req.get('host')}/accept-invite?token=${token}`
+        inviteUrl,
+        emailSent
       });
     } catch (error) {
       console.error('Create invite error:', error);
