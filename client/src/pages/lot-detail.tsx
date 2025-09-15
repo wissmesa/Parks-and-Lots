@@ -187,12 +187,12 @@ export default function LotDetail() {
     
     console.log(`[DEBUG] Created busy 30-minute slot set with ${busySlotSet.size} entries:`, Array.from(busySlotSet));
     
-    // Generate 30-minute time slots from 9am to 7pm
+    // Generate 30-minute time slots from 8am to 7pm
     const timeSlots: Array<{hour: number, minute: number}> = [];
-    for (let hour = 9; hour <= 19; hour++) { // 9am to 7pm
-      timeSlots.push({hour, minute: 0}); // Top of hour (9:00, 10:00, etc.)
+    for (let hour = 8; hour <= 19; hour++) { // 8am to 7pm
+      timeSlots.push({hour, minute: 0}); // Top of hour (8:00, 9:00, etc.)
       if (hour < 19) { // Don't add 7:30pm, end at 7:00pm
-        timeSlots.push({hour, minute: 30}); // Half hour (9:30, 10:30, etc.)
+        timeSlots.push({hour, minute: 30}); // Half hour (8:30, 9:30, etc.)
       }
     }
     
@@ -385,7 +385,7 @@ export default function LotDetail() {
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-4">Showing Availability</h3>
                 <div className="text-sm text-muted-foreground mb-4">
-                  Weekly schedule from 9am to 7pm
+                  Weekly schedule from 8am to 7pm
                 </div>
                 
                 <div className="overflow-x-auto" style={{ touchAction: 'manipulation' }}>
@@ -401,29 +401,32 @@ export default function LotDetail() {
                       </div>
                     ))}
                     
-                    {/* Time slots - 30-minute intervals */}
-                    {Array.from({length: 22}, (_, slotIndex) => {
-                      const hour = 9 + Math.floor(slotIndex / 2);
+                    {/* Time slots - 30-minute intervals from 8am to 7pm */}
+                    {Array.from({length: 24}, (_, slotIndex) => {
+                      const hour = 8 + Math.floor(slotIndex / 2); // Start from 8am
                       const minute = (slotIndex % 2) * 30; // 0 or 30
-                      const displayHour = hour > 12 ? hour - 12 : hour;
+                      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
                       const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')}${hour >= 12 ? 'pm' : 'am'}`;
                       
                       return [
+                        // Time label - always first column
                         <div key={`time-${hour}-${minute}`} className="py-1 text-xs font-medium text-muted-foreground">
                           {timeDisplay}
                         </div>,
+                        
+                        // Day slots - one for each weekday
                         ...weeklySchedule.map(day => {
                           const slot = day.slots.find(s => s.hour === hour && s.minute === minute);
-                          if (!slot) return null;
+                          if (!slot) {
+                            return <div key={`${day.dayName}-${hour}-${minute}-empty`} className="py-1"></div>;
+                          }
                           
                           const handleSlotClick = () => {
                             if (slot.isAvailable) {
                               const selectedDate = slot.date.toISOString().split('T')[0];
                               const selectedTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                               
-                              // Use functional update to get the current state value
                               setSelectedSlot(currentSelectedSlot => {
-                                // If clicking the same slot, deselect it, otherwise select it
                                 if (currentSelectedSlot && currentSelectedSlot.date === selectedDate && currentSelectedSlot.time === selectedTime) {
                                   return null;
                                 } else {
@@ -433,11 +436,10 @@ export default function LotDetail() {
                             }
                           };
                           
-                          // Check if this slot is currently selected
                           const slotDate = slot.date.toISOString().split('T')[0];
                           const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                           const isSelected = selectedSlot && selectedSlot.date === slotDate && selectedSlot.time === slotTime;
-                          
+                        
                           return (
                             <button 
                               key={`${day.dayName}-${hour}-${minute}`}
