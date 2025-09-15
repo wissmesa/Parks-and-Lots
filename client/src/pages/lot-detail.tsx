@@ -163,25 +163,34 @@ export default function LotDetail() {
     console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
     console.log(`[DEBUG] Start of week:`, startOfWeek.toString(), `UTC:`, startOfWeek.toISOString());
     
-    // Pre-normalize busy 30-minute slots for faster comparison
+    // Pre-normalize busy 30-minute slots for faster comparison - USE UTC to avoid timezone issues
     const busySlotSet = new Set<string>();
+    
+    // Helper function to generate consistent UTC-based slot keys
+    const generateUTCSlotKey = (date: Date): string => {
+      const isoDate = date.toISOString().slice(0, 10); // YYYY-MM-DD format
+      const utcHour = date.getUTCHours();
+      const utcMinute = date.getUTCMinutes();
+      return `${isoDate}:${utcHour}:${utcMinute}`;
+    };
+    
     managerBusySlots.forEach(busySlot => {
       const busyStart = new Date(busySlot.start);
       const busyEnd = new Date(busySlot.end);
       
-      // Convert to local time and mark busy 30-minute slots
+      // Work in UTC throughout to avoid timezone conversion issues
       const startTime = new Date(busyStart);
       const endTime = new Date(busyEnd);
       
-      // Round down start time to nearest 30-minute boundary
-      startTime.setMinutes(Math.floor(startTime.getMinutes() / 30) * 30, 0, 0);
+      // Round down start time to nearest 30-minute boundary in UTC
+      startTime.setUTCMinutes(Math.floor(startTime.getUTCMinutes() / 30) * 30, 0, 0);
       
       // Mark every 30-minute slot that overlaps with the busy period
       const current = new Date(startTime);
       while (current < endTime) {
-        const slotKey = `${current.toDateString()}:${current.getHours()}:${current.getMinutes()}`;
+        const slotKey = generateUTCSlotKey(current);
         busySlotSet.add(slotKey);
-        current.setMinutes(current.getMinutes() + 30);
+        current.setUTCMinutes(current.getUTCMinutes() + 30);
       }
     });
     
@@ -233,8 +242,9 @@ export default function LotDetail() {
           new Date(showing.endDt) >= slotStart
         );
         
-        // Check if manager is busy using normalized busy 30-minute slot set
-        const slotKey = `${date.toDateString()}:${hour}:${minute}`;
+        // Check if manager is busy using UTC-based slot key to match busy slot set  
+        const localSlotTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
+        const slotKey = generateUTCSlotKey(localSlotTime);
         const isManagerBusy = busySlotSet.has(slotKey);
         
         // DEBUG: Special logging for Saturday 10-12 and 1pm slots

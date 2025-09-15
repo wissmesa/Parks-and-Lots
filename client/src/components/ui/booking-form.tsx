@@ -33,9 +33,8 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
     if (selectedSlot) {
       setSelectedDate(selectedSlot.date);
       setSelectedTime(selectedSlot.time);
-      onSlotUsed?.(); // Clear the selected slot after using it
     }
-  }, [selectedSlot, onSlotUsed]);
+  }, [selectedSlot]);
 
   const bookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
@@ -61,6 +60,8 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
       queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId, "showings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lots", lotId, "availability"] });
       
+      // Clear selection after successful booking
+      onSlotUsed?.();
       onSuccess?.();
     },
     onError: (error) => {
