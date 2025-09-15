@@ -209,7 +209,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Showing Duration</span>
               <span className="font-medium">
-                {SHOWING_DURATION_MINUTES} minute{SHOWING_DURATION_MINUTES !== 1 ? 's' : ''}
+                {SHOWING_DURATION_MINUTES} minutes
               </span>
             </div>
           </div>
