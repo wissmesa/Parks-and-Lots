@@ -24,6 +24,9 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const [selectedTime, setSelectedTime] = useState(selectedSlot?.time || "");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Dynamic showing duration (30 minutes)
+  const SHOWING_DURATION_MINUTES = 30;
 
   // Update form fields when a time slot is selected
   useEffect(() => {
@@ -104,7 +107,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
     // Create datetime objects
     const startDt = new Date(`${selectedDate}T${selectedTime}:00`);
     const endDt = new Date(startDt);
-    endDt.setMinutes(endDt.getMinutes() + 30); // 30-minute showings
+    endDt.setMinutes(endDt.getMinutes() + SHOWING_DURATION_MINUTES);
 
     const bookingData = {
       clientName,
@@ -205,7 +208,9 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
           <div className="bg-muted p-4 rounded-lg">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Showing Duration</span>
-              <span className="font-medium">1 hour</span>
+              <span className="font-medium">
+                {SHOWING_DURATION_MINUTES} minute{SHOWING_DURATION_MINUTES !== 1 ? 's' : ''}
+              </span>
             </div>
           </div>
           

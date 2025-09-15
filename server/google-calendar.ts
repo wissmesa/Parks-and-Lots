@@ -297,19 +297,38 @@ export class GoogleCalendarService {
       console.log(`[Google Calendar] Found ${calendars.length} calendars for user ${userId}:`, 
         calendars.map(cal => ({ id: cal.id, summary: cal.summary, primary: cal.primary })));
       
-      // Query all calendars the user has access to, not just primary
-      const calendarIds = calendars
-        .filter(cal => cal.accessRole === 'owner' || cal.accessRole === 'reader')
-        .map(cal => ({ id: cal.id! }));
+      // Always include primary calendar first, then add others with expanded access roles
+      const primaryCalendar = calendars.find(cal => cal.primary);
+      const calendarIdsSet = new Set<string>();
       
-      console.log(`[Google Calendar] Querying ${calendarIds.length} calendars for busy times`);
+      // Always include primary calendar
+      if (primaryCalendar?.id) {
+        calendarIdsSet.add(primaryCalendar.id);
+      } else {
+        calendarIdsSet.add('primary'); // Fallback to 'primary' string
+      }
+      
+      // Add other calendars with expanded access roles
+      calendars
+        .filter(cal => cal.accessRole === 'owner' || cal.accessRole === 'writer' || 
+                      cal.accessRole === 'reader' || cal.accessRole === 'freeBusyReader')
+        .forEach(cal => {
+          if (cal.id) {
+            calendarIdsSet.add(cal.id);
+          }
+        });
+      
+      const calendarIds = Array.from(calendarIdsSet).map(id => ({ id }));
+      console.log(`[Google Calendar] Querying ${calendarIds.length} calendars for busy times:`, 
+        calendarIds.map(c => c.id));
       
       // Use FreeBusy API for more reliable availability data
       const response = await calendar.freebusy.query({
         requestBody: {
           timeMin: startDate.toISOString(),
           timeMax: endDate.toISOString(),
-          items: calendarIds.length > 0 ? calendarIds : [{ id: 'primary' }]
+          timeZone: 'UTC', // Use UTC to eliminate timezone ambiguity
+          items: calendarIds
         }
       });
 
@@ -352,9 +371,10 @@ export class GoogleCalendarService {
       
       const allBusySlots: Array<{ start: string; end: string }> = [];
       
-      // Query events from all accessible calendars
+      // Query events from all accessible calendars with expanded access roles
       for (const cal of calendars) {
-        if (cal.accessRole === 'owner' || cal.accessRole === 'reader') {
+        if (cal.accessRole === 'owner' || cal.accessRole === 'writer' || 
+            cal.accessRole === 'reader' || cal.accessRole === 'freeBusyReader') {
           try {
             console.log(`[Google Calendar Fallback] Querying calendar ${cal.id} (${cal.summary})`);
             

@@ -110,6 +110,9 @@ export default function LotDetail() {
   }>({
     queryKey: ["/api/lots", id, "manager-availability"],
     enabled: !!id,
+    staleTime: 30 * 1000, // 30 seconds - short cache for fresh calendar data
+    gcTime: 60 * 1000, // 1 minute garbage collection
+    refetchInterval: 60 * 1000, // Refresh every minute to catch external calendar changes
   });
 
   if (lotLoading) {
