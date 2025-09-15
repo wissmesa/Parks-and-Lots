@@ -274,6 +274,7 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({
 export const insertInviteSchema = createInsertSchema(invites).omit({
   id: true,
   token: true,
+  expiresAt: true,
   acceptedAt: true,
   createdAt: true,
 });
