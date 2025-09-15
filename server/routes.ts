@@ -530,8 +530,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const invite = await storage.createInvite({
         ...parsed,
+        token,
         expiresAt
-      });
+      } as any);
 
       res.status(201).json({ 
         ...invite,
