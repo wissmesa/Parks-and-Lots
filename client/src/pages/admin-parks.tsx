@@ -23,7 +23,7 @@ interface Park {
   address: string;
   city: string;
   state: string;
-  zipCode: string;
+  zip: string;
   companyId: string;
   createdAt: string;
   amenities?: string[];
@@ -49,7 +49,7 @@ export default function AdminParks() {
     address: "",
     city: "",
     state: "",
-    zipCode: "",
+    zip: "",
     companyId: "",
     amenities: [] as string[]
   });
@@ -143,7 +143,7 @@ export default function AdminParks() {
       address: "",
       city: "",
       state: "",
-      zipCode: "",
+      zip: "",
       companyId: "",
       amenities: []
     });
@@ -158,7 +158,7 @@ export default function AdminParks() {
       address: park.address,
       city: park.city,
       state: park.state,
-      zipCode: park.zipCode,
+      zip: park.zip,
       companyId: park.companyId,
       amenities: park.amenities || []
     });
@@ -270,11 +270,11 @@ export default function AdminParks() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="zipCode">Zip Code</Label>
+                    <Label htmlFor="zip">Zip Code</Label>
                     <Input
-                      id="zipCode"
-                      value={formData.zipCode}
-                      onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                      id="zip"
+                      value={formData.zip}
+                      onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
                     />
                   </div>
                   <div className="flex justify-end space-x-2">
@@ -449,11 +449,11 @@ export default function AdminParks() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="edit-zipCode">Zip Code</Label>
+                <Label htmlFor="edit-zip">Zip Code</Label>
                 <Input
-                  id="edit-zipCode"
-                  value={formData.zipCode}
-                  onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                  id="edit-zip"
+                  value={formData.zip}
+                  onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
                 />
               </div>
               
