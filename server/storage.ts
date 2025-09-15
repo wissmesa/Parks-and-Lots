@@ -31,7 +31,7 @@ import {
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, or, like, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -42,21 +42,21 @@ export interface IStorage {
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   
   // Company operations
-  getCompanies(): Promise<Company[]>;
+  getCompanies(includeInactive?: boolean): Promise<Company[]>;
   getCompany(id: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, updates: Partial<InsertCompany>): Promise<Company>;
   deleteCompany(id: string): Promise<void>;
   
   // Park operations
-  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<{ parks: Park[] }>;
+  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; includeInactive?: boolean }): Promise<{ parks: Park[] }>;
   getPark(id: string): Promise<Park | undefined>;
   createPark(park: InsertPark): Promise<Park>;
   updatePark(id: string, updates: Partial<InsertPark>): Promise<Park>;
   deletePark(id: string): Promise<void>;
   
   // Lot operations
-  getLots(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number }): Promise<Lot[]>;
+  getLots(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; includeInactive?: boolean }): Promise<Lot[]>;
   getLot(id: string): Promise<Lot | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: string, updates: Partial<InsertLot>): Promise<Lot>;
@@ -85,11 +85,18 @@ export interface IStorage {
   getInviteByToken(token: string): Promise<Invite | undefined>;
   createInvite(invite: InsertInvite): Promise<Invite>;
   acceptInvite(token: string): Promise<Invite>;
-  getInvites(): Promise<Invite[]>;
   deleteInvite(id: string): Promise<void>;
   deleteUser(id: string): Promise<void>;
   getAllManagerAssignments(): Promise<any[]>;
   removeManagerAssignments(userId: string): Promise<void>;
+  
+  // Missing method declarations
+  getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string; includeInactive?: boolean }): Promise<any[]>;
+  
+  // Unfiltered getters for admin toggle operations (don't filter by isActive)
+  getCompanyAny(id: string): Promise<Company | undefined>;
+  getParkAny(id: string): Promise<Park | undefined>;
+  getLotAny(id: string): Promise<Lot | undefined>;
   
   // Manager assignments
   getManagerAssignments(userId?: string, parkId?: string): Promise<any[]>;
@@ -142,12 +149,26 @@ export class DatabaseStorage implements IStorage {
     return await query.orderBy(asc(users.fullName));
   }
 
-  async getCompanies(): Promise<Company[]> {
-    return await db.select().from(companies).orderBy(asc(companies.name));
+  async getCompanies(includeInactive?: boolean): Promise<Company[]> {
+    if (!includeInactive) {
+      return await db.select().from(companies)
+        .where(eq(companies.isActive, true))
+        .orderBy(asc(companies.name));
+    }
+    
+    return await db.select().from(companies)
+      .orderBy(asc(companies.name));
   }
 
   async getCompany(id: string): Promise<Company | undefined> {
-    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    const [company] = await db.select().from(companies)
+      .where(and(eq(companies.id, id), eq(companies.isActive, true)));
+    return company;
+  }
+
+  async getCompanyAny(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies)
+      .where(eq(companies.id, id));
     return company;
   }
 
@@ -165,9 +186,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(companies).where(eq(companies.id, id));
   }
 
-  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string }): Promise<{ parks: Park[] }> {
-    let query = db.select().from(parks);
+  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; includeInactive?: boolean }): Promise<{ parks: Park[] }> {
+    let query = db.select().from(parks)
+      .innerJoin(companies, eq(parks.companyId, companies.id));
+    
     const conditions = [];
+    
+    if (!filters?.includeInactive) {
+      conditions.push(eq(parks.isActive, true));
+      conditions.push(eq(companies.isActive, true));
+    }
 
     if (filters?.companyId) {
       conditions.push(eq(parks.companyId, filters.companyId));
@@ -181,25 +209,54 @@ export class DatabaseStorage implements IStorage {
     if (filters?.q) {
       const searchTerm = filters.q.toLowerCase();
       conditions.push(
-        or(
-          sql`LOWER(${parks.name}) LIKE ${`%${searchTerm}%`}`,
-          sql`LOWER(${parks.description}) LIKE ${`%${searchTerm}%`}`,
-          sql`LOWER(${parks.address}) LIKE ${`%${searchTerm}%`}`
-        )
+        sql`(
+          LOWER(${parks.name}) LIKE ${'%' + searchTerm + '%'} OR
+          LOWER(COALESCE(${parks.description}, '')) LIKE ${'%' + searchTerm + '%'} OR
+          LOWER(${parks.address}) LIKE ${'%' + searchTerm + '%'}
+        )`
       );
     }
 
-    if (conditions.length > 0) {
-      const parksResult = await query.where(and(...conditions)).orderBy(asc(parks.name));
-      return { parks: parksResult };
-    }
-
-    const parksResult = await query.orderBy(asc(parks.name));
+    const results = await query
+      .where(and(...conditions))
+      .orderBy(asc(parks.name));
+    
+    // Extract only park data from the joined result
+    const parksResult = results.map(row => ({
+      id: row.parks.id,
+      companyId: row.parks.companyId,
+      name: row.parks.name,
+      address: row.parks.address,
+      city: row.parks.city,
+      state: row.parks.state,
+      zip: row.parks.zip,
+      description: row.parks.description,
+      amenities: row.parks.amenities,
+      isActive: row.parks.isActive,
+      createdAt: row.parks.createdAt
+    }));
+    
     return { parks: parksResult };
   }
 
   async getPark(id: string): Promise<Park | undefined> {
-    const [park] = await db.select().from(parks).where(eq(parks.id, id));
+    const results = await db.select()
+      .from(parks)
+      .innerJoin(companies, eq(parks.companyId, companies.id))
+      .where(and(
+        eq(parks.id, id),
+        eq(parks.isActive, true),
+        eq(companies.isActive, true)
+      ));
+    
+    if (results.length === 0) return undefined;
+    
+    return results[0].parks;
+  }
+
+  async getParkAny(id: string): Promise<Park | undefined> {
+    const [park] = await db.select().from(parks)
+      .where(eq(parks.id, id));
     return park;
   }
 
@@ -217,9 +274,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(parks).where(eq(parks.id, id));
   }
 
-  async getLots(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number }): Promise<Lot[]> {
-    let query = db.select().from(lots);
-    const conditions = [eq(lots.isActive, true)];
+  async getLots(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; includeInactive?: boolean }): Promise<Lot[]> {
+    let query = db.select().from(lots)
+      .innerJoin(parks, eq(lots.parkId, parks.id))
+      .innerJoin(companies, eq(parks.companyId, companies.id));
+    
+    const conditions = [];
+    
+    if (!filters?.includeInactive) {
+      conditions.push(eq(lots.isActive, true));
+      conditions.push(eq(parks.isActive, true));
+      conditions.push(eq(companies.isActive, true));
+    }
 
     if (filters?.parkId) {
       conditions.push(eq(lots.parkId, filters.parkId));
@@ -240,10 +306,13 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(lots.bathrooms, filters.bathrooms));
     }
 
-    return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
+    const results = await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
+    
+    // Extract only lot data from the joined result
+    return results.map(row => row.lots);
   }
 
-  async getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string }): Promise<any[]> {
+  async getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string; includeInactive?: boolean }): Promise<any[]> {
     let query = db.select({
       id: lots.id,
       nameOrNumber: lots.nameOrNumber,
@@ -262,9 +331,16 @@ export class DatabaseStorage implements IStorage {
         state: parks.state
       }
     }).from(lots)
-      .innerJoin(parks, eq(lots.parkId, parks.id));
+      .innerJoin(parks, eq(lots.parkId, parks.id))
+      .innerJoin(companies, eq(parks.companyId, companies.id));
     
-    const conditions = [eq(lots.isActive, true)];
+    const conditions = [];
+    
+    if (!filters?.includeInactive) {
+      conditions.push(eq(lots.isActive, true));
+      conditions.push(eq(parks.isActive, true));
+      conditions.push(eq(companies.isActive, true));
+    }
 
     if (filters?.parkId) {
       conditions.push(eq(lots.parkId, filters.parkId));
@@ -288,18 +364,39 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(parks.state, filters.state));
     }
     if (filters?.q) {
-      const searchTerm = `%${filters.q.toLowerCase()}%`;
-      const nameSearch = sql`LOWER(${lots.nameOrNumber}) LIKE ${searchTerm}`;
-      const descSearch = sql`LOWER(${lots.description}) LIKE ${searchTerm}`;
-      const parkSearch = sql`LOWER(${parks.name}) LIKE ${searchTerm}`;
-      conditions.push(or(nameSearch, descSearch, parkSearch));
+      const searchTerm = filters.q.toLowerCase();
+      conditions.push(
+        sql`(
+          LOWER(${lots.nameOrNumber}) LIKE ${'%' + searchTerm + '%'} OR
+          LOWER(${parks.name}) LIKE ${'%' + searchTerm + '%'} OR
+          LOWER(COALESCE(${lots.description}, '')) LIKE ${'%' + searchTerm + '%'}
+        )`
+      );
     }
 
     return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
   }
 
   async getLot(id: string): Promise<Lot | undefined> {
-    const [lot] = await db.select().from(lots).where(eq(lots.id, id));
+    const results = await db.select()
+      .from(lots)
+      .innerJoin(parks, eq(lots.parkId, parks.id))
+      .innerJoin(companies, eq(parks.companyId, companies.id))
+      .where(and(
+        eq(lots.id, id),
+        eq(lots.isActive, true),
+        eq(parks.isActive, true),
+        eq(companies.isActive, true)
+      ));
+    
+    if (results.length === 0) return undefined;
+    
+    return results[0].lots;
+  }
+
+  async getLotAny(id: string): Promise<Lot | undefined> {
+    const [lot] = await db.select().from(lots)
+      .where(eq(lots.id, id));
     return lot;
   }
 
@@ -471,7 +568,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInvite(invite: InsertInvite & { token?: string }): Promise<Invite> {
-    const [newInvite] = await db.insert(invites).values(invite).returning();
+    const inviteData = {
+      ...invite,
+      token: invite.token || '', // Ensure token is provided
+    };
+    const [newInvite] = await db.insert(invites).values(inviteData).returning();
     return newInvite;
   }
 
@@ -579,7 +680,7 @@ export class DatabaseStorage implements IStorage {
       return token;
     } else {
       const [token] = await db.insert(googleCalendarTokens)
-        .values({ userId, ...tokenData })
+        .values({ ...tokenData, userId })
         .returning();
       return token;
     }

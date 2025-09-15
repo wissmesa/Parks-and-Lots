@@ -67,12 +67,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       const managers = await storage.getUsers({ role: 'MANAGER' });
+      const activeManagers = managers.filter(manager => manager.isActive);
       
       res.json({
         totalParks: totalParks.parks?.length || 0,
         activeLots: activeLots.length,
         monthlyBookings: monthlyBookings.length,
-        activeManagers: managers.length
+        activeManagers: activeManagers.length
       });
     } catch (error) {
       console.error('Admin stats error:', error);
@@ -111,6 +112,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Managers list error:', error);
       res.status(500).json({ message: 'Failed to fetch managers' });
+    }
+  });
+
+  // Manager enable/disable
+  app.patch('/api/admin/managers/:id/toggle-active', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const manager = await storage.getUser(req.params.id);
+      if (!manager || manager.role !== 'MANAGER') {
+        return res.status(404).json({ message: 'Manager not found' });
+      }
+      const updatedManager = await storage.updateUser(req.params.id, {
+        isActive: !manager.isActive
+      });
+      res.json(updatedManager);
+    } catch (error) {
+      console.error('Toggle manager active error:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 
@@ -584,7 +602,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company routes
   app.get('/api/companies', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
-      const companies = await storage.getCompanies();
+      const { includeInactive } = req.query;
+      const companies = await storage.getCompanies(includeInactive === 'true');
       res.json(companies);
     } catch (error) {
       console.error('Get companies error:', error);
@@ -682,15 +701,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Park routes (public and protected)
-  app.get('/api/parks', async (req, res) => {
+  // Company enable/disable
+  app.patch('/api/companies/:id/toggle-active', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
-      const { companyId, city, state, q, page = '1', limit = '20' } = req.query;
+      const company = await storage.getCompanyAny(req.params.id);
+      if (!company) {
+        return res.status(404).json({ message: 'Company not found' });
+      }
+      const updatedCompany = await storage.updateCompany(req.params.id, {
+        isActive: !company.isActive
+      });
+      res.json(updatedCompany);
+    } catch (error) {
+      console.error('Toggle company active error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Park routes (public and protected)
+  app.get('/api/parks', async (req: AuthRequest, res) => {
+    try {
+      const { companyId, city, state, q, page = '1', limit = '20', includeInactive } = req.query;
+      
+      // Only admins can see inactive entities
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      
       const filters = {
         companyId: companyId as string,
         city: city as string,
         state: state as string,
-        q: q as string
+        q: q as string,
+        includeInactive: shouldIncludeInactive
       };
 
       const result = await storage.getParks(filters);
@@ -815,10 +856,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lot routes
-  app.get('/api/lots', async (req, res) => {
+  // Park enable/disable
+  app.patch('/api/parks/:id/toggle-active', authenticateToken, requireParkAccess, async (req, res) => {
     try {
-      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20' } = req.query;
+      const park = await storage.getParkAny(req.params.id);
+      if (!park) {
+        return res.status(404).json({ message: 'Park not found' });
+      }
+      const updatedPark = await storage.updatePark(req.params.id, {
+        isActive: !park.isActive
+      });
+      res.json(updatedPark);
+    } catch (error) {
+      console.error('Toggle park active error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Lot routes
+  app.get('/api/lots', async (req: AuthRequest, res) => {
+    try {
+      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20', includeInactive } = req.query;
+      
+      // Only admins can see inactive entities
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
       
       // Handle price range parameter (e.g. "100000-200000", "300000+", "0-100000")
       let parsedMinPrice, parsedMaxPrice;
@@ -841,7 +902,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
         bathrooms: bathrooms ? parseInt(bathrooms as string) : undefined,
         state: state as string,
-        q: q as string
+        q: q as string,
+        includeInactive: shouldIncludeInactive
       };
 
       const lots = await storage.getLotsWithParkInfo(filters);
@@ -953,6 +1015,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lot enable/disable
+  app.patch('/api/lots/:id/toggle-active', authenticateToken, requireLotAccess, async (req, res) => {
+    try {
+      const lot = await storage.getLotAny(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      const updatedLot = await storage.updateLot(req.params.id, {
+        isActive: !lot.isActive
+      });
+      res.json(updatedLot);
+    } catch (error) {
+      console.error('Toggle lot active error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Availability routes
   app.get('/api/lots/:id/availability', async (req, res) => {
     try {
@@ -1019,13 +1098,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Lot not found' });
       }
 
-      // Get assigned manager
+      // Get assigned manager and verify they are active
       const assignments = await storage.getManagerAssignments(undefined, lot.parkId);
       if (assignments.length === 0) {
         return res.status(400).json({ message: 'No manager assigned to this park' });
       }
       
       const managerId = assignments[0].userId;
+      
+      // Verify the assigned manager is active
+      const manager = await storage.getUser(managerId);
+      if (!manager || !manager.isActive) {
+        return res.status(400).json({ message: 'No active manager available for this park' });
+      }
       const startDt = new Date(bookingData.startDt);
       const endDt = new Date(bookingData.endDt);
 

@@ -50,6 +50,7 @@ export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -64,6 +65,7 @@ export const parks = pgTable("parks", {
   zip: varchar("zip").notNull(),
   description: text("description"),
   amenities: text("amenities").array(),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
