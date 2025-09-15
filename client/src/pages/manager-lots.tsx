@@ -26,7 +26,7 @@ import {
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'AVAILABLE' | 'PENDING' | 'SOLD';
+  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
   price: string;
   description: string;
   bedrooms: number;
@@ -53,7 +53,7 @@ export default function ManagerLots() {
   // Form state
   const [formData, setFormData] = useState({
     nameOrNumber: '',
-    status: 'AVAILABLE' as 'AVAILABLE' | 'PENDING' | 'SOLD',
+    status: 'FOR_RENT' as 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE',
     price: '',
     description: '',
     bedrooms: 1,
@@ -95,7 +95,7 @@ export default function ManagerLots() {
       setIsCreateModalOpen(false);
       setFormData({
         nameOrNumber: '',
-        status: 'AVAILABLE',
+        status: 'FOR_RENT',
         price: '',
         description: '',
         bedrooms: 1,
@@ -241,7 +241,7 @@ export default function ManagerLots() {
                         <SelectValue placeholder="Select a park" />
                       </SelectTrigger>
                       <SelectContent>
-                        {assignedParks.map((assignment: any) => (
+                        {Array.isArray(assignedParks) && assignedParks.map((assignment: any) => (
                           <SelectItem key={assignment.parkId} value={assignment.parkId}>
                             {assignment.parkName}
                           </SelectItem>
@@ -317,9 +317,9 @@ export default function ManagerLots() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="AVAILABLE">Available</SelectItem>
-                        <SelectItem value="PENDING">Pending</SelectItem>
-                        <SelectItem value="SOLD">Sold</SelectItem>
+                        <SelectItem value="FOR_RENT">For Rent</SelectItem>
+                        <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                        <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -373,10 +373,9 @@ export default function ManagerLots() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{lot.nameOrNumber}</CardTitle>
                       <Badge variant={
-                        lot.status === 'AVAILABLE' ? 'default' :
-                        lot.status === 'PENDING' ? 'secondary' : 'destructive'
+                        lot.status === 'FOR_RENT' ? 'default' : lot.status === 'RENT_SALE' ? 'secondary' : 'outline'
                       }>
-                        {lot.status}
+                        {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{lot.park.name}</p>
@@ -508,9 +507,9 @@ export default function ManagerLots() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AVAILABLE">Available</SelectItem>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="SOLD">Sold</SelectItem>
+                      <SelectItem value="FOR_RENT">For Rent</SelectItem>
+                      <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                      <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

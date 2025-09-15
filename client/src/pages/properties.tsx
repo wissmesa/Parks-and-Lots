@@ -67,7 +67,7 @@ interface Park {
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE';
+  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
   price: string;
   description: string | null;
   bedrooms: number | null;
@@ -248,6 +248,7 @@ export default function Properties() {
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="FOR_RENT">For Rent</SelectItem>
                     <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                    <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

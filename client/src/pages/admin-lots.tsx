@@ -19,7 +19,7 @@ import { Home, Plus, Edit, Trash2, DollarSign, Camera } from "lucide-react";
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE';
+  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
   price: string;
   description: string | null;
   bedrooms: number | null;
@@ -36,6 +36,12 @@ interface Lot {
 interface Park {
   id: string;
   name: string;
+  companyId: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
 }
 
 export default function AdminLots() {
@@ -46,7 +52,7 @@ export default function AdminLots() {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [formData, setFormData] = useState({
     nameOrNumber: "",
-    status: "FOR_RENT" as 'FOR_RENT' | 'FOR_SALE',
+    status: "FOR_RENT" as 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE',
     price: "",
     description: "",
     bedrooms: "",
@@ -259,6 +265,7 @@ export default function AdminLots() {
                         <SelectContent>
                           <SelectItem value="FOR_RENT">For Rent</SelectItem>
                           <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                          <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -369,14 +376,14 @@ export default function AdminLots() {
                         <Badge variant="outline">
                           {(() => {
                             const park = parkById.get(lot.parkId);
-                            const company = companyById.get(park?.companyId);
+                            const company = park?.companyId ? companyById.get(park.companyId) : null;
                             return company?.name || 'Unknown';
                           })()}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'outline'}>
-                          {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
+                        <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'RENT_SALE' ? 'secondary' : 'outline'}>
+                          {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -471,6 +478,7 @@ export default function AdminLots() {
                     <SelectContent>
                       <SelectItem value="FOR_RENT">For Rent</SelectItem>
                       <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                      <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

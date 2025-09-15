@@ -6,7 +6,7 @@ import { Bed, Bath, Ruler, DollarSign } from "lucide-react";
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE';
+  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
   price: string;
   description?: string;
   bedrooms?: number;
@@ -27,8 +27,8 @@ export function LotCard({ lot, showBookButton = true }: LotCardProps) {
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
               <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
-              <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'secondary'}>
-                {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
+              <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
               </Badge>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
@@ -52,7 +52,7 @@ export function LotCard({ lot, showBookButton = true }: LotCardProps) {
               )}
               <div className="flex items-center">
                 <DollarSign className="w-4 h-4 mr-2" />
-                ${parseFloat(lot.price).toLocaleString()}{lot.status === 'FOR_RENT' ? '/mo' : ''}
+                ${parseFloat(lot.price).toLocaleString()}{lot.status === 'FOR_RENT' || lot.status === 'RENT_SALE' ? '/mo' : ''}
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
