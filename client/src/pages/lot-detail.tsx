@@ -58,6 +58,7 @@ interface Availability {
 
 interface TimeSlot {
   hour: number;
+  minute: number;
   time: string;
   date: Date;
   isAvailable: boolean;
@@ -103,16 +104,19 @@ export default function LotDetail() {
     enabled: !!id,
   });
 
-  // Fetch manager calendar availability
+  // Fetch manager calendar availability - ALWAYS fetch fresh data
   const { data: managerAvailability } = useQuery<{
     busySlots: Array<{ start: string; end: string }>;
     managerConnected: boolean;
   }>({
-    queryKey: ["/api/lots", id, "manager-availability"],
+    queryKey: ["/api/lots", id, "manager-availability"], // Stable key for proper invalidation
+    queryFn: () => fetch(`/api/lots/${id}/manager-availability?ts=${Date.now()}`).then(res => res.json()), // Bypass server cache
     enabled: !!id,
-    staleTime: 30 * 1000, // 30 seconds - short cache for fresh calendar data
-    gcTime: 60 * 1000, // 1 minute garbage collection
-    refetchInterval: 60 * 1000, // Refresh every minute to catch external calendar changes
+    staleTime: 0, // Never use stale data
+    gcTime: 0, // Don't cache at all
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnReconnect: true, // Refetch on network reconnect
   });
 
   if (lotLoading) {
@@ -159,44 +163,48 @@ export default function LotDetail() {
     console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
     console.log(`[DEBUG] Start of week:`, startOfWeek.toString(), `UTC:`, startOfWeek.toISOString());
     
-    // Pre-normalize busy hours for faster comparison
-    const busyHourSet = new Set<string>();
+    // Pre-normalize busy 30-minute slots for faster comparison
+    const busySlotSet = new Set<string>();
     managerBusySlots.forEach(busySlot => {
       const busyStart = new Date(busySlot.start);
       const busyEnd = new Date(busySlot.end);
       
-      // Convert to local time and mark busy hours
-      const startHour = busyStart.getHours();
-      const endHour = busyEnd.getHours();
-      const startDay = busyStart.toDateString();
-      const endDay = busyEnd.toDateString();
+      // Convert to local time and mark busy 30-minute slots
+      const startTime = new Date(busyStart);
+      const endTime = new Date(busyEnd);
       
-      // Mark each hour as busy, but don't mark the end hour if event ends exactly at the hour start
-      const endMinutes = busyEnd.getMinutes();
-      const shouldIncludeEndHour = endMinutes > 0; // Only mark end hour busy if event extends into it
+      // Round down start time to nearest 30-minute boundary
+      startTime.setMinutes(Math.floor(startTime.getMinutes() / 30) * 30, 0, 0);
       
-      for (let hour = startHour; hour < endHour || (hour === endHour && shouldIncludeEndHour); hour++) {
-        const hourKey = `${startDay}:${hour}`;
-        busyHourSet.add(hourKey);
-        
-        // If the busy period spans multiple days, handle that too
-        if (endDay !== startDay && hour === endHour) {
-          const endDayKey = `${endDay}:${hour}`;
-          busyHourSet.add(endDayKey);
-        }
+      // Mark every 30-minute slot that overlaps with the busy period
+      const current = new Date(startTime);
+      while (current < endTime) {
+        const slotKey = `${current.toDateString()}:${current.getHours()}:${current.getMinutes()}`;
+        busySlotSet.add(slotKey);
+        current.setMinutes(current.getMinutes() + 30);
       }
     });
     
-    console.log(`[DEBUG] Created busy hour set with ${busyHourSet.size} entries:`, Array.from(busyHourSet));
+    console.log(`[DEBUG] Created busy 30-minute slot set with ${busySlotSet.size} entries:`, Array.from(busySlotSet));
     
-    const timeSlots = [];
+    // Generate 30-minute time slots from 9am to 7pm
+    const timeSlots: Array<{hour: number, minute: number}> = [];
     for (let hour = 9; hour <= 19; hour++) { // 9am to 7pm
-      timeSlots.push(hour);
+      timeSlots.push({hour, minute: 0}); // Top of hour (9:00, 10:00, etc.)
+      if (hour < 19) { // Don't add 7:30pm, end at 7:00pm
+        timeSlots.push({hour, minute: 30}); // Half hour (9:30, 10:30, etc.)
+      }
     }
     
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + dayOffset);
+      
+      // Skip weekends - no showings on Saturday (6) or Sunday (0)
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        continue; // Skip Saturday and Sunday
+      }
       
       const daySchedule: DaySchedule = {
         date,
@@ -205,10 +213,12 @@ export default function LotDetail() {
         slots: []
       };
       
-      for (const hour of timeSlots) {
-        // Create slot times in user's local timezone
-        const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
-        const slotEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 59, 59, 999);
+      for (const timeSlot of timeSlots) {
+        const { hour, minute } = timeSlot;
+        
+        // Create 30-minute slot times in user's local timezone
+        const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute, 0, 0);
+        const slotEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute + 29, 59, 999);
         
         // Check if this time slot has any blockages or showings
         const hasBlockage = availabilityRules.some((rule: Availability) => 
@@ -223,25 +233,30 @@ export default function LotDetail() {
           new Date(showing.endDt) >= slotStart
         );
         
-        // Check if manager is busy using normalized busy hour set
-        const hourKey = `${date.toDateString()}:${hour}`;
-        const isManagerBusy = busyHourSet.has(hourKey);
+        // Check if manager is busy using normalized busy 30-minute slot set
+        const slotKey = `${date.toDateString()}:${hour}:${minute}`;
+        const isManagerBusy = busySlotSet.has(slotKey);
         
         // DEBUG: Special logging for Saturday 10-12 and 1pm slots
         if ((date.getDay() === 6 && (hour === 10 || hour === 11)) || (hour === 13)) {
-          console.log(`[DEBUG] ${daySchedule.dayName} ${hour}:00 slot check:`, {
-            hourKey,
+          console.log(`[DEBUG] ${daySchedule.dayName} ${hour}:${minute.toString().padStart(2, '0')} slot check:`, {
+            slotKey,
             isManagerBusy,
-            busyHourSet: Array.from(busyHourSet).filter(k => k.includes(date.toDateString())),
+            busySlotSet: Array.from(busySlotSet).filter(k => k.includes(date.toDateString())),
             hasBlockage,
             hasShowing,
             finalAvailable: !hasBlockage && !hasShowing && !isManagerBusy
           });
         }
         
+        // Format time display (9:00am, 9:30am, 10:00am, etc.)
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')}${hour >= 12 ? 'pm' : 'am'}`;
+        
         const slot: TimeSlot = {
           hour,
-          time: `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`,
+          minute,
+          time: timeDisplay,
           date: new Date(date),
           isAvailable: !hasBlockage && !hasShowing && !isManagerBusy
         };
@@ -386,23 +401,25 @@ export default function LotDetail() {
                       </div>
                     ))}
                     
-                    {/* Time slots */}
-                    {Array.from({length: 11}, (_, hourIndex) => {
-                      const hour = 9 + hourIndex;
-                      const timeDisplay = `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'pm' : 'am'}`;
+                    {/* Time slots - 30-minute intervals */}
+                    {Array.from({length: 22}, (_, slotIndex) => {
+                      const hour = 9 + Math.floor(slotIndex / 2);
+                      const minute = (slotIndex % 2) * 30; // 0 or 30
+                      const displayHour = hour > 12 ? hour - 12 : hour;
+                      const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')}${hour >= 12 ? 'pm' : 'am'}`;
                       
                       return [
-                        <div key={`time-${hour}`} className="py-1 text-xs font-medium text-muted-foreground">
+                        <div key={`time-${hour}-${minute}`} className="py-1 text-xs font-medium text-muted-foreground">
                           {timeDisplay}
                         </div>,
                         ...weeklySchedule.map(day => {
-                          const slot = day.slots.find(s => s.hour === hour);
+                          const slot = day.slots.find(s => s.hour === hour && s.minute === minute);
                           if (!slot) return null;
                           
                           const handleSlotClick = () => {
                             if (slot.isAvailable) {
                               const selectedDate = slot.date.toISOString().split('T')[0];
-                              const selectedTime = `${hour.toString().padStart(2, '0')}:00`;
+                              const selectedTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                               
                               // Use functional update to get the current state value
                               setSelectedSlot(currentSelectedSlot => {
@@ -418,14 +435,14 @@ export default function LotDetail() {
                           
                           // Check if this slot is currently selected
                           const slotDate = slot.date.toISOString().split('T')[0];
-                          const slotTime = `${hour.toString().padStart(2, '0')}:00`;
+                          const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
                           const isSelected = selectedSlot && selectedSlot.date === slotDate && selectedSlot.time === slotTime;
                           
                           return (
                             <button 
-                              key={`${day.dayName}-${hour}`}
+                              key={`${day.dayName}-${hour}-${minute}`}
                               type="button"
-                              data-testid={`slot-${day.dayName}-${hour}`}
+                              data-testid={`slot-${day.dayName}-${hour}-${minute}`}
                               onPointerUp={(e) => {
                                 e.preventDefault();
                                 handleSlotClick();
