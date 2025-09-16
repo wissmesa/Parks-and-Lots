@@ -20,7 +20,9 @@ import {
   DollarSign, 
   Bed, 
   Bath, 
-  Ruler 
+  Ruler,
+  Eye,
+  EyeOff 
 } from "lucide-react";
 
 interface Lot {
@@ -33,6 +35,7 @@ interface Lot {
   bathrooms: number;
   sqFt: number;
   parkId: string;
+  isActive: boolean;
   park: {
     id: string;
     name: string;
@@ -159,6 +162,29 @@ export default function ManagerLots() {
     },
   });
 
+  // Toggle lot active/inactive mutation
+  const toggleLotActiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("PATCH", `/api/lots/${id}/toggle-active`);
+      return response.json();
+    },
+    onSuccess: (updatedLot) => {
+      toast({
+        title: "Lot Updated",
+        description: `Lot ${updatedLot.isActive ? 'enabled' : 'disabled'} successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/stats"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await createLotMutation.mutateAsync(formData);
@@ -193,6 +219,10 @@ export default function ManagerLots() {
     if (confirm('Are you sure you want to delete this lot?')) {
       await deleteLotMutation.mutateAsync(id);
     }
+  };
+
+  const handleToggleActive = async (id: string) => {
+    await toggleLotActiveMutation.mutateAsync(id);
   };
 
   const assignedParks = assignments || [];
@@ -368,15 +398,20 @@ export default function ManagerLots() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
-                <Card key={lot.id}>
+                <Card key={lot.id} className={!lot.isActive ? "opacity-60" : ""}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{lot.nameOrNumber}</CardTitle>
-                      <Badge variant={
-                        lot.status === 'FOR_RENT' ? 'default' : lot.status === 'RENT_SALE' ? 'secondary' : 'outline'
-                      }>
-                        {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={
+                          lot.status === 'FOR_RENT' ? 'default' : lot.status === 'RENT_SALE' ? 'secondary' : 'outline'
+                        }>
+                          {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
+                        </Badge>
+                        <Badge variant={lot.isActive ? 'default' : 'destructive'}>
+                          {lot.isActive ? 'Visible' : 'Hidden'}
+                        </Badge>
+                      </div>
                     </div>
                     <p className="text-sm text-muted-foreground">{lot.park.name}</p>
                   </CardHeader>
@@ -409,6 +444,17 @@ export default function ManagerLots() {
                       )}
                       
                       <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleActive(lot.id)}
+                          className={`${lot.isActive ? 'text-accent' : 'text-muted-foreground'}`}
+                          disabled={toggleLotActiveMutation.isPending}
+                          data-testid={`button-toggle-lot-${lot.id}`}
+                        >
+                          {lot.isActive ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
+                          {lot.isActive ? 'Disable' : 'Enable'}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"

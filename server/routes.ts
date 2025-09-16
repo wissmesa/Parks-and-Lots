@@ -171,7 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let availableLots = 0;
       for (const parkId of parkIds) {
         const lots = await storage.getLots({ parkId });
-        availableLots += lots.filter(lot => lot.status === 'FOR_RENT' || lot.status === 'FOR_SALE').length;
+        availableLots += lots.filter(lot => lot.isActive).length;
       }
 
       const showings = await storage.getShowings({ managerId: req.user!.id });

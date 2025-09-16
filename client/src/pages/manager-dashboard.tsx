@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar,
   Home,
-  Clock,
   Phone,
   Check,
   X,
@@ -44,14 +43,15 @@ export default function ManagerDashboard() {
   });
 
 
-  const managerStats = stats || {
+  const managerStats = stats as { todayShowings: number; availableLots: number } || {
     todayShowings: 0,
-    availableLots: 0,
-    pendingRequests: 0
+    availableLots: 0
   };
+  
+  // Type-safe access to arrays
+  const assignedParksArray = Array.isArray(assignments) ? assignments : [];
+  const showingsArray = Array.isArray(todayShowings) ? todayShowings : [];
 
-  const assignedParks = assignments || [];
-  const showings = todayShowings || [];
 
   if (user?.role !== 'MANAGER') {
     return (
@@ -80,7 +80,7 @@ export default function ManagerDashboard() {
                 Welcome back, {user.fullName?.split(' ')[0] || 'Manager'}
               </h1>
               <p className="text-muted-foreground">
-                Managing {assignedParks.length > 0 ? assignedParks.map((a: any) => a.parkName).join(', ') : 'No parks assigned'}
+                Managing {assignedParksArray.length > 0 ? assignedParksArray.map((a: any) => a.parkName).join(', ') : 'No parks assigned'}
               </p>
             </div>
             
@@ -92,7 +92,7 @@ export default function ManagerDashboard() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -109,22 +109,10 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Available Lots</p>
+                    <p className="text-sm text-muted-foreground">Visible Lots</p>
                     <p className="text-2xl font-bold text-foreground">{managerStats.availableLots}</p>
                   </div>
                   <Home className="w-8 h-8 text-accent" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pending Requests</p>
-                    <p className="text-2xl font-bold text-foreground">{managerStats.pendingRequests}</p>
-                  </div>
-                  <Clock className="w-8 h-8 text-yellow-500" />
                 </div>
               </CardContent>
             </Card>
@@ -146,11 +134,11 @@ export default function ManagerDashboard() {
               </div>
             </div>
             <CardContent className="p-6">
-              {showings.length === 0 ? (
+              {showingsArray.length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">No showings scheduled for today</p>
               ) : (
                 <div className="space-y-4">
-                  {showings.map((showing: any) => (
+                  {showingsArray.map((showing: any) => (
                     <div key={showing.id} className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
                       <div className="text-center">
                         <div className="text-sm font-medium text-foreground">
