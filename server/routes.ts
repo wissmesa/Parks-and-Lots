@@ -1268,7 +1268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lotId = req.params.id;
       const bookingData = bookingSchema.parse(req.body);
       
-      const lot = await storage.getLot(lotId);
+      const lotsWithPark = await storage.getLotsWithParkInfo({ 
+        parkId: undefined, 
+        includeInactive: true 
+      });
+      const lot = lotsWithPark.find(l => l.id === lotId);
       if (!lot) {
         return res.status(404).json({ message: 'Lot not found' });
       }
@@ -1330,7 +1334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (await googleCalendarService.isCalendarConnected(managerId)) {
           const event = {
             summary: `Property Showing - ${bookingData.clientName}`,
-            description: `Property showing for lot ${lot.id}\n\nClient: ${bookingData.clientName}\nEmail: ${bookingData.clientEmail}\nPhone: ${bookingData.clientPhone || 'N/A'}`,
+            description: `Property showing for ${lot.park.name} - Lot ${lot.nameOrNumber}\n\nClient: ${bookingData.clientName}\nEmail: ${bookingData.clientEmail}\nPhone: ${bookingData.clientPhone || 'N/A'}`,
             start: {
               dateTime: startDt.toISOString(),
               timeZone: 'UTC',
@@ -1405,9 +1409,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (updates.status === 'CANCELED' && updatedShowing.calendarEventId) {
             await googleCalendarService.deleteCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId);
           } else if (updatedShowing.calendarEventId) {
+            // Fetch lot with park information for proper description
+            const lotsWithPark = await storage.getLotsWithParkInfo({ includeInactive: true });
+            const lotWithPark = lotsWithPark.find(l => l.id === updatedShowing.lotId);
+            const lotDescription = lotWithPark 
+              ? `${lotWithPark.park.name} - Lot ${lotWithPark.nameOrNumber}`
+              : `lot ${updatedShowing.lotId}`;
+            
             const event = {
               summary: `Property Showing - ${updatedShowing.clientName}`,
-              description: `Property showing for lot ${updatedShowing.lotId}\n\nClient: ${updatedShowing.clientName}\nEmail: ${updatedShowing.clientEmail}\nPhone: ${updatedShowing.clientPhone}`,
+              description: `Property showing for ${lotDescription}\n\nClient: ${updatedShowing.clientName}\nEmail: ${updatedShowing.clientEmail}\nPhone: ${updatedShowing.clientPhone}`,
               start: {
                 dateTime: updatedShowing.startDt.toISOString(),
                 timeZone: 'UTC',

@@ -85,9 +85,16 @@ export class CalendarService {
       const oauth2Client = await this.getAuthenticatedClient(managerId);
       const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+      // Fetch lot with park information for proper description
+      const lotsWithPark = await storage.getLotsWithParkInfo({ includeInactive: true });
+      const lotWithPark = lotsWithPark.find(l => l.id === showing.lotId);
+      const lotDescription = lotWithPark 
+        ? `${lotWithPark.park.name} - Lot ${lotWithPark.nameOrNumber}`
+        : `lot ${showing.lotId}`;
+
       const event = {
         summary: `Property Showing - ${showing.clientName}`,
-        description: `Property showing for lot ${showing.lotId}\n\nClient: ${showing.clientName}\nEmail: ${showing.clientEmail}\nPhone: ${showing.clientPhone}`,
+        description: `Property showing for ${lotDescription}\n\nClient: ${showing.clientName}\nEmail: ${showing.clientEmail}\nPhone: ${showing.clientPhone}`,
         start: {
           dateTime: showing.startDt.toISOString(),
           timeZone: 'UTC',
@@ -133,9 +140,16 @@ export class CalendarService {
       const oauth2Client = await this.getAuthenticatedClient(managerId);
       const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+      // Fetch lot with park information for proper description
+      const lotsWithPark = await storage.getLotsWithParkInfo({ includeInactive: true });
+      const lotWithPark = lotsWithPark.find(l => l.id === showing.lotId);
+      const lotDescription = lotWithPark 
+        ? `${lotWithPark.park.name} - Lot ${lotWithPark.nameOrNumber}`
+        : `lot ${showing.lotId}`;
+
       const event = {
         summary: `Property Showing - ${showing.clientName}`,
-        description: `Property showing for lot ${showing.lotId}\n\nClient: ${showing.clientName}\nEmail: ${showing.clientEmail}\nPhone: ${showing.clientPhone}`,
+        description: `Property showing for ${lotDescription}\n\nClient: ${showing.clientName}\nEmail: ${showing.clientEmail}\nPhone: ${showing.clientPhone}`,
         start: {
           dateTime: showing.startDt.toISOString(),
           timeZone: 'UTC',
