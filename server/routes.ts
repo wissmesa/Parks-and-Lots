@@ -449,6 +449,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Calendar sync endpoint - Admin only 
+  app.post('/api/admin/sync-calendar', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const dryRun = req.query.dryRun === 'true';
+      console.log(`[Calendar Sync API] Starting ${dryRun ? 'DRY RUN' : 'LIVE'} sync triggered by admin user ${req.user?.id}`);
+      
+      const result = await googleCalendarService.syncShowingsWithCalendar(dryRun);
+      
+      console.log(`[Calendar Sync API] Sync completed. ${dryRun ? 'Would clean' : 'Cleaned'}: ${result.cleaned}, Errors: ${result.errors.length}, Audits: ${result.audits.length}`);
+      
+      res.json({
+        success: true,
+        dryRun,
+        cleaned: result.cleaned,
+        errors: result.errors,
+        audits: result.audits,
+        message: `${dryRun ? 'DRY RUN - Would clean' : 'Cleaned'} ${result.cleaned} orphaned records. ${result.errors.length} errors encountered.`
+      });
+    } catch (error) {
+      console.error('[Calendar Sync API] Sync failed:', error);
+      res.status(500).json({ 
+        success: false,
+        message: 'Calendar sync failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Get manager availability for a specific lot (used for availability checking)
   // Public endpoint that only returns busy time ranges without personal details
   app.get('/api/lots/:id/manager-availability', async (req, res) => {

@@ -458,48 +458,103 @@ export class GoogleCalendarService {
   }
 
   /**
-   * Sync database showings with Google Calendar - clean up orphaned records
+   * Sync database showings with Google Calendar - SAFELY clean up orphaned records
+   * Only deletes records when we can CONFIRM the calendar event was deleted (404 error)
    */
-  async syncShowingsWithCalendar(): Promise<{ cleaned: number; errors: string[] }> {
-    console.log('[Calendar Sync] Starting sync to clean up orphaned showing records');
+  async syncShowingsWithCalendar(dryRun: boolean = false): Promise<{ cleaned: number; errors: string[]; audits: string[] }> {
+    console.log(`[Calendar Sync] Starting ${dryRun ? 'DRY RUN' : 'LIVE'} sync to clean up orphaned showing records`);
     
     let cleanedCount = 0;
     const errors: string[] = [];
+    const audits: string[] = [];
     
     try {
-      // Get all scheduled showings with calendar event IDs
+      // Get all FUTURE scheduled showings with calendar event IDs
       const showings = await storage.getScheduledShowingsWithCalendarIds();
+      const now = new Date();
+      const futureShowings = showings.filter(showing => new Date(showing.startDt) > now);
       
-      console.log(`[Calendar Sync] Found ${showings.length} scheduled showings with calendar event IDs`);
+      console.log(`[Calendar Sync] Found ${futureShowings.length} future scheduled showings with calendar event IDs (${showings.length} total)`);
       
-      for (const showing of showings) {
-        if (!showing.calendarEventId) continue;
-        
+      // Group by manager to reuse calendar clients and handle token issues
+      const showingsByManager = new Map<string, typeof futureShowings>();
+      for (const showing of futureShowings) {
+        if (!showingsByManager.has(showing.managerId)) {
+          showingsByManager.set(showing.managerId, []);
+        }
+        showingsByManager.get(showing.managerId)!.push(showing);
+      }
+      
+      for (const [managerId, managerShowings] of Array.from(showingsByManager.entries())) {
         try {
-          // Check if the calendar event still exists
-          const eventExists = await this.eventExists(showing.managerId, showing.calendarEventId);
-          
-          if (!eventExists) {
-            console.log(`[Calendar Sync] Event ${showing.calendarEventId} not found, cleaning up showing ${showing.id}`);
-            
-            // Delete the orphaned showing record
-            await storage.deleteShowing(showing.id);
-            cleanedCount++;
+          // Check if manager has valid calendar connection
+          const hasValidToken = await this.isCalendarConnected(managerId);
+          if (!hasValidToken) {
+            console.log(`[Calendar Sync] Skipping manager ${managerId} - no valid calendar connection`);
+            continue;
           }
-        } catch (error: any) {
-          const errorMsg = `Failed to check/clean showing ${showing.id}: ${error.message}`;
+          
+          console.log(`[Calendar Sync] Checking ${managerShowings.length} showings for manager ${managerId}`);
+          
+          for (const showing of managerShowings) {
+            if (!showing.calendarEventId) continue;
+            
+            try {
+              // Check if the calendar event still exists - ONLY delete on confirmed 404
+              const eventExists = await this.eventExists(showing.managerId, showing.calendarEventId);
+              
+              if (!eventExists) {
+                const auditMsg = `ORPHAN DETECTED: Showing ${showing.id} (client: ${showing.clientName}, time: ${showing.startDt}) has calendar event ${showing.calendarEventId} that no longer exists`;
+                console.log(`[Calendar Sync] ${auditMsg}`);
+                audits.push(auditMsg);
+                
+                if (!dryRun) {
+                  // Delete the confirmed orphaned showing record
+                  await storage.deleteShowing(showing.id);
+                  cleanedCount++;
+                  console.log(`[Calendar Sync] DELETED orphaned showing ${showing.id}`);
+                } else {
+                  console.log(`[Calendar Sync] DRY RUN - would delete showing ${showing.id}`);
+                }
+              }
+            } catch (error: any) {
+              // CRITICAL: Only treat 404 as "event deleted" - all other errors are skipped for safety
+              if (error?.status === 404 || error?.code === 404) {
+                const auditMsg = `ORPHAN DETECTED: Showing ${showing.id} calendar event ${showing.calendarEventId} returned 404 - event was deleted`;
+                console.log(`[Calendar Sync] ${auditMsg}`);
+                audits.push(auditMsg);
+                
+                if (!dryRun) {
+                  await storage.deleteShowing(showing.id);
+                  cleanedCount++;
+                  console.log(`[Calendar Sync] DELETED orphaned showing ${showing.id} (404 confirmed)`);
+                } else {
+                  console.log(`[Calendar Sync] DRY RUN - would delete showing ${showing.id} (404 confirmed)`);
+                }
+              } else {
+                // All other errors (auth, network, permissions, etc.) are safely ignored
+                const errorMsg = `Skipping showing ${showing.id} due to non-404 error: ${error.message}`;
+                console.log(`[Calendar Sync] ${errorMsg}`);
+                errors.push(errorMsg);
+              }
+            }
+          }
+        } catch (managerError: any) {
+          const errorMsg = `Failed to process manager ${managerId}: ${managerError.message}`;
           console.error(`[Calendar Sync] ${errorMsg}`);
           errors.push(errorMsg);
         }
       }
       
-      console.log(`[Calendar Sync] Completed sync. Cleaned up ${cleanedCount} orphaned records`);
+      const summary = `[Calendar Sync] ${dryRun ? 'DRY RUN' : 'LIVE'} completed. ${dryRun ? 'Would clean' : 'Cleaned'} ${cleanedCount} orphaned records. Errors: ${errors.length}`;
+      console.log(summary);
+      audits.push(summary);
       
-      return { cleaned: cleanedCount, errors };
+      return { cleaned: cleanedCount, errors, audits };
     } catch (error: any) {
       const errorMsg = `Calendar sync failed: ${error.message}`;
       console.error(`[Calendar Sync] ${errorMsg}`);
-      return { cleaned: cleanedCount, errors: [errorMsg] };
+      return { cleaned: cleanedCount, errors: [errorMsg], audits };
     }
   }
 }

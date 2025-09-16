@@ -84,7 +84,7 @@ export interface IStorage {
   // Invite operations
   getInvites(): Promise<Invite[]>;
   getInviteByToken(token: string): Promise<Invite | undefined>;
-  createInvite(invite: InsertInvite): Promise<Invite>;
+  createInvite(invite: InsertInvite & { token: string; expiresAt: Date }): Promise<Invite>;
   acceptInvite(token: string): Promise<Invite>;
   deleteInvite(id: string): Promise<void>;
   deleteUser(id: string): Promise<void>;
@@ -581,12 +581,8 @@ export class DatabaseStorage implements IStorage {
     return invite;
   }
 
-  async createInvite(invite: InsertInvite & { token?: string }): Promise<Invite> {
-    const inviteData = {
-      ...invite,
-      token: invite.token || '', // Ensure token is provided
-    };
-    const [newInvite] = await db.insert(invites).values(inviteData).returning();
+  async createInvite(invite: InsertInvite & { token: string; expiresAt: Date }): Promise<Invite> {
+    const [newInvite] = await db.insert(invites).values(invite).returning();
     return newInvite;
   }
 
