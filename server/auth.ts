@@ -103,7 +103,7 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return next();
   }
 
-  const lotId = req.params.lotId || req.body.lotId;
+  const lotId = req.params.lotId || req.params.id || req.body.lotId;
   if (!lotId) {
     return res.status(400).json({ message: 'Lot ID required' });
   }
