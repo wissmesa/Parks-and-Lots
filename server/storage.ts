@@ -31,7 +31,7 @@ import {
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -69,6 +69,7 @@ export interface IStorage {
   updateShowing(id: string, updates: Partial<InsertShowing>): Promise<Showing>;
   deleteShowing(id: string): Promise<void>;
   checkShowingOverlap(lotId: string, startDt: Date, endDt: Date, excludeId?: string): Promise<boolean>;
+  getScheduledShowingsWithCalendarIds(): Promise<Showing[]>;
   
   // Availability operations
   getAvailability(lotId: string): Promise<Availability[]>;
@@ -504,6 +505,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShowing(id: string): Promise<void> {
     await db.delete(showings).where(eq(showings.id, id));
+  }
+
+  async getScheduledShowingsWithCalendarIds(): Promise<Showing[]> {
+    const results = await db.select().from(showings)
+      .where(
+        and(
+          eq(showings.status, 'SCHEDULED'),
+          isNotNull(showings.calendarEventId)
+        )
+      )
+      .orderBy(asc(showings.startDt));
+    
+    return results;
   }
 
   async checkShowingOverlap(lotId: string, startDt: Date, endDt: Date, excludeId?: string): Promise<boolean> {

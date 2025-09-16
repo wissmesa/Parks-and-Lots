@@ -433,6 +433,75 @@ export class GoogleCalendarService {
       return [];
     }
   }
+
+  /**
+   * Check if a specific calendar event exists
+   */
+  async eventExists(userId: string, eventId: string): Promise<boolean> {
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      await calendar.events.get({
+        calendarId: 'primary',
+        eventId: eventId
+      });
+      
+      return true;
+    } catch (error: any) {
+      if (error?.status === 404 || error?.code === 404) {
+        return false; // Event not found
+      }
+      
+      console.error(`Error checking if event ${eventId} exists:`, error);
+      throw error; // Re-throw non-404 errors
+    }
+  }
+
+  /**
+   * Sync database showings with Google Calendar - clean up orphaned records
+   */
+  async syncShowingsWithCalendar(): Promise<{ cleaned: number; errors: string[] }> {
+    console.log('[Calendar Sync] Starting sync to clean up orphaned showing records');
+    
+    let cleanedCount = 0;
+    const errors: string[] = [];
+    
+    try {
+      // Get all scheduled showings with calendar event IDs
+      const showings = await storage.getScheduledShowingsWithCalendarIds();
+      
+      console.log(`[Calendar Sync] Found ${showings.length} scheduled showings with calendar event IDs`);
+      
+      for (const showing of showings) {
+        if (!showing.calendarEventId) continue;
+        
+        try {
+          // Check if the calendar event still exists
+          const eventExists = await this.eventExists(showing.managerId, showing.calendarEventId);
+          
+          if (!eventExists) {
+            console.log(`[Calendar Sync] Event ${showing.calendarEventId} not found, cleaning up showing ${showing.id}`);
+            
+            // Delete the orphaned showing record
+            await storage.deleteShowing(showing.id);
+            cleanedCount++;
+          }
+        } catch (error: any) {
+          const errorMsg = `Failed to check/clean showing ${showing.id}: ${error.message}`;
+          console.error(`[Calendar Sync] ${errorMsg}`);
+          errors.push(errorMsg);
+        }
+      }
+      
+      console.log(`[Calendar Sync] Completed sync. Cleaned up ${cleanedCount} orphaned records`);
+      
+      return { cleaned: cleanedCount, errors };
+    } catch (error: any) {
+      const errorMsg = `Calendar sync failed: ${error.message}`;
+      console.error(`[Calendar Sync] ${errorMsg}`);
+      return { cleaned: cleanedCount, errors: [errorMsg] };
+    }
+  }
 }
 
 export const googleCalendarService = new GoogleCalendarService();
