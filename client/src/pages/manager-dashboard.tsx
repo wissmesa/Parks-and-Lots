@@ -10,9 +10,9 @@ import {
   Calendar,
   Home,
   Phone,
-  Check,
-  X,
-  ExternalLink
+  ExternalLink,
+  MapPin,
+  Building
 } from "lucide-react";
 import { useEffect } from "react";
 
@@ -43,9 +43,11 @@ export default function ManagerDashboard() {
   });
 
 
-  const managerStats = stats as { todayShowings: number; availableLots: number } || {
+  const managerStats = stats as { todayShowings: number; availableLots: number; parkCount: number; totalLots: number } || {
     todayShowings: 0,
-    availableLots: 0
+    availableLots: 0,
+    parkCount: 0,
+    totalLots: 0
   };
   
   // Type-safe access to arrays
@@ -92,13 +94,13 @@ export default function ManagerDashboard() {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Today's Showings</p>
-                    <p className="text-2xl font-bold text-foreground">{managerStats.todayShowings}</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-todays-showings">{managerStats.todayShowings}</p>
                   </div>
                   <Calendar className="w-8 h-8 text-primary" />
                 </div>
@@ -109,8 +111,32 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
+                    <p className="text-sm text-muted-foreground">My Parks</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-parks">{managerStats.parkCount}</p>
+                  </div>
+                  <MapPin className="w-8 h-8 text-emerald-500" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">My Lots</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-lots">{managerStats.totalLots}</p>
+                  </div>
+                  <Building className="w-8 h-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
                     <p className="text-sm text-muted-foreground">Visible Lots</p>
-                    <p className="text-2xl font-bold text-foreground">{managerStats.availableLots}</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-visible-lots">{managerStats.availableLots}</p>
                   </div>
                   <Home className="w-8 h-8 text-accent" />
                 </div>
@@ -155,12 +181,6 @@ export default function ManagerDashboard() {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Button size="sm" variant="ghost" className="text-accent hover:text-accent/80" data-testid={`button-complete-showing-${showing.id}`}>
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive/80" data-testid={`button-cancel-showing-${showing.id}`}>
-                          <X className="w-4 h-4" />
-                        </Button>
                         {showing.calendarHtmlLink && (
                           <Button size="sm" variant="ghost" asChild>
                             <a href={showing.calendarHtmlLink} target="_blank" rel="noopener noreferrer">

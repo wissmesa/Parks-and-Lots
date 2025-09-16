@@ -169,9 +169,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parkIds = assignments.map((a: any) => a.parkId);
       
       let availableLots = 0;
+      let totalLots = 0;
       for (const parkId of parkIds) {
-        const lots = await storage.getLots({ parkId });
-        availableLots += lots.filter(lot => lot.isActive).length;
+        const activeLots = await storage.getLots({ parkId });
+        const allLots = await storage.getLotsWithParkInfo({ parkId, includeInactive: true });
+        availableLots += activeLots.filter(lot => lot.isActive).length;
+        totalLots += allLots.length;
       }
 
       const showings = await storage.getShowings({ managerId: req.user!.id });
@@ -189,7 +192,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         todayShowings: todayShowings.length,
         availableLots,
-        pendingRequests
+        pendingRequests,
+        parkCount: parkIds.length,
+        totalLots
       });
     } catch (error) {
       console.error('Manager stats error:', error);
