@@ -165,22 +165,29 @@ export default function ManagerDashboard() {
               ) : (
                 <div className="space-y-4">
                   {showingsArray.map((showing: any) => (
-                    <div key={showing.id} className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
-                      <div className="text-center">
-                        <div className="text-sm font-medium text-foreground">
+                    <div key={showing.id} className="grid grid-cols-12 gap-4 p-4 bg-muted rounded-lg">
+                      {/* Time Section */}
+                      <div className="col-span-3 text-center">
+                        <div className="text-lg font-bold text-foreground">
                           {new Date(showing.startDt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                         <div className="text-xs text-muted-foreground">30 min</div>
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{showing.clientName}</div>
-                        <div className="text-xs text-muted-foreground">{showing.lotName || `Lot ${showing.lotId}`}</div>
-                        <div className="text-xs text-muted-foreground flex items-center">
-                          <Phone className="w-3 h-3 mr-1" />
-                          {showing.clientPhone}
-                        </div>
+                      
+                      {/* Client Info */}
+                      <div className="col-span-4">
+                        <div className="font-medium text-base">{showing.clientName}</div>
+                        <div className="text-sm text-muted-foreground mt-1">{showing.lotName || `Lot ${showing.lotId}`}</div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      
+                      {/* Contact Info */}
+                      <div className="col-span-3 flex items-center">
+                        <Phone className="w-4 h-4 mr-2 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">{showing.clientPhone}</span>
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="col-span-2 flex justify-end">
                         {showing.calendarHtmlLink && (
                           <Button size="sm" variant="ghost" asChild>
                             <a href={showing.calendarHtmlLink} target="_blank" rel="noopener noreferrer">
