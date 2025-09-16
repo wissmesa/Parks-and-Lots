@@ -178,6 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalLots += allLots.length;
       }
 
+      // Get database showings for fallback and completed/cancelled counts
       const showings = await storage.getShowings({ managerId: req.user!.id });
       const today = new Date();
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -192,27 +193,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 6);
       endOfWeek.setHours(23, 59, 59, 999);
-      
-      const todayShowings = showings.filter(showing => {
-        const showingDate = new Date(showing.startDt);
-        return showingDate >= startOfDay && showingDate < endOfDay;
-      });
 
-      const thisWeekShowings = showings.filter(showing => {
-        const showingDate = new Date(showing.startDt);
-        return showingDate >= startOfWeek && showingDate <= endOfWeek;
-      });
+      // Try to get accurate counts from Google Calendar
+      let scheduledCount = 0;
+      let todayShowings = 0;
+      let thisWeekShowings = 0;
 
-      // Count by status (treat SCHEDULED and CONFIRMED as upcoming/scheduled)
-      const scheduledCount = showings.filter(showing => 
-        showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
-      ).length;
+      try {
+        // Check if manager has Google Calendar connected
+        const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
+        
+        if (isConnected) {
+          // Fetch calendar events for the relevant time ranges more efficiently
+          const oneMonthBack = new Date(today);
+          oneMonthBack.setMonth(oneMonthBack.getMonth() - 1);
+          const oneMonthForward = new Date(today);
+          oneMonthForward.setMonth(oneMonthForward.getMonth() + 1);
+          
+          const calendarEvents = await googleCalendarService.getUserCalendarEvents(
+            req.user!.id, 
+            oneMonthBack, 
+            oneMonthForward
+          );
+
+          // Get database showings with calendar event IDs
+          const showingsWithCalendarIds = showings.filter(showing => 
+            showing.calendarEventId && (showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED')
+          );
+
+          // Filter property showing events and create a map for efficient lookup
+          const propertyShowingEvents = calendarEvents.filter(event => 
+            event.id && event.summary && event.summary.includes('Property Showing')
+          );
+
+          const calendarEventMap = new Map(
+            propertyShowingEvents.map(event => [event.id!, event])
+          );
+
+          // Filter showings that have corresponding calendar events and use calendar times
+          const validShowings = showingsWithCalendarIds.filter(showing => 
+            calendarEventMap.has(showing.calendarEventId!)
+          );
+
+          // Count based on calendar event times for accuracy
+          scheduledCount = validShowings.filter(showing => {
+            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
+            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
+            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+            return eventStart > today;
+          }).length;
+
+          // Count today's showings using calendar event times
+          todayShowings = validShowings.filter(showing => {
+            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
+            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
+            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+            return eventStart >= startOfDay && eventStart < endOfDay;
+          }).length;
+
+          // Count this week's showings using calendar event times
+          thisWeekShowings = validShowings.filter(showing => {
+            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
+            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
+            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+            return eventStart >= startOfWeek && eventStart <= endOfWeek;
+          }).length;
+        } else {
+          // Fallback to database counts if calendar not connected
+          scheduledCount = showings.filter(showing => 
+            showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
+          ).length;
+
+          todayShowings = showings.filter(showing => {
+            const showingDate = new Date(showing.startDt);
+            return showingDate >= startOfDay && showingDate < endOfDay;
+          }).length;
+
+          thisWeekShowings = showings.filter(showing => {
+            const showingDate = new Date(showing.startDt);
+            return showingDate >= startOfWeek && showingDate <= endOfWeek;
+          }).length;
+        }
+      } catch (calendarError) {
+        console.log('Calendar verification failed, falling back to database counts:', calendarError);
+        // Fallback to database counts
+        scheduledCount = showings.filter(showing => 
+          showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
+        ).length;
+
+        todayShowings = showings.filter(showing => {
+          const showingDate = new Date(showing.startDt);
+          return showingDate >= startOfDay && showingDate < endOfDay;
+        }).length;
+
+        thisWeekShowings = showings.filter(showing => {
+          const showingDate = new Date(showing.startDt);
+          return showingDate >= startOfWeek && showingDate <= endOfWeek;
+        }).length;
+      }
+
+      // Always use database for completed/cancelled counts as these are managed internally
       const completedCount = showings.filter(showing => showing.status === 'COMPLETED').length;
       const cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
 
       res.json({
-        todayShowings: todayShowings.length,
-        thisWeekShowings: thisWeekShowings.length,
+        todayShowings,
+        thisWeekShowings,
         scheduledCount,
         completedCount,
         cancelledCount,
