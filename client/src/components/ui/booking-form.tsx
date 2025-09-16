@@ -96,6 +96,34 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate all required fields
+    if (!clientName.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your full name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!clientEmail.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!clientPhone.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter your phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedDate || !selectedTime) {
       toast({
         title: "Missing Information",
