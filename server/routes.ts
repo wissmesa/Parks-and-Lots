@@ -205,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let allLots = [];
       for (const parkId of parkIds) {
-        const lots = await storage.getLotsWithParkInfo({ parkId });
+        const lots = await storage.getLotsWithParkInfo({ parkId, includeInactive: true });
         allLots.push(...lots);
       }
       
