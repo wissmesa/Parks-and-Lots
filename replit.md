@@ -72,3 +72,12 @@ Preferred communication style: Simple, everyday language.
 ### File Upload
 - **Multer**: Express middleware for handling multipart/form-data uploads
 - **File System**: Local storage with future S3 abstraction capability
+
+## Recent Changes
+
+### Manager Dashboard Improvements (September 2025)
+- **Simplified Dashboard Layout**: Removed "Pending Requests" section, streamlined to 2-column layout with essential metrics only
+- **Lot Visibility Management**: Added enable/disable functionality for lots with visual indicators (badges, icons, opacity changes)
+- **Enhanced UI/UX**: Clear status indicators (Visible/Hidden badges), toggle buttons with eye icons, immediate visual feedback
+- **Accurate Statistics**: "Visible Lots" metric now counts only active (isActive) lots across all statuses
+- **Secure API Integration**: Toggle endpoint with proper authentication and role-based authorization for managers
