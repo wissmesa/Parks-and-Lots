@@ -183,17 +183,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
       
+      // Start of this week (Monday)
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      // End of this week (Sunday)
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      
       const todayShowings = showings.filter(showing => {
         const showingDate = new Date(showing.startDt);
         return showingDate >= startOfDay && showingDate < endOfDay;
       });
 
-      const pendingRequests = showings.filter(showing => showing.status === 'SCHEDULED').length;
+      const thisWeekShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfWeek && showingDate <= endOfWeek;
+      });
+
+      // Count by status (treat SCHEDULED and CONFIRMED as upcoming/scheduled)
+      const scheduledCount = showings.filter(showing => 
+        showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
+      ).length;
+      const completedCount = showings.filter(showing => showing.status === 'COMPLETED').length;
+      const cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
 
       res.json({
         todayShowings: todayShowings.length,
+        thisWeekShowings: thisWeekShowings.length,
+        scheduledCount,
+        completedCount,
+        cancelledCount,
         availableLots,
-        pendingRequests,
         parkCount: parkIds.length,
         totalLots
       });

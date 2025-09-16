@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Calendar, Clock, MapPin, User, Search, X } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Search, X, CheckCircle, XCircle, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +17,7 @@ interface Showing {
   id: string;
   startDt: string;
   endDt: string;
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELED';
+  status: 'SCHEDULED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELED';
   clientName: string;
   clientEmail: string;
   clientPhone?: string;
@@ -39,6 +39,17 @@ interface Assignment {
   userName: string;
   userEmail: string;
   parkName: string;
+}
+
+interface ManagerStats {
+  todayShowings: number;
+  thisWeekShowings: number;
+  scheduledCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  availableLots: number;
+  parkCount: number;
+  totalLots: number;
 }
 
 export default function ManagerBookings() {
@@ -64,6 +75,11 @@ export default function ManagerBookings() {
     enabled: user?.role === 'MANAGER',
   });
 
+  const { data: stats } = useQuery<ManagerStats>({
+    queryKey: ["/api/manager/stats"],
+    enabled: user?.role === 'MANAGER',
+  });
+
   // Mutation to cancel a showing
   const cancelShowingMutation = useMutation({
     mutationFn: async (showingId: string) => {
@@ -71,6 +87,7 @@ export default function ManagerBookings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/manager/showings/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/stats"] });
       toast({
         title: "Meeting Cancelled",
         description: "The showing has been successfully cancelled and removed from the calendar.",
@@ -80,6 +97,28 @@ export default function ManagerBookings() {
       toast({
         title: "Cancellation Failed", 
         description: error?.message || "Failed to cancel the showing. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutation to complete a showing
+  const completeShowingMutation = useMutation({
+    mutationFn: async (showingId: string) => {
+      return apiRequest('PATCH', `/api/showings/${showingId}`, { status: 'COMPLETED' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/showings/today"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/stats"] });
+      toast({
+        title: "Meeting Completed",
+        description: "The showing has been marked as completed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Completion Failed", 
+        description: error?.message || "Failed to complete the showing. Please try again.",
         variant: "destructive",
       });
     }
@@ -103,8 +142,9 @@ export default function ManagerBookings() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'SCHEDULED': return 'default';
-      case 'COMPLETED': return 'success';
+      case 'SCHEDULED': return 'secondary';
+      case 'CONFIRMED': return 'default';
+      case 'COMPLETED': return 'outline';
       case 'CANCELED': return 'destructive';
       default: return 'secondary';
     }
@@ -131,28 +171,26 @@ export default function ManagerBookings() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Showings</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
+                <Calendar className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{showings.length}</div>
+                <div className="text-2xl font-bold" data-testid="text-scheduled-count">{stats?.scheduledCount || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  Scheduled for today
+                  Upcoming showings
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {showings.filter(s => s.status === 'COMPLETED').length}
-                </div>
+                <div className="text-2xl font-bold" data-testid="text-completed-count">{stats?.completedCount || 0}</div>
                 <p className="text-xs text-muted-foreground">
                   Successfully completed
                 </p>
@@ -160,15 +198,37 @@ export default function ManagerBookings() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                <User className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
+                <XCircle className="h-4 w-4 text-red-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {showings.filter(s => s.status === 'SCHEDULED').length}
-                </div>
+                <div className="text-2xl font-bold" data-testid="text-cancelled-count">{stats?.cancelledCount || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  Awaiting completion
+                  Cancelled meetings
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Today</CardTitle>
+                <Clock className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-meetings-today">{stats?.todayShowings || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  Meetings today
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">This Week</CardTitle>
+                <CalendarDays className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-meetings-week">{stats?.thisWeekShowings || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  Meetings this week
                 </p>
               </CardContent>
             </Card>
@@ -197,6 +257,7 @@ export default function ManagerBookings() {
                   <SelectContent>
                     <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                    <SelectItem value="CONFIRMED">Confirmed</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
                     <SelectItem value="CANCELED">Cancelled</SelectItem>
                   </SelectContent>
@@ -299,12 +360,32 @@ export default function ManagerBookings() {
                               >
                                 View Details
                               </Button>
-                              {showing.status === 'SCHEDULED' && (
+                              
+                              {/* Complete Meeting Button - Only for past scheduled/confirmed meetings */}
+                              {(showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED') && new Date(showing.endDt) < new Date() && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to mark this meeting as completed?')) {
+                                      completeShowingMutation.mutate(showing.id);
+                                    }
+                                  }}
+                                  disabled={completeShowingMutation.isPending}
+                                  data-testid={`button-complete-showing-${showing.id}`}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  {completeShowingMutation.isPending ? 'Completing...' : 'Complete Meeting'}
+                                </Button>
+                              )}
+                              
+                              {/* Cancel Button - Only for scheduled/confirmed meetings */}
+                              {(showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED') && (
                                 <Button
                                   size="sm"
                                   variant="destructive"
                                   onClick={() => {
-                                    if (confirm('Are you sure you want to cancel this showing? This action cannot be undone.')) {
+                                    if (confirm('Are you sure you want to cancel this showing? This will remove it from your calendar and showing availability.')) {
                                       cancelShowingMutation.mutate(showing.id);
                                     }
                                   }}
