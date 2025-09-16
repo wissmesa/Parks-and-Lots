@@ -1469,8 +1469,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete photo (works for all entity types)
-  app.delete('/api/photos/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/photos/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      // Get photo information to check permissions
+      const photo = await storage.getPhoto(req.params.id);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      // Check permissions based on entity type
+      if (photo.entityType === 'LOT') {
+        // For lots, allow both admins and managers with lot access
+        if (req.user?.role === 'ADMIN') {
+          // Admin can delete any lot photo
+        } else if (req.user?.role === 'MANAGER') {
+          // Check if manager has access to this lot
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied' });
+          }
+        } else {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else {
+        // For company and park photos, only admins can delete
+        if (req.user?.role !== 'ADMIN') {
+          return res.status(403).json({ message: 'Admin access required' });
+        }
+      }
+
       await storage.deletePhoto(req.params.id);
       res.status(204).send();
     } catch (error) {

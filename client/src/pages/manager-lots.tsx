@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { PhotoManagement } from "@/components/ui/photo-management";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,8 @@ import {
   Bath, 
   Ruler,
   Eye,
-  EyeOff 
+  EyeOff,
+  Camera 
 } from "lucide-react";
 
 interface Lot {
@@ -52,6 +54,7 @@ export default function ManagerLots() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showPhotos, setShowPhotos] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -458,12 +461,19 @@ export default function ManagerLots() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => setShowPhotos(lot.id)}
+                          title="Manage Photos"
+                          data-testid={`button-photos-lot-${lot.id}`}
+                        >
+                          <Camera className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleEdit(lot)}
-                          className="flex-1"
                           data-testid={`button-edit-lot-${lot.id}`}
                         >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit
+                          <Edit className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="outline"
@@ -579,6 +589,24 @@ export default function ManagerLots() {
                   </Button>
                 </div>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Photo Management Modal */}
+          <Dialog open={!!showPhotos} onOpenChange={(open) => !open && setShowPhotos(null)}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Manage Photos - {lots?.find(l => l.id === showPhotos)?.nameOrNumber}
+                </DialogTitle>
+              </DialogHeader>
+              {showPhotos && (
+                <PhotoManagement 
+                  entityType="LOT"
+                  entityId={showPhotos}
+                  entityName={lots?.find(l => l.id === showPhotos)?.nameOrNumber || 'Lot'}
+                />
+              )}
             </DialogContent>
           </Dialog>
         </main>

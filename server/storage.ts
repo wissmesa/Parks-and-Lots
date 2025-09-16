@@ -78,6 +78,7 @@ export interface IStorage {
   
   // Photo operations
   getPhotos(entityType: string, entityId: string): Promise<Photo[]>;
+  getPhoto(id: string): Promise<Photo | null>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
   deletePhoto(id: string): Promise<void>;
   
@@ -561,6 +562,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(photos)
       .where(and(eq(photos.entityType, entityType as any), eq(photos.entityId, entityId)))
       .orderBy(asc(photos.sortOrder));
+  }
+
+  async getPhoto(id: string): Promise<Photo | null> {
+    const result = await db.select().from(photos).where(eq(photos.id, id)).limit(1);
+    return result[0] || null;
   }
 
   async createPhoto(photo: InsertPhoto): Promise<Photo> {
