@@ -99,10 +99,7 @@ export default function LotDetail() {
     enabled: !!id,
   });
 
-  const { data: showings = [] } = useQuery<Showing[]>({
-    queryKey: ["/api/lots", id, "showings"],
-    enabled: !!id,
-  });
+  // REMOVED: No longer fetching database showings - Google Calendar is the single source of truth for bookings
 
   // Fetch manager calendar availability - ALWAYS fetch fresh data
   const { data: managerAvailability } = useQuery<{
@@ -148,7 +145,7 @@ export default function LotDetail() {
 
   const lotPhotos = photos || [];
   const availabilityRules = Array.isArray(availability) ? availability : [];
-  const lotShowings = showings || [];
+  // REMOVED: No longer needed - Google Calendar is the source of truth for bookings
   const managerBusySlots = managerAvailability?.busySlots || [];
 
   // Generate weekly schedule from 9am to 7pm for this week
@@ -236,35 +233,28 @@ export default function LotDetail() {
         const slotStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute, 0, 0);
         const slotEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute + 29, 59, 999);
         
-        // Check if this time slot has any blockages or showings
+        // Check if this time slot has any blockages (manual rules)
         const hasBlockage = availabilityRules.some((rule: Availability) => 
           rule.ruleType === 'BLOCKED' && 
           new Date(rule.startDt) <= slotEnd && 
           new Date(rule.endDt) >= slotStart
         );
         
-        const hasShowing = lotShowings.some((showing: Showing) =>
-          showing.status === 'SCHEDULED' &&
-          new Date(showing.startDt) <= slotEnd && 
-          new Date(showing.endDt) >= slotStart
-        );
+        // REMOVED: Database showing checks - Google Calendar is now the single source of truth for bookings
         
-        // Check if manager is busy using UTC-based slot key to match busy slot set  
+        // Check if manager is busy using UTC-based slot key to match Google Calendar busy slots  
         const localSlotTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
         const slotKey = generateUTCSlotKey(localSlotTime);
         const isManagerBusy = busySlotSet.has(slotKey);
         
-        // DEBUG: Special logging for Saturday 10-12 and 1pm slots
-        if ((date.getDay() === 6 && (hour === 10 || hour === 11)) || (hour === 13)) {
-          console.log(`[DEBUG] ${daySchedule.dayName} ${hour}:${minute.toString().padStart(2, '0')} slot check:`, {
-            slotKey,
-            isManagerBusy,
-            busySlotSet: Array.from(busySlotSet).filter(k => k.includes(date.toDateString())),
-            hasBlockage,
-            hasShowing,
-            finalAvailable: !hasBlockage && !hasShowing && !isManagerBusy
-          });
-        }
+        // DEBUG: Logging for availability calculation
+        console.log(`[AVAILABILITY] ${daySchedule.dayName} ${hour}:${minute.toString().padStart(2, '0')} slot check:`, {
+          slotKey,
+          isManagerBusy,
+          hasBlockage,
+          finalAvailable: !hasBlockage && !isManagerBusy,
+          managerConnected: managerAvailability?.managerConnected
+        });
         
         // Format time display (9:00am, 9:30am, 10:00am, etc.)
         const displayHour = hour > 12 ? hour - 12 : hour;
@@ -275,7 +265,7 @@ export default function LotDetail() {
           minute,
           time: timeDisplay,
           date: new Date(date),
-          isAvailable: !hasBlockage && !hasShowing && !isManagerBusy
+          isAvailable: !hasBlockage && !isManagerBusy
         };
         
         daySchedule.slots.push(slot);
@@ -528,7 +518,7 @@ export default function LotDetail() {
                     title: "Showing Requested", 
                     description: "Your showing request has been submitted successfully.",
                   });
-                  queryClient.invalidateQueries({ queryKey: ["/api/lots", id, "showings"] });
+                  // REMOVED: No longer invalidating showings - Google Calendar is source of truth
                   setSelectedSlot(null);
                 }} 
               />

@@ -204,58 +204,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
         
         if (isConnected) {
-          // Fetch calendar events for the relevant time ranges more efficiently
+          // Fetch calendar events for a broader range to get all property showings
           const oneMonthBack = new Date(today);
           oneMonthBack.setMonth(oneMonthBack.getMonth() - 1);
-          const oneMonthForward = new Date(today);
-          oneMonthForward.setMonth(oneMonthForward.getMonth() + 1);
+          const sixMonthsForward = new Date(today);
+          sixMonthsForward.setMonth(sixMonthsForward.getMonth() + 6);
           
           const calendarEvents = await googleCalendarService.getUserCalendarEvents(
             req.user!.id, 
             oneMonthBack, 
-            oneMonthForward
+            sixMonthsForward
           );
 
-          // Get database showings with calendar event IDs
-          const showingsWithCalendarIds = showings.filter(showing => 
-            showing.calendarEventId && (showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED')
-          );
-
-          // Filter property showing events and create a map for efficient lookup
+          // Filter property showing events - Google Calendar is the source of truth
           const propertyShowingEvents = calendarEvents.filter(event => 
             event.id && event.summary && event.summary.includes('Property Showing')
           );
 
-          const calendarEventMap = new Map(
-            propertyShowingEvents.map(event => [event.id!, event])
-          );
-
-          // Filter showings that have corresponding calendar events and use calendar times
-          const validShowings = showingsWithCalendarIds.filter(showing => 
-            calendarEventMap.has(showing.calendarEventId!)
-          );
-
-          // Count based on calendar event times for accuracy
-          scheduledCount = validShowings.filter(showing => {
-            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
-            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
-            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+          // Count scheduled showings (future events in calendar)
+          scheduledCount = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
             return eventStart > today;
           }).length;
 
-          // Count today's showings using calendar event times
-          todayShowings = validShowings.filter(showing => {
-            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
-            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
-            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+          // Count today's showings (calendar events)
+          todayShowings = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
             return eventStart >= startOfDay && eventStart < endOfDay;
           }).length;
 
-          // Count this week's showings using calendar event times
-          thisWeekShowings = validShowings.filter(showing => {
-            const calendarEvent = calendarEventMap.get(showing.calendarEventId!);
-            if (!calendarEvent?.start?.dateTime && !calendarEvent?.start?.date) return false;
-            const eventStart = new Date(calendarEvent.start.dateTime || calendarEvent.start.date!);
+          // Count this week's showings (calendar events)
+          thisWeekShowings = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
             return eventStart >= startOfWeek && eventStart <= endOfWeek;
           }).length;
         } else {
