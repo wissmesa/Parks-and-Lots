@@ -1459,6 +1459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
   // Delete/remove manager
   app.delete('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {

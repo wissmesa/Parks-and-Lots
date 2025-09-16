@@ -155,9 +155,21 @@ export default function LotDetail() {
   const generateWeeklySchedule = (): DaySchedule[] => {
     const schedule: DaySchedule[] = [];
     const today = new Date();
+    
+    // Find the Monday of this week
+    const currentDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
     const startOfWeek = new Date(today);
-    // Show the week starting from today forward (current week forward view)
-    // This ensures we show the current date and coming days where bookings are most relevant
+    
+    // Calculate days back to Monday (0=Sunday needs 6 back, 1=Monday needs 0, 2=Tuesday needs 1, etc.)
+    const daysToMonday = (currentDayOfWeek + 6) % 7;
+    startOfWeek.setDate(today.getDate() - daysToMonday);
+    
+    // If it's Friday afternoon (after 5pm) or weekend, show next week
+    if (currentDayOfWeek === 6 || (currentDayOfWeek === 5 && today.getHours() >= 17) || currentDayOfWeek === 0) {
+      startOfWeek.setDate(startOfWeek.getDate() + 7);
+    }
+    
+    // Show Monday through Friday (5 days)
     
     console.log(`[DEBUG] Generating memoized schedule with ${managerBusySlots.length} manager busy slots:`, managerBusySlots);
     console.log(`[DEBUG] Today is:`, today.toString(), `UTC:`, today.toISOString());
@@ -205,15 +217,10 @@ export default function LotDetail() {
       }
     }
     
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    // Show Monday through Friday only (5 weekdays)
+    for (let dayOffset = 0; dayOffset < 5; dayOffset++) {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + dayOffset);
-      
-      // Skip weekends - no showings on Saturday (6) or Sunday (0)
-      const dayOfWeek = date.getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
-        continue; // Skip Saturday and Sunday
-      }
       
       const daySchedule: DaySchedule = {
         date,
