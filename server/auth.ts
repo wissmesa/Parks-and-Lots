@@ -108,7 +108,8 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return res.status(400).json({ message: 'Lot ID required' });
   }
 
-  const lot = await storage.getLot(lotId);
+  // Use getLotAny instead of getLot for managers to access all lots regardless of active status
+  const lot = await storage.getLotAny(lotId);
   if (!lot) {
     return res.status(404).json({ message: 'Lot not found' });
   }

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Home, Plus, Edit, Trash2, DollarSign, Camera } from "lucide-react";
+import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff } from "lucide-react";
 
 interface Lot {
   id: string;
@@ -155,6 +155,26 @@ export default function AdminLots() {
       toast({
         title: "Error",
         description: "Failed to delete lot",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("PATCH", `/api/lots/${id}/toggle-active`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      toast({
+        title: "Success",
+        description: "Lot visibility updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update lot visibility",
         variant: "destructive",
       });
     },
@@ -355,6 +375,7 @@ export default function AdminLots() {
                     <TableHead>Park</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Visibility</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
@@ -387,6 +408,11 @@ export default function AdminLots() {
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <Badge variant={lot.isActive ? 'default' : 'secondary'}>
+                          {lot.isActive ? 'Visible' : 'Hidden'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-1">
                           <DollarSign className="w-3 h-3" />
                           <span>{parseInt(lot.price).toLocaleString()}</span>
@@ -415,6 +441,16 @@ export default function AdminLots() {
                             title="Manage Photos"
                           >
                             <Camera className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => toggleMutation.mutate(lot.id)}
+                            disabled={toggleMutation.isPending}
+                            title={lot.isActive ? "Hide lot" : "Show lot"}
+                            data-testid={`toggle-lot-${lot.id}`}
+                          >
+                            {lot.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </Button>
                           <Button
                             size="sm"
