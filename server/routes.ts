@@ -2,6 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import path from "path";
+import { promises as fs } from "fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { 
@@ -1502,6 +1503,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.user?.role !== 'ADMIN') {
           return res.status(403).json({ message: 'Admin access required' });
         }
+      }
+
+      // Delete the file from filesystem
+      try {
+        const filePath = path.join(process.cwd(), photo.urlOrPath.replace(/^\//, ''));
+        await fs.unlink(filePath);
+      } catch (fileError) {
+        console.error('Failed to delete file:', fileError);
+        // Continue with DB deletion even if file deletion fails
       }
 
       await storage.deletePhoto(req.params.id);
