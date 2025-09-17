@@ -49,7 +49,7 @@ export interface IStorage {
   deleteCompany(id: string): Promise<void>;
   
   // Park operations
-  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; includeInactive?: boolean }): Promise<{ parks: Park[] }>;
+  getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; status?: string; minPrice?: number; maxPrice?: number; includeInactive?: boolean }): Promise<{ parks: Park[] }>;
   getPark(id: string): Promise<Park | undefined>;
   createPark(park: InsertPark): Promise<Park>;
   updatePark(id: string, updates: Partial<InsertPark>): Promise<Park>;
