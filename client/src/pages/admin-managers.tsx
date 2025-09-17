@@ -141,7 +141,7 @@ export default function AdminManagers() {
 
   const handleAssignParks = (manager: Manager) => {
     setSelectedManager(manager);
-    const managerAssignments = assignments?.filter((a: any) => a.userId === manager.id) || [];
+    const managerAssignments = Array.isArray(assignments) ? assignments.filter((a: any) => a.userId === manager.id) : [];
     setSelectedParkIds(managerAssignments.map((a: any) => a.parkId));
     setIsAssignModalOpen(true);
   };
@@ -169,11 +169,11 @@ export default function AdminManagers() {
     );
   };
 
-  const managersList = managers?.managers || managers || [];
-  const parksList = parks?.parks || parks || [];
+  const managersList = Array.isArray(managers?.managers) ? managers.managers : Array.isArray(managers) ? managers : [];
+  const parksList = Array.isArray(parks?.parks) ? parks.parks : Array.isArray(parks) ? parks : [];
 
   // Group assignments by manager
-  const managerParkMap = (assignments || []).reduce((acc: any, assignment: any) => {
+  const managerParkMap = Array.isArray(assignments) ? assignments.reduce((acc: any, assignment: any) => {
     if (!acc[assignment.userId]) {
       acc[assignment.userId] = [];
     }
@@ -182,7 +182,7 @@ export default function AdminManagers() {
       name: assignment.parkName
     });
     return acc;
-  }, {});
+  }, {}) : {};
 
   return (
     <div className="flex min-h-screen bg-background">

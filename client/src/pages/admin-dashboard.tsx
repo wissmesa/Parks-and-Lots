@@ -102,12 +102,12 @@ export default function AdminDashboard() {
     });
   };
 
-  const parks = parksData?.parks || [];
-  const dashboardStats = stats || {
-    totalParks: parks.length,
-    activeLots: 0,
-    monthlyBookings: 0,
-    activeManagers: 0
+  const parks = Array.isArray(parksData?.parks) ? parksData.parks : Array.isArray(parksData) ? parksData : [];
+  const dashboardStats = {
+    totalParks: stats?.totalParks ?? parks.length,
+    activeLots: stats?.activeLots ?? 0,
+    monthlyBookings: stats?.monthlyBookings ?? 0,
+    activeManagers: stats?.activeManagers ?? 0
   };
 
   if (user?.role !== 'ADMIN') {
@@ -270,11 +270,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <CardContent className="p-6">
-                {!recentBookings || recentBookings.length === 0 ? (
+                {!recentBookings || !Array.isArray(recentBookings) || recentBookings.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4">No recent bookings</p>
                 ) : (
                   <div className="space-y-4">
-                    {recentBookings.map((booking: any) => (
+                    {Array.isArray(recentBookings) && recentBookings.map((booking: any) => (
                       <div key={booking.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div className="flex-1">
                           <div className="font-medium text-sm">{booking.clientName}</div>
@@ -302,11 +302,11 @@ export default function AdminDashboard() {
                 <h3 className="text-lg font-semibold">Manager Overview</h3>
               </div>
               <CardContent className="p-6">
-                {!managers || managers.length === 0 ? (
+                {!managers || !Array.isArray(managers) || managers.length === 0 ? (
                   <p className="text-muted-foreground text-center py-4">No managers assigned</p>
                 ) : (
                   <div className="space-y-4">
-                    {managers.map((manager: any) => (
+                    {Array.isArray(managers) && managers.map((manager: any) => (
                       <div key={manager.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
