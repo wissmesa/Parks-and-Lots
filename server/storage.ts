@@ -80,7 +80,9 @@ export interface IStorage {
   getPhotos(entityType: string, entityId: string): Promise<Photo[]>;
   getPhoto(id: string): Promise<Photo | null>;
   createPhoto(photo: InsertPhoto): Promise<Photo>;
+  updatePhoto(id: string, updates: Partial<InsertPhoto>): Promise<Photo>;
   deletePhoto(id: string): Promise<void>;
+  reorderPhotos(entityType: string, entityId: string, photoOrders: Array<{id: string, sortOrder: number}>): Promise<void>;
   
   // Invite operations
   getInvites(): Promise<Invite[]>;
@@ -588,8 +590,28 @@ export class DatabaseStorage implements IStorage {
     return newPhoto;
   }
 
+  async updatePhoto(id: string, updates: Partial<InsertPhoto>): Promise<Photo> {
+    const [photo] = await db.update(photos).set(updates).where(eq(photos.id, id)).returning();
+    return photo;
+  }
+
   async deletePhoto(id: string): Promise<void> {
     await db.delete(photos).where(eq(photos.id, id));
+  }
+
+  async reorderPhotos(entityType: string, entityId: string, photoOrders: Array<{id: string, sortOrder: number}>): Promise<void> {
+    // Update all photos in a transaction
+    await db.transaction(async (tx) => {
+      for (const { id, sortOrder } of photoOrders) {
+        await tx.update(photos)
+          .set({ sortOrder })
+          .where(and(
+            eq(photos.id, id),
+            eq(photos.entityType, entityType as any),
+            eq(photos.entityId, entityId)
+          ));
+      }
+    });
   }
 
   async getInvites(): Promise<Invite[]> {
