@@ -50,8 +50,7 @@ export default function AdminBookings() {
         params.set("status", statusFilter);
       }
       const url = `/api/admin/bookings${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      const response = await apiRequest("GET", url);
       return response.json();
     },
     enabled: user?.role === 'ADMIN',
@@ -107,7 +106,7 @@ export default function AdminBookings() {
     }
   };
 
-  const bookingsList = bookings?.bookings || bookings || [];
+  const bookingsList = (bookings as any)?.bookings || bookings || [];
 
   return (
     <div className="flex min-h-screen bg-background">

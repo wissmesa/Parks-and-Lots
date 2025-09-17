@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, Plus, Edit, Trash2, Camera } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Camera, TreePine } from "lucide-react";
 
 interface Company {
   id: string;
@@ -24,6 +24,12 @@ interface Company {
   phone: string;
   email: string;
   createdAt: string;
+}
+
+interface Park {
+  id: string;
+  name: string;
+  companyId: string;
 }
 
 export default function AdminCompanies() {
@@ -42,6 +48,8 @@ export default function AdminCompanies() {
     email: ""
   });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [assigningParks, setAssigningParks] = useState<Company | null>(null);
+  const [selectedParkIds, setSelectedParkIds] = useState<string[]>([]);
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -123,6 +131,33 @@ export default function AdminCompanies() {
     },
   });
 
+  const assignParksMutation = useMutation({
+    mutationFn: async ({ companyId, parkIds }: { companyId: string; parkIds: string[] }) => {
+      return Promise.all(
+        parkIds.map(parkId => 
+          apiRequest("PATCH", `/api/parks/${parkId}`, { companyId })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+      setAssigningParks(null);
+      setSelectedParkIds([]);
+      toast({
+        title: "Success",
+        description: "Parks assigned successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign parks",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -154,6 +189,30 @@ export default function AdminCompanies() {
       updateMutation.mutate(formData);
     } else {
       createMutation.mutate(formData);
+    }
+  };
+
+  const handleAssignParks = (company: Company) => {
+    setAssigningParks(company);
+    // Pre-select parks already assigned to this company
+    const currentParks = parksByCompanyId.get(company.id) || [];
+    setSelectedParkIds(currentParks.map(park => park.id));
+  };
+
+  const handleParkSelection = (parkId: string, isChecked: boolean) => {
+    setSelectedParkIds(prev => 
+      isChecked 
+        ? [...prev, parkId]
+        : prev.filter(id => id !== parkId)
+    );
+  };
+
+  const handleConfirmAssignment = () => {
+    if (assigningParks) {
+      assignParksMutation.mutate({
+        companyId: assigningParks.id,
+        parkIds: selectedParkIds
+      });
     }
   };
 
@@ -334,14 +393,26 @@ export default function AdminCompanies() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleEdit(company)}
+                            title="Edit Company"
+                            data-testid={`edit-company-${company.id}`}
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => handleAssignParks(company)}
+                            title="Assign Parks"
+                            data-testid={`assign-parks-${company.id}`}
+                          >
+                            <TreePine className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => setShowPhotos(company.id)}
                             title="Manage Photos"
+                            data-testid={`manage-photos-${company.id}`}
                           >
                             <Camera className="w-4 h-4" />
                           </Button>
@@ -353,6 +424,8 @@ export default function AdminCompanies() {
                                 deleteMutation.mutate(company.id);
                               }
                             }}
+                            title="Delete Company"
+                            data-testid={`delete-company-${company.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -463,6 +536,61 @@ export default function AdminCompanies() {
                 entityName={companiesList.find(c => c.id === showPhotos)?.name || 'Company'}
               />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Park Assignment Dialog */}
+        <Dialog open={!!assigningParks} onOpenChange={(open) => !open && setAssigningParks(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                Assign Parks to {assigningParks?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select parks to assign to this company:
+              </p>
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {parksList.map(park => (
+                  <div key={park.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`park-${park.id}`}
+                      checked={selectedParkIds.includes(park.id)}
+                      onChange={(e) => handleParkSelection(park.id, e.target.checked)}
+                      className="rounded border-gray-300"
+                      data-testid={`checkbox-park-${park.id}`}
+                    />
+                    <Label htmlFor={`park-${park.id}`} className="text-sm cursor-pointer">
+                      {park.name}
+                      {park.companyId !== assigningParks?.id && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          (Currently: {companiesList.find(c => c.id === park.companyId)?.name || 'Unassigned'})
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAssigningParks(null)}
+                  data-testid="cancel-assign-parks"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmAssignment}
+                  disabled={assignParksMutation.isPending}
+                  data-testid="confirm-assign-parks"
+                >
+                  {assignParksMutation.isPending ? "Assigning..." : "Assign Parks"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

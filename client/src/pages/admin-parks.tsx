@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X } from "lucide-react";
+import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home } from "lucide-react";
 
 interface Park {
   id: string;
@@ -37,6 +37,15 @@ interface Company {
   name: string;
 }
 
+interface Lot {
+  id: string;
+  nameOrNumber: string;
+  parkId: string;
+  park?: {
+    name: string;
+  };
+}
+
 export default function AdminParks() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -55,6 +64,8 @@ export default function AdminParks() {
   });
   const [newAmenity, setNewAmenity] = useState('');
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [assigningLots, setAssigningLots] = useState<Park | null>(null);
+  const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -69,6 +80,15 @@ export default function AdminParks() {
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
+    enabled: user?.role === 'ADMIN',
+  });
+
+  const { data: lots } = useQuery<{ lots: Lot[] }>({
+    queryKey: ["/api/lots", "includeInactive=true"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/lots?includeInactive=true");
+      return response.json();
+    },
     enabled: user?.role === 'ADMIN',
   });
 
@@ -136,6 +156,33 @@ export default function AdminParks() {
     },
   });
 
+  const assignLotsMutation = useMutation({
+    mutationFn: async ({ parkId, lotIds }: { parkId: string; lotIds: string[] }) => {
+      return Promise.all(
+        lotIds.map(lotId => 
+          apiRequest("PATCH", `/api/lots/${lotId}`, { parkId })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      setAssigningLots(null);
+      setSelectedLotIds([]);
+      toast({
+        title: "Success",
+        description: "Lots assigned successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign lots",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -174,11 +221,47 @@ export default function AdminParks() {
     }
   };
 
+  const handleAssignLots = (park: Park) => {
+    setAssigningLots(park);
+    // Pre-select lots already assigned to this park
+    const currentLots = lotsByParkId.get(park.id) || [];
+    setSelectedLotIds(currentLots.map(lot => lot.id));
+  };
+
+  const handleLotSelection = (lotId: string, isChecked: boolean) => {
+    setSelectedLotIds(prev => 
+      isChecked 
+        ? [...prev, lotId]
+        : prev.filter(id => id !== lotId)
+    );
+  };
+
+  const handleConfirmLotAssignment = () => {
+    if (assigningLots) {
+      assignLotsMutation.mutate({
+        parkId: assigningLots.id,
+        lotIds: selectedLotIds
+      });
+    }
+  };
+
   const parksList = parks?.parks ?? [];
   const companiesList = companies ?? [];
+  const lotsList = lots?.lots ?? [];
   
-  // Create efficient lookup map for companies
-  const companyById = new Map(companiesList.map(c => [c.id, c]));
+  // Create efficient lookup maps for relationships
+  const companyById = new Map<string, Company>();
+  companiesList.forEach(company => {
+    companyById.set(company.id, company);
+  });
+  
+  const lotsByParkId = new Map<string, Lot[]>();
+  lotsList.forEach(lot => {
+    if (!lotsByParkId.has(lot.parkId)) {
+      lotsByParkId.set(lot.parkId, []);
+    }
+    lotsByParkId.get(lot.parkId)!.push(lot);
+  });
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -347,14 +430,26 @@ export default function AdminParks() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleEdit(park)}
+                            title="Edit Park"
+                            data-testid={`edit-park-${park.id}`}
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => handleAssignLots(park)}
+                            title="Assign Lots"
+                            data-testid={`assign-lots-${park.id}`}
+                          >
+                            <Home className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => setShowPhotos(park.id)}
                             title="Manage Photos"
+                            data-testid={`manage-photos-${park.id}`}
                           >
                             <Camera className="w-4 h-4" />
                           </Button>
@@ -366,6 +461,8 @@ export default function AdminParks() {
                                 deleteMutation.mutate(park.id);
                               }
                             }}
+                            title="Delete Park"
+                            data-testid={`delete-park-${park.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -557,6 +654,61 @@ export default function AdminParks() {
                 entityName={parksList.find(p => p.id === showPhotos)?.name || 'Park'}
               />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Lot Assignment Dialog */}
+        <Dialog open={!!assigningLots} onOpenChange={(open) => !open && setAssigningLots(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                Assign Lots to {assigningLots?.name}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select lots to assign to this park:
+              </p>
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {lotsList.map(lot => (
+                  <div key={lot.id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`lot-${lot.id}`}
+                      checked={selectedLotIds.includes(lot.id)}
+                      onChange={(e) => handleLotSelection(lot.id, e.target.checked)}
+                      className="rounded border-gray-300"
+                      data-testid={`checkbox-lot-${lot.id}`}
+                    />
+                    <Label htmlFor={`lot-${lot.id}`} className="text-sm cursor-pointer">
+                      {lot.nameOrNumber}
+                      {lot.parkId !== assigningLots?.id && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          (Currently: {parksList.find(p => p.id === lot.parkId)?.name || 'Unassigned'})
+                        </span>
+                      )}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAssigningLots(null)}
+                  data-testid="cancel-assign-lots"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmLotAssignment}
+                  disabled={assignLotsMutation.isPending}
+                  data-testid="confirm-assign-lots"
+                >
+                  {assignLotsMutation.isPending ? "Assigning..." : "Assign Lots"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

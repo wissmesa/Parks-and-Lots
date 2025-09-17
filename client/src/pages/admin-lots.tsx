@@ -69,7 +69,11 @@ export default function AdminLots() {
   }
 
   const { data: lots, isLoading } = useQuery<{ lots: Lot[] }>({
-    queryKey: ["/api/lots"],
+    queryKey: ["/api/lots", "includeInactive=true"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/lots?includeInactive=true");
+      return response.json();
+    },
     enabled: user?.role === 'ADMIN',
   });
 
