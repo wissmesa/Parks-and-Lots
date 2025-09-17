@@ -190,7 +190,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(companies).where(eq(companies.id, id));
   }
 
-  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; includeInactive?: boolean }): Promise<{ parks: Park[] }> {
+  async getParks(filters?: { companyId?: string; city?: string; state?: string; q?: string; status?: string; minPrice?: number; maxPrice?: number; includeInactive?: boolean }): Promise<{ parks: Park[] }> {
     let query = db.select().from(parks)
       .innerJoin(companies, eq(parks.companyId, companies.id));
     
@@ -218,6 +218,45 @@ export class DatabaseStorage implements IStorage {
           LOWER(COALESCE(${parks.description}, '')) LIKE ${'%' + searchTerm + '%'} OR
           LOWER(${parks.address}) LIKE ${'%' + searchTerm + '%'}
         )`
+      );
+    }
+    
+    // Filter parks based on their lots' status and price
+    if (filters?.status || filters?.minPrice || filters?.maxPrice) {
+      const lotConditions = [];
+      
+      // Status filtering with RENT_SALE inclusion
+      if (filters?.status) {
+        if (filters.status === 'FOR_SALE') {
+          lotConditions.push(inArray(lots.status, ['FOR_SALE', 'RENT_SALE']));
+        } else if (filters.status === 'FOR_RENT') {
+          lotConditions.push(inArray(lots.status, ['FOR_RENT', 'RENT_SALE']));
+        } else {
+          lotConditions.push(eq(lots.status, filters.status as any));
+        }
+      }
+      
+      // Price filtering
+      if (filters?.minPrice) {
+        lotConditions.push(gte(lots.price, filters.minPrice.toString()));
+      }
+      if (filters?.maxPrice) {
+        lotConditions.push(lte(lots.price, filters.maxPrice.toString()));
+      }
+      
+      // Include inactive lot check
+      if (!filters?.includeInactive) {
+        lotConditions.push(eq(lots.isActive, true));
+      }
+      
+      // Add condition to only include parks that have at least one lot matching the criteria
+      const parksWithMatchingLots = db.select({ parkId: lots.parkId })
+        .from(lots)
+        .where(and(...lotConditions))
+        .as('matching_lots');
+      
+      conditions.push(
+        sql`${parks.id} IN (SELECT DISTINCT ${parksWithMatchingLots.parkId} FROM ${parksWithMatchingLots})`
       );
     }
 

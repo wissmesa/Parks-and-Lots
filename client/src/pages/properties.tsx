@@ -129,11 +129,13 @@ export default function Properties() {
 
   // Parks data
   const { data: parksData, isLoading: parksLoading } = useQuery({
-    queryKey: ["/api/parks", searchQuery, selectedState],
+    queryKey: ["/api/parks", searchQuery, selectedState, selectedStatus, priceRange],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
+      if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
+      if (priceRange && priceRange !== 'all') params.set('price', priceRange);
       
       const url = `/api/parks${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await fetch(url, { credentials: 'include' });

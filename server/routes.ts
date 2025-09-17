@@ -920,16 +920,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Park routes (public and protected)
   app.get('/api/parks', async (req: AuthRequest, res) => {
     try {
-      const { companyId, city, state, q, page = '1', limit = '20', includeInactive } = req.query;
+      const { companyId, city, state, q, status, price, page = '1', limit = '20', includeInactive } = req.query;
       
       // Only admins can see inactive entities
       const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      
+      // Parse price range if provided
+      let minPrice: number | undefined;
+      let maxPrice: number | undefined;
+      if (price && price !== 'all') {
+        const priceStr = price as string;
+        if (priceStr === 'under-1000') {
+          maxPrice = 1000;
+        } else if (priceStr === '1000-2000') {
+          minPrice = 1000;
+          maxPrice = 2000;
+        } else if (priceStr === '2000-3000') {
+          minPrice = 2000;
+          maxPrice = 3000;
+        } else if (priceStr === 'over-3000') {
+          minPrice = 3000;
+        }
+      }
       
       const filters = {
         companyId: companyId as string,
         city: city as string,
         state: state as string,
         q: q as string,
+        status: (status && status !== 'all') ? status as string : undefined,
+        minPrice,
+        maxPrice,
         includeInactive: shouldIncludeInactive
       };
 
