@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Upload, Trash2, Edit, Camera } from "lucide-react";
+import { Upload, Trash2, Edit, Camera, GripVertical } from "lucide-react";
 
 interface Photo {
   id: string;
@@ -32,6 +32,8 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [draggedPhoto, setDraggedPhoto] = useState<Photo | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const endpointBase = entityType === 'COMPANY' ? 'companies' : entityType === 'PARK' ? 'parks' : 'lots';
 
@@ -110,6 +112,31 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     },
   });
 
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: async (photoOrders: Array<{id: string, sortOrder: number}>) => {
+      return apiRequest("PATCH", "/api/photos/reorder", {
+        entityType,
+        entityId,
+        photoOrders
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/${endpointBase}`, entityId, 'photos'] });
+      toast({
+        title: "Success",
+        description: "Photos reordered successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to reorder photos",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles: File[] = [];
@@ -169,6 +196,54 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     if (confirm("Are you sure you want to delete this photo?")) {
       deleteMutation.mutate(photoId);
     }
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, photo: Photo) => {
+    setDraggedPhoto(photo);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', (e.currentTarget as HTMLElement).outerHTML);
+    (e.currentTarget as HTMLElement).style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.currentTarget as HTMLElement).style.opacity = '1';
+    setDraggedPhoto(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    if (!draggedPhoto) return;
+
+    const dragIndex = photos.findIndex(p => p.id === draggedPhoto.id);
+    if (dragIndex === dropIndex) return;
+
+    // Create new order for photos
+    const reorderedPhotos = [...photos];
+    const [draggedItem] = reorderedPhotos.splice(dragIndex, 1);
+    reorderedPhotos.splice(dropIndex, 0, draggedItem);
+
+    // Generate new sort orders
+    const photoOrders = reorderedPhotos.map((photo, index) => ({
+      id: photo.id,
+      sortOrder: index + 1
+    }));
+
+    // Call reorder mutation
+    reorderMutation.mutate(photoOrders);
   };
 
   if (isLoading) {
@@ -286,43 +361,66 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
             <p className="text-sm">Click "Add Photo" to upload the first photo</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {photos.map((photo) => (
-              <div key={photo.id} className="relative group">
-                <img
-                  src={photo.urlOrPath}
-                  alt={photo.caption || 'Photo'}
-                  className="w-full h-32 object-cover rounded-lg"
-                  data-testid={`img-photo-${photo.id}`}
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center space-x-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setEditingPhoto(photo);
-                      setEditCaption(photo.caption);
-                    }}
-                    data-testid={`button-edit-photo-${photo.id}`}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(photo.id)}
-                    data-testid={`button-delete-photo-${photo.id}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                {photo.caption && (
-                  <p className="text-xs text-muted-foreground mt-1 truncate" title={photo.caption}>
-                    {photo.caption}
-                  </p>
-                )}
+          <div className="space-y-4">
+            {photos.length > 1 && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <GripVertical className="w-4 h-4" />
+                Drag and drop photos to reorder them
               </div>
-            ))}
+            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {photos.map((photo, index) => (
+                <div 
+                  key={photo.id} 
+                  className={`relative group cursor-move transition-all duration-200 ${
+                    dragOverIndex === index ? 'scale-105 ring-2 ring-blue-500' : ''
+                  } ${draggedPhoto?.id === photo.id ? 'opacity-50' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, photo)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, index)}
+                  data-testid={`photo-item-${photo.id}`}
+                >
+                  <div className="absolute top-2 left-2 z-10 bg-white/80 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <GripVertical className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <img
+                    src={photo.urlOrPath}
+                    alt={photo.caption || 'Photo'}
+                    className="w-full h-32 object-cover rounded-lg"
+                    data-testid={`img-photo-${photo.id}`}
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setEditingPhoto(photo);
+                        setEditCaption(photo.caption);
+                      }}
+                      data-testid={`button-edit-photo-${photo.id}`}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(photo.id)}
+                      data-testid={`button-delete-photo-${photo.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {photo.caption && (
+                    <p className="text-xs text-muted-foreground mt-1 truncate" title={photo.caption}>
+                      {photo.caption}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
