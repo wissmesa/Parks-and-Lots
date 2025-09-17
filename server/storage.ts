@@ -293,7 +293,14 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(lots.parkId, filters.parkId));
     }
     if (filters?.status) {
-      conditions.push(eq(lots.status, filters.status as any));
+      // Include RENT_SALE lots when filtering for either FOR_SALE or FOR_RENT
+      if (filters.status === 'FOR_SALE') {
+        conditions.push(inArray(lots.status, ['FOR_SALE', 'RENT_SALE']));
+      } else if (filters.status === 'FOR_RENT') {
+        conditions.push(inArray(lots.status, ['FOR_RENT', 'RENT_SALE']));
+      } else {
+        conditions.push(eq(lots.status, filters.status as any));
+      }
     }
     if (filters?.minPrice) {
       conditions.push(gte(lots.price, filters.minPrice.toString()));
@@ -348,7 +355,14 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(lots.parkId, filters.parkId));
     }
     if (filters?.status) {
-      conditions.push(eq(lots.status, filters.status as any));
+      // Include RENT_SALE lots when filtering for either FOR_SALE or FOR_RENT
+      if (filters.status === 'FOR_SALE') {
+        conditions.push(inArray(lots.status, ['FOR_SALE', 'RENT_SALE']));
+      } else if (filters.status === 'FOR_RENT') {
+        conditions.push(inArray(lots.status, ['FOR_RENT', 'RENT_SALE']));
+      } else {
+        conditions.push(eq(lots.status, filters.status as any));
+      }
     }
     if (filters?.minPrice) {
       conditions.push(gte(lots.price, filters.minPrice.toString()));
