@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [inviteEmail, setInviteEmail] = useState("");
   const [selectedParkForInvite, setSelectedParkForInvite] = useState("");
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -262,7 +264,9 @@ export default function AdminDashboard() {
               <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Recent Bookings</h3>
-                  <Button variant="ghost" size="sm">View All</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setLocation('/admin/bookings')} data-testid="button-view-all-bookings">
+                    View All
+                  </Button>
                 </div>
               </div>
               <CardContent className="p-6">
