@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navigation } from "@/components/ui/navigation";
-import { useAuth } from "@/hooks/use-auth";
+import { RequireRole } from "@/components/RequireRole";
 
 // Import pages
 import Properties from "@/pages/properties";
@@ -26,8 +26,6 @@ import ManagerBookings from "@/pages/manager-bookings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, user } = useAuth();
-
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -42,27 +40,41 @@ function Router() {
         <Route path="/accept-invite" component={AcceptInvite} />
         
         {/* Protected admin routes */}
-        {isAuthenticated && user?.role === 'ADMIN' && (
-          <>
-            <Route path="/admin" component={AdminDashboard} />
-            <Route path="/admin/companies" component={AdminCompanies} />
-            <Route path="/admin/parks" component={AdminParks} />
-            <Route path="/admin/lots" component={AdminLots} />
-            <Route path="/admin/managers" component={AdminManagers} />
-            <Route path="/admin/bookings" component={AdminBookings} />
-            <Route path="/admin/invites" component={AdminInvites} />
-          </>
-        )}
+        <Route path="/admin" component={() => (
+          <RequireRole role="ADMIN"><AdminDashboard /></RequireRole>
+        )} />
+        <Route path="/admin/companies" component={() => (
+          <RequireRole role="ADMIN"><AdminCompanies /></RequireRole>
+        )} />
+        <Route path="/admin/parks" component={() => (
+          <RequireRole role="ADMIN"><AdminParks /></RequireRole>
+        )} />
+        <Route path="/admin/lots" component={() => (
+          <RequireRole role="ADMIN"><AdminLots /></RequireRole>
+        )} />
+        <Route path="/admin/managers" component={() => (
+          <RequireRole role="ADMIN"><AdminManagers /></RequireRole>
+        )} />
+        <Route path="/admin/bookings" component={() => (
+          <RequireRole role="ADMIN"><AdminBookings /></RequireRole>
+        )} />
+        <Route path="/admin/invites" component={() => (
+          <RequireRole role="ADMIN"><AdminInvites /></RequireRole>
+        )} />
         
         {/* Protected manager routes */}
-        {isAuthenticated && user?.role === 'MANAGER' && (
-          <>
-            <Route path="/manager" component={ManagerDashboard} />
-            <Route path="/manager/parks" component={ManagerParks} />
-            <Route path="/manager/lots" component={ManagerLots} />
-            <Route path="/manager/bookings" component={ManagerBookings} />
-          </>
-        )}
+        <Route path="/manager" component={() => (
+          <RequireRole role="MANAGER"><ManagerDashboard /></RequireRole>
+        )} />
+        <Route path="/manager/parks" component={() => (
+          <RequireRole role="MANAGER"><ManagerParks /></RequireRole>
+        )} />
+        <Route path="/manager/lots" component={() => (
+          <RequireRole role="MANAGER"><ManagerLots /></RequireRole>
+        )} />
+        <Route path="/manager/bookings" component={() => (
+          <RequireRole role="MANAGER"><ManagerBookings /></RequireRole>
+        )} />
         
         {/* Fallback to 404 */}
         <Route component={NotFound} />

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, Plus, Trash2, UserPlus, Settings } from "lucide-react";
+import { Users, Plus, Trash2, UserPlus, Settings, Edit } from "lucide-react";
 
 interface Manager {
   id: string;
@@ -36,14 +36,13 @@ export default function AdminManagers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+  const [editingManager, setEditingManager] = useState<Manager | null>(null);
+  const [editedName, setEditedName] = useState("");
   const [selectedParkIds, setSelectedParkIds] = useState<string[]>([]);
 
-  // Redirect if not admin
-  if (user?.role !== 'ADMIN') {
-    window.location.href = '/';
-    return null;
-  }
+  // RequireRole component now handles authentication/authorization
 
   const { data: managers, isLoading: managersLoading } = useQuery({
     queryKey: ["/api/admin/managers"],
@@ -97,6 +96,29 @@ export default function AdminManagers() {
     },
   });
 
+  const updateManagerMutation = useMutation({
+    mutationFn: async ({ id, fullName }: { id: string; fullName: string }) => {
+      return apiRequest("PATCH", `/api/admin/managers/${id}`, { fullName });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/managers"] });
+      setIsEditModalOpen(false);
+      setEditingManager(null);
+      setEditedName("");
+      toast({
+        title: "Success",
+        description: "Manager name updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update manager name",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteManagerMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/admin/managers/${id}`);
@@ -122,6 +144,21 @@ export default function AdminManagers() {
     const managerAssignments = assignments?.filter((a: any) => a.userId === manager.id) || [];
     setSelectedParkIds(managerAssignments.map((a: any) => a.parkId));
     setIsAssignModalOpen(true);
+  };
+
+  const handleEditManager = (manager: Manager) => {
+    setEditingManager(manager);
+    setEditedName(manager.fullName);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingManager && editedName.trim()) {
+      updateManagerMutation.mutate({
+        id: editingManager.id,
+        fullName: editedName.trim()
+      });
+    }
   };
 
   const handleParkToggle = (parkId: string) => {
@@ -232,7 +269,18 @@ export default function AdminManagers() {
                             <Button
                               size="sm"
                               variant="outline"
+                              onClick={() => handleEditManager(manager)}
+                              data-testid={`button-edit-manager-${manager.id}`}
+                              title="Edit name"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => handleAssignParks(manager)}
+                              data-testid={`button-assign-parks-${manager.id}`}
+                              title="Assign parks"
                             >
                               <Settings className="w-4 h-4" />
                             </Button>
@@ -244,6 +292,8 @@ export default function AdminManagers() {
                                   deleteManagerMutation.mutate(manager.id);
                                 }
                               }}
+                              data-testid={`button-delete-manager-${manager.id}`}
+                              title="Delete manager"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -303,6 +353,43 @@ export default function AdminManagers() {
                   disabled={assignParksMutation.isPending}
                 >
                   {assignParksMutation.isPending ? "Updating..." : "Update Assignments"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Manager Dialog */}
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Manager Name</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="manager-name">Full Name</Label>
+                <Input
+                  id="manager-name"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  placeholder="Enter manager name"
+                  data-testid="input-manager-name"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditModalOpen(false)}
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={updateManagerMutation.isPending || !editedName.trim()}
+                  data-testid="button-save-edit"
+                >
+                  {updateManagerMutation.isPending ? "Updating..." : "Update"}
                 </Button>
               </div>
             </div>

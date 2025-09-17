@@ -134,6 +134,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update manager details
+  app.patch('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const manager = await storage.getUser(req.params.id);
+      if (!manager || manager.role !== 'MANAGER') {
+        return res.status(404).json({ message: 'Manager not found' });
+      }
+      
+      // Only allow updating fullName for now
+      const { fullName } = req.body;
+      if (!fullName || typeof fullName !== 'string' || fullName.trim() === '') {
+        return res.status(400).json({ message: 'Full name is required' });
+      }
+      
+      const updatedManager = await storage.updateUser(req.params.id, {
+        fullName: fullName.trim()
+      });
+      res.json(updatedManager);
+    } catch (error) {
+      console.error('Update manager error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Manager API Endpoints
   app.get('/api/manager/assignments', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
     try {
