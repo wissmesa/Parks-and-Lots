@@ -202,7 +202,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   const handleDragStart = (e: React.DragEvent, photo: Photo) => {
     setDraggedPhoto(photo);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', (e.currentTarget as HTMLElement).outerHTML);
+    e.dataTransfer.setData('text/plain', photo.id);
     (e.currentTarget as HTMLElement).style.opacity = '0.5';
   };
 
