@@ -440,9 +440,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/refresh', (req, res) => {
-    // TODO: Implement refresh token logic
-    res.status(501).json({ message: 'Not implemented' });
+  app.post('/api/auth/refresh', async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+      
+      if (!refreshToken) {
+        return res.status(400).json({ message: 'Refresh token required' });
+      }
+
+      // Verify the refresh token
+      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as any;
+      
+      // Get the user from the decoded token
+      const user = await storage.getUser(decoded.userId);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ message: 'Invalid or inactive user' });
+      }
+
+      // Generate new tokens
+      const tokens = generateTokens(user);
+      
+      res.json({
+        user: { 
+          id: user.id, 
+          email: user.email, 
+          fullName: user.fullName, 
+          role: user.role 
+        },
+        ...tokens
+      });
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      return res.status(403).json({ message: 'Invalid refresh token' });
+    }
   });
 
   app.post('/api/auth/logout', (req, res) => {
@@ -1319,6 +1349,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       console.error('Delete lot error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Bulk lot upload
+  app.post('/api/lots/bulk', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { rows, skipIfExists = false } = req.body;
+      
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ message: 'Rows array is required and cannot be empty' });
+      }
+
+      if (rows.length > 1000) {
+        return res.status(400).json({ message: 'Maximum 1000 rows per batch allowed' });
+      }
+
+      const results = [];
+      const isAdmin = req.user!.role === 'ADMIN';
+      let managerParkIds: string[] = [];
+      
+      // Get manager assignments if user is a manager
+      if (!isAdmin) {
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        managerParkIds = assignments.map((a: any) => a.parkId);
+      }
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          // Validate lot data using schema
+          const lotData = insertLotSchema.parse(row);
+          
+          // Check park access for managers
+          if (!isAdmin && !managerParkIds.includes(lotData.parkId)) {
+            results.push({
+              index: i,
+              ok: false,
+              error: 'You can only create lots in your assigned parks'
+            });
+            continue;
+          }
+
+          // Check if lot already exists (if skipIfExists is enabled)
+          if (skipIfExists) {
+            const existingLots = await storage.getLotsWithParkInfo({ 
+              parkId: lotData.parkId,
+              includeInactive: true 
+            });
+            const exists = existingLots.some(lot => 
+              lot.nameOrNumber.toLowerCase() === lotData.nameOrNumber.toLowerCase()
+            );
+            
+            if (exists) {
+              results.push({
+                index: i,
+                ok: false,
+                error: 'Lot with this name already exists in the park (skipped)'
+              });
+              continue;
+            }
+          }
+
+          // Create the lot
+          const lot = await storage.createLot(lotData);
+          results.push({
+            index: i,
+            ok: true,
+            id: lot.id,
+            data: lot
+          });
+        } catch (error) {
+          console.error(`Bulk upload error for row ${i}:`, error);
+          results.push({
+            index: i,
+            ok: false,
+            error: error instanceof Error ? error.message : 'Validation error'
+          });
+        }
+      }
+
+      // Calculate summary stats
+      const successful = results.filter(r => r.ok).length;
+      const failed = results.length - successful;
+
+      res.json({
+        results,
+        summary: {
+          total: rows.length,
+          successful,
+          failed
+        }
+      });
+    } catch (error) {
+      console.error('Bulk lot upload error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

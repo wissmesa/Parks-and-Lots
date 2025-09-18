@@ -62,4 +62,63 @@ export class AuthManager {
     const token = this.getToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
+
+  static async refreshAccessToken(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const authResponse: AuthResponse = await response.json();
+        this.setAuth(authResponse);
+        return true;
+      } else {
+        // Refresh failed, clear auth
+        this.clearAuth();
+        return false;
+      }
+    } catch (error) {
+      // Network error or other issue, clear auth
+      this.clearAuth();
+      return false;
+    }
+  }
+
+  static async isTokenValid(): Promise<boolean> {
+    const token = this.getToken();
+    if (!token) {
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/auth/validate', {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        return true;
+      } else if (response.status === 401 || response.status === 403) {
+        // Token is invalid, try to refresh
+        return await this.refreshAccessToken();
+      } else {
+        return false;
+      }
+    } catch (error) {
+      // Network error, assume token is invalid
+      return false;
+    }
+  }
 }

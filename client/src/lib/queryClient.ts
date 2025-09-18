@@ -13,17 +13,36 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const headers = {
+  let headers = {
     ...AuthManager.getAuthHeaders(),
     ...(data ? { "Content-Type": "application/json" } : {}),
   };
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // If we get 401/403, try to refresh the token and retry once
+  if ((res.status === 401 || res.status === 403) && AuthManager.getRefreshToken()) {
+    const refreshed = await AuthManager.refreshAccessToken();
+    if (refreshed) {
+      // Retry the request with the new token
+      headers = {
+        ...AuthManager.getAuthHeaders(),
+        ...(data ? { "Content-Type": "application/json" } : {}),
+      };
+      
+      res = await fetch(url, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -35,10 +54,22 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    let res = await fetch(queryKey.join("/") as string, {
       headers: AuthManager.getAuthHeaders(),
       credentials: "include",
     });
+
+    // If we get 401/403, try to refresh the token and retry once
+    if ((res.status === 401 || res.status === 403) && AuthManager.getRefreshToken()) {
+      const refreshed = await AuthManager.refreshAccessToken();
+      if (refreshed) {
+        // Retry the query with the new token
+        res = await fetch(queryKey.join("/") as string, {
+          headers: AuthManager.getAuthHeaders(),
+          credentials: "include",
+        });
+      }
+    }
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
