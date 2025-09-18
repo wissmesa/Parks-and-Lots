@@ -267,12 +267,12 @@ export default function AdminLots() {
 
   const handleAssignSpecialStatus = (lot: Lot) => {
     setAssigningSpecialStatus(lot);
-    setSelectedSpecialStatusId(lot.specialStatusId || "");
+    setSelectedSpecialStatusId(lot.specialStatusId || "none");
   };
 
   const handleConfirmSpecialStatusAssignment = () => {
     if (assigningSpecialStatus) {
-      const specialStatusId = selectedSpecialStatusId === "" ? null : selectedSpecialStatusId;
+      const specialStatusId = selectedSpecialStatusId === "none" ? null : selectedSpecialStatusId;
       assignSpecialStatusMutation.mutate({
         lotId: assigningSpecialStatus.id,
         specialStatusId
@@ -686,7 +686,7 @@ export default function AdminLots() {
                     <SelectValue placeholder="Select a special status or leave empty" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (Remove special status)</SelectItem>
+                    <SelectItem value="none">None (Remove special status)</SelectItem>
                     {specialStatuses
                       .filter(status => status.isActive)
                       .map((status) => (
