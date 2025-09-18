@@ -384,15 +384,23 @@ export class DatabaseStorage implements IStorage {
       sqFt: lots.sqFt,
       isActive: lots.isActive,
       parkId: lots.parkId,
+      specialStatusId: lots.specialStatusId,
       park: {
         id: parks.id,
         name: parks.name,
         city: parks.city,
         state: parks.state
+      },
+      specialStatus: {
+        id: specialStatuses.id,
+        name: specialStatuses.name,
+        color: specialStatuses.color,
+        isActive: specialStatuses.isActive
       }
     }).from(lots)
       .innerJoin(parks, eq(lots.parkId, parks.id))
-      .innerJoin(companies, eq(parks.companyId, companies.id));
+      .innerJoin(companies, eq(parks.companyId, companies.id))
+      .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id));
     
     const conditions = [];
     

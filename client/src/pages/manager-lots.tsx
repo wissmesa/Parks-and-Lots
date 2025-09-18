@@ -478,6 +478,17 @@ export default function ManagerLots() {
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground">{lot.park.name}</p>
+                    {lot.specialStatus && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <div
+                          className="w-2 h-2 rounded-full border"
+                          style={{ backgroundColor: lot.specialStatus.color }}
+                        />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {lot.specialStatus.name}
+                        </span>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
