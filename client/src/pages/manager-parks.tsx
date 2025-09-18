@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag } from "lucide-react";
 
 interface Park {
   id: string;
@@ -40,6 +40,14 @@ interface Assignment {
   parkName: string;
 }
 
+interface SpecialStatus {
+  id: string;
+  name: string;
+  color: string;
+  isActive: boolean;
+  parkId: string;
+}
+
 export default function ManagerParks() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -56,6 +64,13 @@ export default function ManagerParks() {
   });
   const [newAmenity, setNewAmenity] = useState('');
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
+  const [editingStatus, setEditingStatus] = useState<SpecialStatus | null>(null);
+  const [statusFormData, setStatusFormData] = useState({
+    name: "",
+    color: "#3B82F6",
+    isActive: true
+  });
 
   // Redirect if not manager
   if (user?.role !== 'MANAGER') {
@@ -114,6 +129,14 @@ export default function ManagerParks() {
     setNewAmenity('');
   };
 
+  const resetStatusForm = () => {
+    setStatusFormData({
+      name: "",
+      color: "#3B82F6",
+      isActive: true
+    });
+  };
+
   const handleEdit = (park: Park) => {
     setEditingPark(park);
     setFormData({
@@ -135,8 +158,100 @@ export default function ManagerParks() {
     }
   };
 
+  const handleStatusSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingStatus) {
+      updateStatusMutation.mutate(statusFormData);
+    } else {
+      createStatusMutation.mutate(statusFormData);
+    }
+  };
+
+  const handleEditStatus = (status: SpecialStatus) => {
+    setEditingStatus(status);
+    setStatusFormData({
+      name: status.name,
+      color: status.color,
+      isActive: status.isActive
+    });
+  };
+
+  const handleDeleteStatus = (statusId: string) => {
+    deleteStatusMutation.mutate(statusId);
+  };
+
   // Filter parks to only show assigned ones
   const parks = allParks?.filter(park => parkIds.includes(park.id)) || [];
+
+  // Special status queries and mutations
+  const { data: specialStatuses = [], isLoading: statusesLoading } = useQuery<SpecialStatus[]>({
+    queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"],
+    enabled: !!manageSpecialStatuses?.id,
+  });
+
+  const createStatusMutation = useMutation({
+    mutationFn: async (data: typeof statusFormData) => {
+      return apiRequest("POST", `/api/parks/${manageSpecialStatuses?.id}/special-statuses`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      setEditingStatus(null);
+      resetStatusForm();
+      toast({
+        title: "Success",
+        description: "Special status created successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create special status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async (data: typeof statusFormData) => {
+      return apiRequest("PUT", `/api/special-statuses/${editingStatus?.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      setEditingStatus(null);
+      resetStatusForm();
+      toast({
+        title: "Success",
+        description: "Special status updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update special status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteStatusMutation = useMutation({
+    mutationFn: async (statusId: string) => {
+      return apiRequest("DELETE", `/api/special-statuses/${statusId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      toast({
+        title: "Success",
+        description: "Special status deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete special status",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -227,6 +342,15 @@ export default function ManagerParks() {
                               data-testid={`button-manage-photos-${park?.id || 'unknown'}`}
                             >
                               <Camera className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => park && setManageSpecialStatuses(park)}
+                              disabled={!park}
+                              data-testid={`button-manage-special-statuses-${park?.id || 'unknown'}`}
+                            >
+                              <Tag className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -414,6 +538,155 @@ export default function ManagerParks() {
                   entityName={parks.find(p => p?.id === showPhotos)?.name || "Park"}
                 />
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Special Status Management Dialog */}
+          <Dialog open={!!manageSpecialStatuses} onOpenChange={(open) => !open && setManageSpecialStatuses(null)}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Manage Special Statuses - {manageSpecialStatuses?.name}
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="space-y-6">
+                {/* Create/Edit Form */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{editingStatus ? "Edit" : "Create"} Special Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleStatusSubmit} className="space-y-4">
+                      <div>
+                        <Label htmlFor="status-name">Status Name</Label>
+                        <Input
+                          id="status-name"
+                          value={statusFormData.name}
+                          onChange={(e) => setStatusFormData({ ...statusFormData, name: e.target.value })}
+                          placeholder="e.g. Premium, Luxury, Under Renovation"
+                          required
+                          data-testid="input-status-name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="status-color">Status Color</Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            id="status-color"
+                            value={statusFormData.color}
+                            onChange={(e) => setStatusFormData({ ...statusFormData, color: e.target.value })}
+                            className="w-12 h-8 rounded border"
+                            data-testid="input-status-color"
+                          />
+                          <Input
+                            value={statusFormData.color}
+                            onChange={(e) => setStatusFormData({ ...statusFormData, color: e.target.value })}
+                            placeholder="#3B82F6"
+                            className="font-mono"
+                            data-testid="input-status-color-text"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="status-active"
+                          checked={statusFormData.isActive}
+                          onChange={(e) => setStatusFormData({ ...statusFormData, isActive: e.target.checked })}
+                          data-testid="checkbox-status-active"
+                        />
+                        <Label htmlFor="status-active">Active Status</Label>
+                      </div>
+                      
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setEditingStatus(null);
+                            resetStatusForm();
+                          }}
+                          data-testid="button-cancel-status"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={createStatusMutation.isPending || updateStatusMutation.isPending}
+                          data-testid="button-save-status"
+                        >
+                          {createStatusMutation.isPending || updateStatusMutation.isPending 
+                            ? "Saving..." 
+                            : editingStatus ? "Update" : "Create"}
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* Existing Special Statuses */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Existing Special Statuses</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {statusesLoading ? (
+                      <div className="text-center py-4">Loading statuses...</div>
+                    ) : specialStatuses.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Tag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No special statuses created yet</p>
+                        <p className="text-sm">Create your first special status above</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {specialStatuses.map((status) => (
+                          <div
+                            key={status.id}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-4 h-4 rounded-full border"
+                                style={{ backgroundColor: status.color }}
+                              />
+                              <div>
+                                <div className="font-medium">{status.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {status.isActive ? "Active" : "Inactive"} • {status.color}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditStatus(status)}
+                                data-testid={`button-edit-status-${status.id}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteStatus(status.id)}
+                                disabled={deleteStatusMutation.isPending}
+                                data-testid={`button-delete-status-${status.id}`}
+                              >
+                                {deleteStatusMutation.isPending ? "..." : <X className="w-4 h-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
