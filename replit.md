@@ -81,3 +81,11 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced UI/UX**: Clear status indicators (Visible/Hidden badges), toggle buttons with eye icons, immediate visual feedback
 - **Accurate Statistics**: "Visible Lots" metric now counts only active (isActive) lots across all statuses
 - **Secure API Integration**: Toggle endpoint with proper authentication and role-based authorization for managers
+
+### Multi-Park Bulk Upload Enhancement (September 2025)
+- **Smart Park Assignment**: Single-park managers get automatic park assignment, multi-park managers can specify target park in CSV
+- **Flexible Park Specification**: Support for both `parkId` (direct) and `parkName` (case-insensitive lookup) columns in CSV files
+- **Enhanced Security**: Backend validates all park assignments against manager's authorized parks, preventing unauthorized uploads
+- **Improved User Experience**: Clear documentation in upload dialog explaining single vs multi-park behavior
+- **Column Mapping Enhancement**: Added Park ID and Park Name as optional mapping fields with user-friendly labels
+- **Robust Error Handling**: Per-row validation with detailed error messages including available parks for troubleshooting
