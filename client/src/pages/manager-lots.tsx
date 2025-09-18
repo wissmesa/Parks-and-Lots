@@ -991,13 +991,24 @@ export default function ManagerLots() {
                       className="hidden"
                       id="bulk-upload-file-input"
                       data-testid="bulk-upload-file-input"
+                      ref={(el) => {
+                        if (el) {
+                          (window as any).bulkUploadFileInput = el;
+                        }
+                      }}
                     />
-                    <label htmlFor="bulk-upload-file-input">
-                      <Button variant="outline" className="cursor-pointer">
-                        <Upload className="w-4 h-4 mr-2" />
-                        Choose File
-                      </Button>
-                    </label>
+                    <Button 
+                      variant="outline" 
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const fileInput = document.getElementById('bulk-upload-file-input') as HTMLInputElement;
+                        fileInput?.click();
+                      }}
+                      data-testid="choose-file-button"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Choose File
+                    </Button>
                   </div>
                   
                   <div className="grid md:grid-cols-2 gap-6">
