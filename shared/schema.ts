@@ -186,14 +186,27 @@ export const parksRelations = relations(parks, ({ one, many }) => ({
     references: [companies.id],
   }),
   lots: many(lots),
+  specialStatuses: many(specialStatuses),
   managerAssignments: many(managerAssignments),
   photos: many(photos),
+}));
+
+export const specialStatusesRelations = relations(specialStatuses, ({ one, many }) => ({
+  park: one(parks, {
+    fields: [specialStatuses.parkId],
+    references: [parks.id],
+  }),
+  lots: many(lots),
 }));
 
 export const lotsRelations = relations(lots, ({ one, many }) => ({
   park: one(parks, {
     fields: [lots.parkId],
     references: [parks.id],
+  }),
+  specialStatus: one(specialStatuses, {
+    fields: [lots.specialStatusId],
+    references: [specialStatuses.id],
   }),
   showings: many(showings),
   availability: many(availability),
@@ -297,6 +310,11 @@ export const insertGoogleCalendarTokenSchema = createInsertSchema(googleCalendar
   updatedAt: true,
 });
 
+export const insertSpecialStatusSchema = createInsertSchema(specialStatuses).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const bookingSchema = z.object({
   clientName: z.string().min(1),
   clientEmail: z.string().email(),
@@ -324,5 +342,7 @@ export type Invite = typeof invites.$inferSelect;
 export type InsertInvite = z.infer<typeof insertInviteSchema>;
 export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
+export type SpecialStatus = typeof specialStatuses.$inferSelect;
+export type InsertSpecialStatus = z.infer<typeof insertSpecialStatusSchema>;
 export type BookingRequest = z.infer<typeof bookingSchema>;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
