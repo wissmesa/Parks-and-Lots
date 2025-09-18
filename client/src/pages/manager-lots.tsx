@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Home, 
@@ -25,8 +27,14 @@ import {
   Eye,
   EyeOff,
   Camera,
-  Tag
+  Tag,
+  Upload,
+  FileSpreadsheet,
+  CheckCircle,
+  Loader2
 } from "lucide-react";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 interface Lot {
   id: string;
@@ -73,6 +81,17 @@ export default function ManagerLots() {
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
+
+  // Bulk upload state
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [bulkUploadStep, setBulkUploadStep] = useState<'upload' | 'mapping' | 'preview' | 'importing' | 'results'>('upload');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [mappedData, setMappedData] = useState<any[]>([]);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importResults, setImportResults] = useState<any>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -234,6 +253,183 @@ export default function ManagerLots() {
     },
   });
 
+  // Bulk upload mutation for managers
+  const bulkUploadMutation = useMutation({
+    mutationFn: async (data: any[]) => {
+      return await apiRequest('POST', '/api/manager/lots/bulk', { lots: data });
+    },
+    onSuccess: async (response) => {
+      const results = await response.json();
+      setImportResults(results);
+      setImportProgress(100);
+      
+      // Refresh lots data
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/lots'] });
+      
+      // Switch to results step after a brief delay
+      setTimeout(() => {
+        setBulkUploadStep('results');
+      }, 500);
+      
+      toast({
+        title: "Bulk upload completed",
+        description: `Successfully processed ${results.successful?.length || 0} of ${mappedData.length} lots`,
+      });
+    },
+    onError: (error) => {
+      // Handle specific error for multiple park assignments
+      if (error.message && error.message.includes('400:')) {
+        try {
+          // Extract JSON from error message (format: "400: {json}")
+          const colonIndex = error.message.indexOf(':');
+          if (colonIndex !== -1) {
+            const jsonPart = error.message.substring(colonIndex + 1).trim();
+            // Only attempt to parse if it looks like JSON (starts with '{')
+            if (jsonPart.startsWith('{')) {
+              const errorData = JSON.parse(jsonPart);
+              
+              if (errorData?.code === 'MULTIPLE_PARKS') {
+                toast({
+                  title: "Multiple Parks Assigned",
+                  description: "You are assigned to multiple parks. Please contact your administrator to specify which park should receive these lots.",
+                  variant: "destructive"
+                });
+                return;
+              }
+            }
+          }
+        } catch (e) {
+          // Fall through to generic error handling if JSON parsing fails
+          console.warn('Failed to parse error response:', e);
+        }
+      }
+      
+      toast({
+        title: "Bulk upload failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // File upload and parsing functions
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    
+    if (fileExtension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          setCsvHeaders(results.meta.fields || []);
+          setParsedData(results.data);
+          setBulkUploadStep('mapping');
+        },
+        error: (error) => {
+          toast({
+            title: "Error parsing CSV",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
+      });
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (jsonData.length > 0) {
+            const headers = jsonData[0] as string[];
+            const rows = jsonData.slice(1).map(row => {
+              const obj: any = {};
+              headers.forEach((header, index) => {
+                obj[header] = (row as any[])[index] || '';
+              });
+              return obj;
+            });
+            
+            setCsvHeaders(headers);
+            setParsedData(rows);
+            setBulkUploadStep('mapping');
+          }
+        } catch (error) {
+          toast({
+            title: "Error parsing Excel file",
+            description: "Please check the file format",
+            variant: "destructive"
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast({
+        title: "Unsupported file type",
+        description: "Please upload a CSV or Excel file",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const resetBulkUpload = () => {
+    setIsBulkUploadOpen(false);
+    setBulkUploadStep('upload');
+    setUploadedFile(null);
+    setParsedData([]);
+    setCsvHeaders([]);
+    setColumnMapping({});
+    setMappedData([]);
+    setImportProgress(0);
+    setImportResults(null);
+  };
+
+  const isValidMapping = () => {
+    return columnMapping['nameOrNumber'] && columnMapping['status'];
+  };
+
+  const handleProceedToPreview = () => {
+    if (!isValidMapping()) return;
+    
+    const mapped = parsedData.map(row => {
+      const mappedRow: any = {};
+      Object.entries(columnMapping).forEach(([field, csvColumn]) => {
+        if (csvColumn && csvColumn !== 'ignore') {
+          mappedRow[field] = row[csvColumn];
+        }
+      });
+      return mappedRow;
+    }).filter(row => row.nameOrNumber && row.status); // Filter out incomplete rows
+    
+    setMappedData(mapped);
+    setBulkUploadStep('preview');
+  };
+
+  const handleStartImport = () => {
+    setBulkUploadStep('importing');
+    setImportProgress(0);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setImportProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90; // Will be set to 100% in onSuccess
+        }
+        return prev + 10;
+      });
+    }, 300);
+
+    bulkUploadMutation.mutate(mappedData);
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await createLotMutation.mutateAsync(formData);
@@ -316,13 +512,23 @@ export default function ManagerLots() {
               <p className="text-muted-foreground">Manage lots in your assigned parks</p>
             </div>
             
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-create-lot">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add New Lot
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setIsBulkUploadOpen(true)}
+                variant="outline"
+                data-testid="bulk-upload-button"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Bulk Upload
+              </Button>
+              
+              <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-lot">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Lot
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Create New Lot</DialogTitle>
@@ -440,6 +646,7 @@ export default function ManagerLots() {
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           {/* Lots Grid */}
@@ -759,6 +966,264 @@ export default function ManagerLots() {
                   </Button>
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bulk Upload Dialog */}
+          <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Bulk Upload Lots</DialogTitle>
+              </DialogHeader>
+              
+              {bulkUploadStep === 'upload' && (
+                <div className="space-y-6">
+                  <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Upload CSV or Excel File</h3>
+                    <p className="text-gray-500 mb-4">
+                      Upload lots data to your assigned park. No need to specify park ID - lots will be automatically assigned to your park.
+                    </p>
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="bulk-upload-file-input"
+                      data-testid="bulk-upload-file-input"
+                    />
+                    <label htmlFor="bulk-upload-file-input">
+                      <Button variant="outline" className="cursor-pointer">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose File
+                      </Button>
+                    </label>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-semibold mb-3 text-green-700">Required Columns</h4>
+                      <ul className="space-y-1 text-sm">
+                        <li>• <strong>Lot Name/Number</strong> - Unique identifier</li>
+                        <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, or RENT_SALE</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-3 text-blue-700">Optional Columns</h4>
+                      <ul className="space-y-1 text-sm">
+                        <li>• <strong>Price</strong> - Rental or sale price</li>
+                        <li>• <strong>Description</strong> - Lot description</li>
+                        <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
+                        <li>• <strong>Bathrooms</strong> - Number of bathrooms</li>
+                        <li>• <strong>Sq Ft</strong> - Square footage</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {bulkUploadStep === 'mapping' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Map CSV Columns</h3>
+                  <p className="text-sm text-gray-600">
+                    Map your CSV columns to the required fields. Note: All lots will be assigned to your park automatically.
+                  </p>
+                  
+                  <div className="grid gap-4">
+                    {/* Required fields */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-green-700">Required Fields</h4>
+                      
+                      <div>
+                        <Label htmlFor="nameOrNumber-mapping">Lot Name/Number *</Label>
+                        <Select value={columnMapping['nameOrNumber'] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, nameOrNumber: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select CSV column for Lot Name/Number" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ignore">-- Ignore --</SelectItem>
+                            {csvHeaders.map(header => (
+                              <SelectItem key={header} value={header}>{header}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="status-mapping">Status *</Label>
+                        <Select value={columnMapping['status'] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, status: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select CSV column for Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ignore">-- Ignore --</SelectItem>
+                            {csvHeaders.map(header => (
+                              <SelectItem key={header} value={header}>{header}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Optional fields */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-blue-700">Optional Fields</h4>
+                      
+                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt'].map(field => (
+                        <div key={field}>
+                          <Label htmlFor={`${field}-mapping`}>{field.charAt(0).toUpperCase() + field.slice(1)}</Label>
+                          <Select value={columnMapping[field] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Select CSV column for ${field}`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ignore">-- Ignore --</SelectItem>
+                              {csvHeaders.map(header => (
+                                <SelectItem key={header} value={header}>{header}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setBulkUploadStep('upload')}>
+                      Back
+                    </Button>
+                    <Button onClick={handleProceedToPreview} disabled={!isValidMapping()} data-testid="proceed-mapping">
+                      Proceed to Preview
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {bulkUploadStep === 'preview' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Preview Data</h3>
+                  <p className="text-sm text-gray-600">
+                    Review the mapped data before importing. Showing first 10 rows:
+                  </p>
+                  
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Lot Name/Number</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead>Description</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mappedData.slice(0, 10).map((lot, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{lot.nameOrNumber || 'N/A'}</TableCell>
+                            <TableCell>
+                              <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                                {lot.status || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{lot.price ? `$${lot.price}` : 'N/A'}</TableCell>
+                            <TableCell className="max-w-xs truncate">{lot.description || 'N/A'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {mappedData.length > 10 && (
+                      <div className="p-2 text-center text-sm text-gray-500 border-t">
+                        ... and {mappedData.length - 10} more lots
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setBulkUploadStep('mapping')}>
+                      Back to Mapping
+                    </Button>
+                    <Button onClick={handleStartImport} data-testid="start-import">
+                      Start Import
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {bulkUploadStep === 'importing' && (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <div className="inline-flex items-center gap-2 text-lg font-semibold">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Importing lots...
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Processing {mappedData.length} lots to your assigned park
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{importProgress}%</span>
+                    </div>
+                    <Progress value={importProgress} className="w-full" />
+                  </div>
+                </div>
+              )}
+
+              {bulkUploadStep === 'results' && (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                    <h3 className="text-lg font-semibold">Import Completed</h3>
+                    {importResults?.assignedPark && (
+                      <p className="text-sm text-muted-foreground">
+                        All lots assigned to: <strong>{importResults.assignedPark}</strong>
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {importResults?.successful?.length || 0}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Successful</div>
+                    </div>
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {importResults?.failed?.length || 0}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Failed</div>
+                    </div>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {mappedData.length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Total</div>
+                    </div>
+                  </div>
+                  
+                  {importResults?.failed?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Failed rows:</h4>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {importResults.failed.map((failure: any, index: number) => (
+                          <div key={index} className="text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                            <strong>Row {failure.row}:</strong> {failure.error}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-center">
+                    <Button onClick={resetBulkUpload} data-testid="close-bulk-upload">
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </main>

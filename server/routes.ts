@@ -1269,7 +1269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Maximum 1000 lots per upload' });
       }
 
-      const results = { successful: [], failed: [] };
+      const results: { successful: any[], failed: any[] } = { successful: [], failed: [] };
       
       for (let i = 0; i < lots.length; i++) {
         const lotData = lots[i];
@@ -1309,11 +1309,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
             status: lotData.status,
             parkId: lotData.parkId,
-            price: lotData.price ? String(lotData.price) : "",
+            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
             description: lotData.description ? String(lotData.description).trim() : "",
-            bedrooms: lotData.bedrooms ? parseInt(lotData.bedrooms) || null : null,
-            bathrooms: lotData.bathrooms ? parseInt(lotData.bathrooms) || null : null,
-            sqFt: lotData.sqFt ? parseInt(lotData.sqFt) || null : null,
+            bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
+            bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
+            sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
             isActive: true
           };
 
@@ -1337,6 +1337,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(results);
     } catch (error) {
       console.error('Bulk upload error:', error);
+      res.status(500).json({ message: 'Internal server error during bulk upload' });
+    }
+  });
+
+  // Bulk upload lots for managers (auto-assigns to manager's park)
+  app.post('/api/manager/lots/bulk', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const { lots } = req.body;
+      
+      if (!Array.isArray(lots) || lots.length === 0) {
+        return res.status(400).json({ message: 'Lots array is required' });
+      }
+
+      if (lots.length > 1000) {
+        return res.status(400).json({ message: 'Maximum 1000 lots per upload' });
+      }
+
+      // Get manager's assigned parks
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      if (assignments.length === 0) {
+        return res.status(403).json({ message: 'Manager is not assigned to any parks' });
+      }
+
+      // Handle multi-park scenario - require exactly one park assignment for bulk upload
+      if (assignments.length > 1) {
+        return res.status(400).json({ 
+          code: 'MULTIPLE_PARKS',
+          message: 'Multiple park assignments found. Please contact administrator to assign lots to a specific park.',
+          assignedParks: assignments.map(a => ({ id: a.parkId, name: a.parkName }))
+        });
+      }
+
+      // Use the single assigned park
+      const managerParkId = assignments[0].parkId;
+      const results: { successful: any[], failed: any[], assignedPark: string } = { successful: [], failed: [], assignedPark: assignments[0].parkName };
+      
+      for (let i = 0; i < lots.length; i++) {
+        const lotData = lots[i];
+        const rowNumber = i + 1;
+        
+        try {
+          // Validate required fields (park ID is automatically assigned)
+          if (!lotData.nameOrNumber || !lotData.status) {
+            results.failed.push({
+              row: rowNumber,
+              error: 'Missing required fields: nameOrNumber, status'
+            });
+            continue;
+          }
+
+          // Validate status enum
+          if (!['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+            results.failed.push({
+              row: rowNumber,
+              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
+            });
+            continue;
+          }
+
+          // Parse and validate numeric fields, automatically assign park ID
+          const parsedData = {
+            nameOrNumber: String(lotData.nameOrNumber).trim(),
+            status: lotData.status,
+            parkId: managerParkId, // Automatically assign to manager's park
+            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
+            description: lotData.description ? String(lotData.description).trim() : "",
+            bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
+            bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
+            sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
+            isActive: true
+          };
+
+          // Create the lot
+          const newLot = await storage.createLot(parsedData as any);
+          results.successful.push({
+            row: rowNumber,
+            id: newLot.id,
+            nameOrNumber: newLot.nameOrNumber
+          });
+
+        } catch (error) {
+          console.error(`Error creating lot at row ${rowNumber}:`, error);
+          results.failed.push({
+            row: rowNumber,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error('Manager bulk upload error:', error);
       res.status(500).json({ message: 'Internal server error during bulk upload' });
     }
   });
