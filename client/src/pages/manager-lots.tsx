@@ -92,6 +92,7 @@ export default function ManagerLots() {
   const [mappedData, setMappedData] = useState<any[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<any>(null);
+  const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -277,6 +278,16 @@ export default function ManagerLots() {
       });
     },
     onError: (error) => {
+      // Clear progress interval if running
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        setProgressInterval(null);
+      }
+      
+      // Reset UI state
+      setImportProgress(0);
+      setBulkUploadStep('upload');
+      
       // Handle specific error for multiple park assignments
       if (error.message && error.message.includes('400:')) {
         try {
@@ -380,6 +391,12 @@ export default function ManagerLots() {
   };
 
   const resetBulkUpload = () => {
+    // Clear any running progress interval
+    if (progressInterval) {
+      clearInterval(progressInterval);
+      setProgressInterval(null);
+    }
+    
     setIsBulkUploadOpen(false);
     setBulkUploadStep('upload');
     setUploadedFile(null);
@@ -416,17 +433,24 @@ export default function ManagerLots() {
     setBulkUploadStep('importing');
     setImportProgress(0);
     
+    // Clear any existing interval
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
+    
     // Simulate progress
-    const progressInterval = setInterval(() => {
+    const newProgressInterval = setInterval(() => {
       setImportProgress(prev => {
         if (prev >= 90) {
-          clearInterval(progressInterval);
+          clearInterval(newProgressInterval);
+          setProgressInterval(null);
           return 90; // Will be set to 100% in onSuccess
         }
         return prev + 10;
       });
     }, 300);
-
+    
+    setProgressInterval(newProgressInterval);
     bulkUploadMutation.mutate(mappedData);
   };
 
