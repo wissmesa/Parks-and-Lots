@@ -10,6 +10,7 @@ import {
   managerAssignments,
   oauthAccounts,
   googleCalendarTokens,
+  specialStatuses,
   type User, 
   type InsertUser,
   type Company,
@@ -28,6 +29,8 @@ import {
   type InsertInvite,
   type GoogleCalendarToken,
   type InsertGoogleCalendarToken,
+  type SpecialStatus,
+  type InsertSpecialStatus,
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
@@ -61,6 +64,13 @@ export interface IStorage {
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: string, updates: Partial<InsertLot>): Promise<Lot>;
   deleteLot(id: string): Promise<void>;
+  
+  // Special Status operations
+  getSpecialStatuses(parkId: string, includeInactive?: boolean): Promise<SpecialStatus[]>;
+  getSpecialStatus(id: string): Promise<SpecialStatus | undefined>;
+  createSpecialStatus(specialStatus: InsertSpecialStatus): Promise<SpecialStatus>;
+  updateSpecialStatus(id: string, updates: Partial<InsertSpecialStatus>): Promise<SpecialStatus>;
+  deleteSpecialStatus(id: string): Promise<void>;
   
   // Showing operations
   getShowings(filters?: { lotId?: string; managerId?: string; status?: string }): Promise<Showing[]>;
@@ -780,6 +790,47 @@ export class DatabaseStorage implements IStorage {
   async deleteGoogleCalendarToken(userId: string): Promise<void> {
     await db.delete(googleCalendarTokens)
       .where(eq(googleCalendarTokens.userId, userId));
+  }
+
+  // Special Status operations
+  async getSpecialStatuses(parkId: string, includeInactive?: boolean): Promise<SpecialStatus[]> {
+    const conditions = [eq(specialStatuses.parkId, parkId)];
+    
+    if (!includeInactive) {
+      conditions.push(eq(specialStatuses.isActive, true));
+    }
+    
+    return await db.select().from(specialStatuses)
+      .where(and(...conditions))
+      .orderBy(asc(specialStatuses.name));
+  }
+
+  async getSpecialStatus(id: string): Promise<SpecialStatus | undefined> {
+    const [specialStatus] = await db.select().from(specialStatuses).where(eq(specialStatuses.id, id));
+    return specialStatus;
+  }
+
+  async createSpecialStatus(specialStatus: InsertSpecialStatus): Promise<SpecialStatus> {
+    const [result] = await db.insert(specialStatuses).values(specialStatus).returning();
+    return result;
+  }
+
+  async updateSpecialStatus(id: string, updates: Partial<InsertSpecialStatus>): Promise<SpecialStatus> {
+    const [result] = await db.update(specialStatuses)
+      .set(updates)
+      .where(eq(specialStatuses.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteSpecialStatus(id: string): Promise<void> {
+    // First, remove special status from any lots that are using it
+    await db.update(lots)
+      .set({ specialStatusId: null })
+      .where(eq(lots.specialStatusId, id));
+    
+    // Then delete the special status
+    await db.delete(specialStatuses).where(eq(specialStatuses.id, id));
   }
 }
 
