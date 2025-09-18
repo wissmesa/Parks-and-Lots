@@ -1006,7 +1006,7 @@ export default function ManagerLots() {
                     <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <h3 className="text-lg font-medium mb-2">Upload CSV or Excel File</h3>
                     <p className="text-gray-500 mb-4">
-                      Upload lots data to your assigned park. No need to specify park ID - lots will be automatically assigned to your park.
+                      Upload lots data to your assigned park(s). If you manage only one park, lots will be automatically assigned. If you manage multiple parks, include a Park ID or Park Name column in your file.
                     </p>
                     <input
                       type="file"
@@ -1051,6 +1051,8 @@ export default function ManagerLots() {
                         <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
                         <li>• <strong>Bathrooms</strong> - Number of bathrooms</li>
                         <li>• <strong>Sq Ft</strong> - Square footage</li>
+                        <li>• <strong>Park ID</strong> - Required for multi-park managers</li>
+                        <li>• <strong>Park Name</strong> - Alternative to Park ID</li>
                       </ul>
                     </div>
                   </div>
@@ -1061,7 +1063,7 @@ export default function ManagerLots() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Map CSV Columns</h3>
                   <p className="text-sm text-gray-600">
-                    Map your CSV columns to the required fields. Note: All lots will be assigned to your park automatically.
+                    Map your CSV columns to the required fields. For multi-park managers, include Park ID or Park Name to specify the target park for each lot.
                   </p>
                   
                   <div className="grid gap-4">
@@ -1104,22 +1106,33 @@ export default function ManagerLots() {
                     <div className="space-y-3">
                       <h4 className="font-medium text-blue-700">Optional Fields</h4>
                       
-                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt'].map(field => (
-                        <div key={field}>
-                          <Label htmlFor={`${field}-mapping`}>{field.charAt(0).toUpperCase() + field.slice(1)}</Label>
-                          <Select value={columnMapping[field] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
-                            <SelectTrigger>
-                              <SelectValue placeholder={`Select CSV column for ${field}`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ignore">-- Ignore --</SelectItem>
-                              {csvHeaders.map(header => (
-                                <SelectItem key={header} value={header}>{header}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ))}
+                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt', 'parkId', 'parkName'].map(field => {
+                        const fieldLabels = {
+                          'price': 'Price',
+                          'description': 'Description', 
+                          'bedrooms': 'Bedrooms',
+                          'bathrooms': 'Bathrooms',
+                          'sqFt': 'Sq Ft',
+                          'parkId': 'Park ID',
+                          'parkName': 'Park Name'
+                        };
+                        return (
+                          <div key={field}>
+                            <Label htmlFor={`${field}-mapping`}>{fieldLabels[field as keyof typeof fieldLabels]}</Label>
+                            <Select value={columnMapping[field] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
+                              <SelectTrigger>
+                                <SelectValue placeholder={`Select CSV column for ${field}`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ignore">-- Ignore --</SelectItem>
+                                {csvHeaders.map(header => (
+                                  <SelectItem key={header} value={header}>{header}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                   

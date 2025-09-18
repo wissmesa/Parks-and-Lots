@@ -1360,18 +1360,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Manager is not assigned to any parks' });
       }
 
-      // Handle multi-park scenario - require exactly one park assignment for bulk upload
-      if (assignments.length > 1) {
-        return res.status(400).json({ 
-          code: 'MULTIPLE_PARKS',
-          message: 'Multiple park assignments found. Please contact administrator to assign lots to a specific park.',
-          assignedParks: assignments.map(a => ({ id: a.parkId, name: a.parkName }))
-        });
+      // Handle single vs multi-park scenarios
+      const isMultiPark = assignments.length > 1;
+      let defaultParkId: string | null = null;
+      let assignedParkName = '';
+      
+      if (!isMultiPark) {
+        // Single park - use automatic assignment
+        defaultParkId = assignments[0].parkId;
+        assignedParkName = assignments[0].parkName;
       }
 
-      // Use the single assigned park
-      const managerParkId = assignments[0].parkId;
-      const results: { successful: any[], failed: any[], assignedPark: string } = { successful: [], failed: [], assignedPark: assignments[0].parkName };
+      const results: { successful: any[], failed: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
+        successful: [], 
+        failed: [],
+        ...(isMultiPark ? { 
+          multiPark: true, 
+          assignedParks: assignments.map(a => ({ id: a.parkId, name: a.parkName }))
+        } : { 
+          assignedPark: assignedParkName 
+        })
+      };
       
       for (let i = 0; i < lots.length; i++) {
         const lotData = lots[i];
@@ -1396,11 +1405,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Parse and validate numeric fields, automatically assign park ID
+          // Determine park ID for this lot
+          let lotParkId: string;
+          
+          if (isMultiPark) {
+            // Multi-park manager: check for park specification in CSV
+            let specifiedParkId: string | null = null;
+            
+            // Check if parkId is provided
+            if (lotData.parkId && String(lotData.parkId).trim()) {
+              specifiedParkId = String(lotData.parkId).trim();
+            }
+            // Check if parkName is provided and resolve to ID
+            else if (lotData.parkName && String(lotData.parkName).trim()) {
+              const parkName = String(lotData.parkName).trim();
+              const matchingPark = assignments.find(a => 
+                a.parkName.toLowerCase() === parkName.toLowerCase()
+              );
+              if (matchingPark) {
+                specifiedParkId = matchingPark.parkId;
+              } else {
+                results.failed.push({
+                  row: rowNumber,
+                  error: `Park '${parkName}' not found in your assigned parks: ${assignments.map(a => a.parkName).join(', ')}`
+                });
+                continue;
+              }
+            }
+            
+            // Validate park assignment
+            if (specifiedParkId) {
+              const hasAccess = assignments.some(a => a.parkId === specifiedParkId);
+              if (!hasAccess) {
+                results.failed.push({
+                  row: rowNumber,
+                  error: `You don't have access to park ID '${specifiedParkId}'. Available parks: ${assignments.map(a => `${a.parkName} (${a.parkId})`).join(', ')}`
+                });
+                continue;
+              }
+              lotParkId = specifiedParkId;
+            } else {
+              results.failed.push({
+                row: rowNumber,
+                error: 'Park ID or Park Name must be specified for multi-park managers. Available parks: ' + assignments.map(a => `${a.parkName} (${a.parkId})`).join(', ')
+              });
+              continue;
+            }
+          } else {
+            // Single park manager: use automatic assignment
+            lotParkId = defaultParkId!;
+          }
+
+          // Parse and validate numeric fields
           const parsedData = {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
             status: lotData.status,
-            parkId: managerParkId, // Automatically assign to manager's park
+            parkId: lotParkId,
             price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
             description: lotData.description ? String(lotData.description).trim() : "",
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
