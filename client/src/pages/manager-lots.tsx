@@ -114,7 +114,14 @@ export default function ManagerLots() {
   }, [user]);
 
   // Fetch manager assignments (parks)
-  const { data: assignments } = useQuery({
+  const { data: assignments, isLoading: assignmentsLoading } = useQuery<{
+    id: string;
+    userId: string;
+    parkId: string;
+    userName: string;
+    userEmail: string;
+    parkName: string;
+  }[]>({
     queryKey: ["/api/manager/assignments"],
     enabled: user?.role === 'MANAGER',
   });
@@ -411,6 +418,11 @@ export default function ManagerLots() {
   const isValidMapping = () => {
     const hasRequiredFields = columnMapping['nameOrNumber'] && columnMapping['nameOrNumber'] !== 'ignore' && 
                              columnMapping['status'] && columnMapping['status'] !== 'ignore';
+    
+    // Don't validate if assignments are still loading
+    if (assignmentsLoading) {
+      return false;
+    }
     
     // For multi-park managers, park name is required
     if (assignments && assignments.length > 1) {
@@ -1071,7 +1083,12 @@ export default function ManagerLots() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Map CSV Columns</h3>
                   <p className="text-sm text-gray-600">
-                    Map your CSV columns to the required fields. For multi-park managers, include Park ID or Park Name to specify the target park for each lot.
+                    Map your CSV columns to the required fields. {
+                      assignmentsLoading ? 'Loading park assignments...' :
+                      assignments && assignments.length > 1 
+                        ? 'Since you manage multiple parks, you must specify the park name for each lot.'
+                        : 'Lots will be automatically assigned to your park.'
+                    }
                   </p>
                   
                   <div className="grid gap-4">
@@ -1094,6 +1111,24 @@ export default function ManagerLots() {
                         </Select>
                       </div>
                       
+                      {/* Show park name as required field for multi-park managers */}
+                      {!assignmentsLoading && assignments && assignments.length > 1 && (
+                        <div>
+                          <Label htmlFor="parkName-mapping">Park Name *</Label>
+                          <Select value={columnMapping['parkName'] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, parkName: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select CSV column for Park Name" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ignore">-- Ignore --</SelectItem>
+                              {csvHeaders.map(header => (
+                                <SelectItem key={header} value={header}>{header}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
                       <div>
                         <Label htmlFor="status-mapping">Status *</Label>
                         <Select value={columnMapping['status'] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, status: value }))}>
@@ -1114,7 +1149,21 @@ export default function ManagerLots() {
                     <div className="space-y-3">
                       <h4 className="font-medium text-blue-700">Optional Fields</h4>
                       
-                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt', 'parkId', 'parkName'].map(field => {
+                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
+                        // Don't filter during loading
+                        if (assignmentsLoading) {
+                          return true;
+                        }
+                        // Hide park fields for single-park managers (auto-assigned)
+                        if (assignments && assignments.length === 1 && (field === 'parkId' || field === 'parkName')) {
+                          return false;
+                        }
+                        // Hide park name for multi-park managers (it's now in required section)
+                        if (assignments && assignments.length > 1 && field === 'parkName') {
+                          return false;
+                        }
+                        return true;
+                      }).map(field => {
                         const fieldLabels = {
                           'price': 'Price',
                           'description': 'Description', 
