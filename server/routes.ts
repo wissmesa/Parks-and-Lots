@@ -26,6 +26,7 @@ import {
   insertAvailabilitySchema,
   insertPhotoSchema,
   insertInviteSchema,
+  insertSpecialStatusSchema,
   bookingSchema
 } from "@shared/schema";
 import { randomBytes } from "crypto";
@@ -1089,6 +1090,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedPark);
     } catch (error) {
       console.error('Toggle park active error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Special Status routes
+  // Get all special statuses for a park
+  app.get('/api/parks/:parkId/special-statuses', authenticateToken, requireParkAccess, async (req: AuthRequest, res) => {
+    try {
+      const { includeInactive } = req.query;
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      
+      const specialStatuses = await storage.getSpecialStatuses(
+        req.params.parkId, 
+        shouldIncludeInactive
+      );
+      res.json(specialStatuses);
+    } catch (error) {
+      console.error('Get special statuses error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Create a new special status for a park
+  app.post('/api/parks/:parkId/special-statuses', authenticateToken, requireParkAccess, async (req: AuthRequest, res) => {
+    try {
+      // Validate request body
+      const validatedData = insertSpecialStatusSchema.parse({
+        ...req.body,
+        parkId: req.params.parkId
+      });
+
+      const specialStatus = await storage.createSpecialStatus(validatedData);
+      res.status(201).json(specialStatus);
+    } catch (error: any) {
+      console.error('Create special status error:', error);
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Update a special status
+  app.put('/api/special-statuses/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      // First get the special status to check park access
+      const existingStatus = await storage.getSpecialStatus(req.params.id);
+      if (!existingStatus) {
+        return res.status(404).json({ message: 'Special status not found' });
+      }
+
+      // Check if user has access to the park this special status belongs to
+      // This uses the same park access logic as other endpoints
+      const managerAssignments = req.user?.role === 'MANAGER' 
+        ? await storage.getManagerAssignments(req.user.id, existingStatus.parkId)
+        : [];
+      const hasAccess = req.user?.role === 'ADMIN' || 
+        (req.user?.role === 'MANAGER' && managerAssignments.length > 0);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Validate request body (exclude parkId from updates, allow partial updates)
+      const validatedData = insertSpecialStatusSchema.omit({ parkId: true }).partial().parse(req.body);
+
+      const updatedStatus = await storage.updateSpecialStatus(req.params.id, validatedData);
+      res.json(updatedStatus);
+    } catch (error: any) {
+      console.error('Update special status error:', error);
+      if (error?.name === 'ZodError') {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Delete a special status
+  app.delete('/api/special-statuses/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      // First get the special status to check park access
+      const existingStatus = await storage.getSpecialStatus(req.params.id);
+      if (!existingStatus) {
+        return res.status(404).json({ message: 'Special status not found' });
+      }
+
+      // Check if user has access to the park this special status belongs to
+      const managerAssignments = req.user?.role === 'MANAGER' 
+        ? await storage.getManagerAssignments(req.user.id, existingStatus.parkId)
+        : [];
+      const hasAccess = req.user?.role === 'ADMIN' || 
+        (req.user?.role === 'MANAGER' && managerAssignments.length > 0);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteSpecialStatus(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete special status error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Assign or remove special status from a lot
+  app.put('/api/lots/:lotId/special-status', authenticateToken, requireLotAccess, async (req: AuthRequest, res) => {
+    try {
+      const { specialStatusId } = req.body;
+      
+      // If specialStatusId is provided, validate it exists and belongs to the same park as the lot
+      if (specialStatusId) {
+        const lot = await storage.getLot(req.params.lotId);
+        const specialStatus = await storage.getSpecialStatus(specialStatusId);
+        
+        if (!lot || !specialStatus) {
+          return res.status(404).json({ message: 'Lot or special status not found' });
+        }
+        
+        if (lot.parkId !== specialStatus.parkId) {
+          return res.status(400).json({ message: 'Special status must belong to the same park as the lot' });
+        }
+      }
+
+      // Update the lot with the new special status (null to remove)
+      const updatedLot = await storage.updateLot(req.params.lotId, {
+        specialStatusId: specialStatusId || null
+      });
+      
+      res.json(updatedLot);
+    } catch (error) {
+      console.error('Assign special status error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
