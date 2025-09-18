@@ -24,7 +24,8 @@ import {
   Ruler,
   Eye,
   EyeOff,
-  Camera 
+  Camera,
+  Tag
 } from "lucide-react";
 
 interface Lot {
@@ -38,12 +39,27 @@ interface Lot {
   sqFt: number;
   parkId: string;
   isActive: boolean;
+  specialStatusId?: string | null;
   park: {
     id: string;
     name: string;
     city: string;
     state: string;
   };
+  specialStatus?: {
+    id: string;
+    name: string;
+    color: string;
+    isActive: boolean;
+  } | null;
+}
+
+interface SpecialStatus {
+  id: string;
+  name: string;
+  color: string;
+  isActive: boolean;
+  parkId: string;
 }
 
 export default function ManagerLots() {
@@ -55,6 +71,8 @@ export default function ManagerLots() {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
+  const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
   
   // Form state
   const [formData, setFormData] = useState({
@@ -85,6 +103,12 @@ export default function ManagerLots() {
   const { data: lots, isLoading } = useQuery<Lot[]>({
     queryKey: ["/api/manager/lots"],
     enabled: user?.role === 'MANAGER',
+  });
+
+  // Special statuses query for the selected park
+  const { data: specialStatuses = [] } = useQuery<SpecialStatus[]>({
+    queryKey: ["/api/parks", assigningSpecialStatus?.parkId, "special-statuses"],
+    enabled: !!assigningSpecialStatus?.parkId,
   });
 
   // Create lot mutation
@@ -188,6 +212,28 @@ export default function ManagerLots() {
     },
   });
 
+  const assignSpecialStatusMutation = useMutation({
+    mutationFn: async ({ lotId, specialStatusId }: { lotId: string; specialStatusId: string | null }) => {
+      return apiRequest("PUT", `/api/lots/${lotId}/special-status`, { specialStatusId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      setAssigningSpecialStatus(null);
+      setSelectedSpecialStatusId("");
+      toast({
+        title: "Success",
+        description: "Special status assigned successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign special status",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await createLotMutation.mutateAsync(formData);
@@ -216,6 +262,21 @@ export default function ManagerLots() {
       parkId: lot.parkId
     });
     setIsEditModalOpen(true);
+  };
+
+  const handleAssignSpecialStatus = (lot: Lot) => {
+    setAssigningSpecialStatus(lot);
+    setSelectedSpecialStatusId(lot.specialStatusId || "");
+  };
+
+  const handleConfirmSpecialStatusAssignment = () => {
+    if (assigningSpecialStatus) {
+      const specialStatusId = selectedSpecialStatusId === "" ? null : selectedSpecialStatusId;
+      assignSpecialStatusMutation.mutate({
+        lotId: assigningSpecialStatus.id,
+        specialStatusId
+      });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -470,6 +531,15 @@ export default function ManagerLots() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleAssignSpecialStatus(lot)}
+                          title="Assign Special Status"
+                          data-testid={`button-assign-special-status-${lot.id}`}
+                        >
+                          <Tag className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleEdit(lot)}
                           data-testid={`button-edit-lot-${lot.id}`}
                         >
@@ -607,6 +677,77 @@ export default function ManagerLots() {
                   entityName={lots?.find(l => l.id === showPhotos)?.nameOrNumber || 'Lot'}
                 />
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Special Status Assignment Dialog */}
+          <Dialog open={!!assigningSpecialStatus} onOpenChange={(open) => !open && setAssigningSpecialStatus(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>
+                  Assign Special Status - {assigningSpecialStatus?.nameOrNumber}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="special-status-select">Special Status</Label>
+                  <Select value={selectedSpecialStatusId} onValueChange={setSelectedSpecialStatusId}>
+                    <SelectTrigger id="special-status-select">
+                      <SelectValue placeholder="Select a special status or leave empty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None (Remove special status)</SelectItem>
+                      {specialStatuses
+                        .filter(status => status.isActive)
+                        .map((status) => (
+                          <SelectItem key={status.id} value={status.id}>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full border"
+                                style={{ backgroundColor: status.color }}
+                              />
+                              {status.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="text-sm text-muted-foreground">
+                  <p><strong>Park:</strong> {assigningSpecialStatus?.park?.name || 'Unknown'}</p>
+                  {assigningSpecialStatus?.specialStatus && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span>Current status:</span>
+                      <div className="flex items-center gap-1">
+                        <div
+                          className="w-3 h-3 rounded-full border"
+                          style={{ backgroundColor: assigningSpecialStatus.specialStatus.color }}
+                        />
+                        <span className="font-medium">{assigningSpecialStatus.specialStatus.name}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAssigningSpecialStatus(null)}
+                    data-testid="cancel-assign-special-status"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmSpecialStatusAssignment}
+                    disabled={assignSpecialStatusMutation.isPending}
+                    data-testid="confirm-assign-special-status"
+                  >
+                    {assignSpecialStatusMutation.isPending ? "Assigning..." : "Assign"}
+                  </Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
         </main>
