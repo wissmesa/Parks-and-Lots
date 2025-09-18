@@ -162,8 +162,13 @@ export default function AdminLots() {
   };
 
   const handleColumnMapping = () => {
-    const requiredFields = ['nameOrNumber', 'status', 'parkId'];
-    const missingFields = requiredFields.filter(field => !columnMapping[field]);
+    const requiredFields = ['nameOrNumber', 'status'];
+    const missingFields = requiredFields.filter(field => !columnMapping[field] || columnMapping[field] === 'skip');
+    
+    // Park name is required - park ID is only an optional fallback
+    if (!columnMapping['parkName'] || columnMapping['parkName'] === 'skip') {
+      missingFields.push('parkName (required - Park ID alone is not sufficient)');
+    }
     
     if (missingFields.length > 0) {
       toast({
@@ -976,10 +981,11 @@ export default function AdminLots() {
                   <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
                     <li>Lot Name/Number</li>
                     <li>Status (FOR_RENT, FOR_SALE, or RENT_SALE)</li>
-                    <li>Park ID or Park Name</li>
+                    <li>Park Name (preferred - easier than Park ID)</li>
                   </ul>
                   <h4 className="font-medium mt-3 mb-2">Optional Columns:</h4>
                   <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>Park ID (can be used instead of Park Name)</li>
                     <li>Price, Description, Bedrooms, Bathrooms, Square Feet</li>
                   </ul>
                 </div>
@@ -1002,7 +1008,8 @@ export default function AdminLots() {
                       {[
                         { field: 'nameOrNumber', label: 'Lot Name/Number *', required: true },
                         { field: 'status', label: 'Status *', required: true },
-                        { field: 'parkId', label: 'Park ID *', required: true },
+                        { field: 'parkName', label: 'Park Name * (Required)', required: true },
+                        { field: 'parkId', label: 'Park ID (Optional)', required: false },
                         { field: 'price', label: 'Price', required: false },
                         { field: 'description', label: 'Description', required: false },
                         { field: 'bedrooms', label: 'Bedrooms', required: false },

@@ -409,7 +409,15 @@ export default function ManagerLots() {
   };
 
   const isValidMapping = () => {
-    return columnMapping['nameOrNumber'] && columnMapping['status'];
+    const hasRequiredFields = columnMapping['nameOrNumber'] && columnMapping['nameOrNumber'] !== 'ignore' && 
+                             columnMapping['status'] && columnMapping['status'] !== 'ignore';
+    
+    // For multi-park managers, park name is required
+    if (assignments && assignments.length > 1) {
+      return hasRequiredFields && columnMapping['parkName'] && columnMapping['parkName'] !== 'ignore';
+    }
+    
+    return hasRequiredFields;
   };
 
   const handleProceedToPreview = () => {
@@ -1006,7 +1014,7 @@ export default function ManagerLots() {
                     <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <h3 className="text-lg font-medium mb-2">Upload CSV or Excel File</h3>
                     <p className="text-gray-500 mb-4">
-                      Upload lots data to your assigned park(s). If you manage only one park, lots will be automatically assigned. If you manage multiple parks, include a Park ID or Park Name column in your file.
+                      Upload lots data to your assigned park(s). If you manage only one park, lots will be automatically assigned. If you manage multiple parks, you must include a Park Name column in your file (required, preferred over Park ID).
                     </p>
                     <input
                       type="file"
@@ -1113,8 +1121,8 @@ export default function ManagerLots() {
                           'bedrooms': 'Bedrooms',
                           'bathrooms': 'Bathrooms',
                           'sqFt': 'Sq Ft',
-                          'parkId': 'Park ID',
-                          'parkName': 'Park Name'
+                          'parkId': 'Park ID (Optional)',
+                          'parkName': 'Park Name (Required for multi-park)'
                         };
                         return (
                           <div key={field}>

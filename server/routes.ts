@@ -1277,10 +1277,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           // Validate required fields
-          if (!lotData.nameOrNumber || !lotData.status || !lotData.parkId) {
+          if (!lotData.nameOrNumber || !lotData.status) {
             results.failed.push({
               row: rowNumber,
-              error: 'Missing required fields: nameOrNumber, status, parkId'
+              error: 'Missing required fields: nameOrNumber, status'
             });
             continue;
           }
@@ -1294,12 +1294,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          // Verify park exists
-          const park = await storage.getPark(lotData.parkId);
-          if (!park) {
+          // Determine park ID - prioritize park name over park ID
+          let lotParkId: string;
+          
+          // Check if parkName is provided first (prioritized)
+          if (lotData.parkName && String(lotData.parkName).trim()) {
+            const parkName = String(lotData.parkName).trim();
+            const { parks: allParks } = await storage.getParks();
+            const matchingPark = allParks.find(p => 
+              p.name.toLowerCase() === parkName.toLowerCase()
+            );
+            if (matchingPark) {
+              lotParkId = matchingPark.id;
+            } else {
+              const availableParks = allParks.map(p => p.name).join(', ');
+              results.failed.push({
+                row: rowNumber,
+                error: `Park '${parkName}' not found. Available parks: ${availableParks}`
+              });
+              continue;
+            }
+          }
+          // Fallback to parkId if no parkName provided
+          else if (lotData.parkId && String(lotData.parkId).trim()) {
+            const parkId = String(lotData.parkId).trim();
+            const park = await storage.getPark(parkId);
+            if (!park) {
+              results.failed.push({
+                row: rowNumber,
+                error: `Park with ID ${parkId} not found`
+              });
+              continue;
+            }
+            lotParkId = parkId;
+          }
+          // Neither park name nor park ID provided
+          else {
             results.failed.push({
               row: rowNumber,
-              error: `Park with ID ${lotData.parkId} not found`
+              error: 'Park Name or Park ID must be specified'
             });
             continue;
           }
@@ -1308,7 +1341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const parsedData = {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
             status: lotData.status,
-            parkId: lotData.parkId,
+            parkId: lotParkId,
             price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
             description: lotData.description ? String(lotData.description).trim() : "",
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
@@ -1412,12 +1445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Multi-park manager: check for park specification in CSV
             let specifiedParkId: string | null = null;
             
-            // Check if parkId is provided
-            if (lotData.parkId && String(lotData.parkId).trim()) {
-              specifiedParkId = String(lotData.parkId).trim();
-            }
-            // Check if parkName is provided and resolve to ID
-            else if (lotData.parkName && String(lotData.parkName).trim()) {
+            // Check if parkName is provided and resolve to ID (prioritized)
+            if (lotData.parkName && String(lotData.parkName).trim()) {
               const parkName = String(lotData.parkName).trim();
               const matchingPark = assignments.find(a => 
                 a.parkName.toLowerCase() === parkName.toLowerCase()
@@ -1431,6 +1460,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
                 continue;
               }
+            }
+            // Fallback to parkId if no parkName provided
+            else if (lotData.parkId && String(lotData.parkId).trim()) {
+              specifiedParkId = String(lotData.parkId).trim();
             }
             
             // Validate park assignment
