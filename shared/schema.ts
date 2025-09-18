@@ -91,6 +91,17 @@ export const googleCalendarTokens = pgTable("google_calendar_tokens", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Special status table - park-specific statuses for lots
+export const specialStatuses = pgTable("special_statuses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parkId: varchar("park_id").references(() => parks.id).notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  color: varchar("color"), // Optional hex color for UI display
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Lots table
 export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -102,6 +113,7 @@ export const lots = pgTable("lots", {
   bedrooms: integer("bedrooms"),
   bathrooms: integer("bathrooms"),
   sqFt: integer("sq_ft"),
+  specialStatusId: varchar("special_status_id").references(() => specialStatuses.id),
   isActive: boolean("is_active").default(true).notNull(),
 });
 
