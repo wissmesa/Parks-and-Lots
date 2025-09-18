@@ -4,6 +4,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import { promises as fs } from "fs";
 import multer from "multer";
+import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
 import { 
   authenticateToken, 
@@ -29,8 +30,11 @@ import {
   insertSpecialStatusSchema,
   bookingSchema
 } from "@shared/schema";
-import { randomBytes } from "crypto";
-import { sendInviteEmail } from "./email";
+import { randomBytes, createHash } from "crypto";
+import { sendInviteEmail, sendPasswordResetEmail } from "./email";
+
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5000';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -478,6 +482,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/logout', (req, res) => {
     // For JWT, logout is handled client-side by removing tokens
     res.json({ message: 'Logged out successfully' });
+  });
+
+  // Forgot Password Endpoint
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: 'Email is required' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user || !user.isActive) {
+        // Don't reveal if email exists for security
+        return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+      }
+
+      // Generate a secure reset token
+      const resetToken = randomBytes(32).toString('hex');
+      const resetTokenHash = createHash('sha256').update(resetToken).digest('hex');
+      const resetTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Update user with hashed reset token
+      await storage.updateUser(user.id, {
+        resetToken: resetTokenHash,
+        resetTokenExpiresAt
+      });
+
+      // Create reset URL using configured frontend base URL
+      const resetUrl = `${FRONTEND_BASE_URL}/reset-password?token=${resetToken}`;
+
+      // Send password reset email
+      const emailSent = await sendPasswordResetEmail(
+        user.email,
+        resetUrl,
+        user.fullName
+      );
+
+      if (!emailSent) {
+        console.error('Failed to send password reset email to:', user.email);
+        return res.status(500).json({ message: 'Failed to send password reset email' });
+      }
+
+      res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Reset Password Endpoint
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, password, confirmPassword } = req.body;
+      
+      if (!token || !password || !confirmPassword) {
+        return res.status(400).json({ message: 'Token, password, and confirm password are required' });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: 'Passwords do not match' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      }
+
+      // Find user by reset token
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user || !user.resetToken || !user.resetTokenExpiresAt) {
+        return res.status(400).json({ message: 'Invalid or expired reset token' });
+      }
+
+      // Check if token is expired
+      if (new Date() > new Date(user.resetTokenExpiresAt)) {
+        return res.status(400).json({ message: 'Reset token has expired' });
+      }
+
+      // Hash the new password
+      const passwordHash = await hashPassword(password);
+
+      // Update user password and clear reset token
+      await storage.updateUser(user.id, {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpiresAt: null
+      });
+
+      res.json({ message: 'Password has been reset successfully' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
   });
 
   // Google Calendar OAuth routes

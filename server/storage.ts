@@ -40,6 +40,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
   getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
@@ -135,6 +136,14 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    // Hash the provided token to compare with stored hash
+    const crypto = await import('crypto');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const [user] = await db.select().from(users).where(eq(users.resetToken, tokenHash));
     return user;
   }
 

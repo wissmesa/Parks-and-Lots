@@ -42,6 +42,74 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 }
 
+export async function sendPasswordResetEmail(
+  userEmail: string,
+  resetUrl: string,
+  userName: string,
+  fromEmail: string = 'support@bluepaperclip.com'
+): Promise<boolean> {
+  const subject = 'Password Reset - Parks & Lots Booking System';
+  
+  const text = `
+Hello ${userName},
+
+We received a request to reset your password for Parks & Lots Booking System.
+
+Click the link below to reset your password:
+${resetUrl}
+
+This link will expire in 24 hours for security reasons.
+
+If you did not request this password reset, please ignore this email and your password will remain unchanged.
+
+Best regards,
+Parks & Lots Team
+  `;
+
+  const html = `
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #333;">Password Reset Request</h2>
+      
+      <p>Hello ${userName},</p>
+      
+      <p>We received a request to reset your password for Parks & Lots Booking System.</p>
+      
+      <div style="margin: 30px 0; text-align: center;">
+        <a href="${resetUrl}" 
+           style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+          Reset Password
+        </a>
+      </div>
+      
+      <p>Or copy and paste this link into your browser:</p>
+      <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+      
+      <p style="color: #666; font-size: 14px;">
+        <em>This link will expire in 24 hours for security reasons.</em>
+      </p>
+      
+      <p style="color: #999; font-size: 14px;">
+        If you did not request this password reset, please ignore this email and your password will remain unchanged.
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+      
+      <p style="color: #999; font-size: 12px;">
+        Best regards,<br>
+        Parks & Lots Team
+      </p>
+    </div>
+  `;
+
+  return await sendEmail({
+    to: userEmail,
+    from: fromEmail,
+    subject,
+    text,
+    html
+  });
+}
+
 export async function sendInviteEmail(
   inviteEmail: string,
   inviteUrl: string,

@@ -11,6 +11,8 @@ import Properties from "@/pages/properties";
 import ParkDetail from "@/pages/park-detail";
 import LotDetail from "@/pages/lot-detail";
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import AcceptInvite from "@/pages/accept-invite";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminCompanies from "@/pages/admin-companies";
@@ -37,6 +39,8 @@ function Router() {
         <Route path="/parks/:id" component={ParkDetail} />
         <Route path="/lots/:id" component={LotDetail} />
         <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/accept-invite" component={AcceptInvite} />
         
         {/* Protected admin routes */}

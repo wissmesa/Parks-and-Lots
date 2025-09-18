@@ -97,6 +97,12 @@ export default function Login() {
               </Button>
             </form>
 
+            <div className="mt-4 text-center">
+              <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/80" data-testid="link-forgot-password">
+                Forgot Password?
+              </Link>
+            </div>
+
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account? Managers are invited by administrators.
