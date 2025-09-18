@@ -89,3 +89,10 @@ Preferred communication style: Simple, everyday language.
 - **Improved User Experience**: Clear documentation in upload dialog explaining single vs multi-park behavior
 - **Column Mapping Enhancement**: Added Park ID and Park Name as optional mapping fields with user-friendly labels
 - **Robust Error Handling**: Per-row validation with detailed error messages including available parks for troubleshooting
+
+### Mandatory Park Name Implementation (September 2025)
+- **Mandatory Park Name**: Park name is now required for all bulk uploads (admins) and multi-park managers, with park ID as optional fallback
+- **Backend Park Name Priority**: Both admin and manager endpoints prioritize park name over park ID for user-friendly CSV creation
+- **Enhanced Validation**: Frontend validation prevents 'skip'/'ignore' selection for required park name field
+- **User-Friendly CSV Format**: Users can now use familiar park names instead of technical park IDs in their CSV files
+- **Comprehensive Error Messages**: Clear feedback when park names are invalid with list of available parks for easy correction
