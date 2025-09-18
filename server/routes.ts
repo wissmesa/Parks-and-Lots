@@ -1256,6 +1256,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk upload lots (admin only)
+  app.post('/api/admin/lots/bulk', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const { lots } = req.body;
+      
+      if (!Array.isArray(lots) || lots.length === 0) {
+        return res.status(400).json({ message: 'Lots array is required' });
+      }
+
+      if (lots.length > 1000) {
+        return res.status(400).json({ message: 'Maximum 1000 lots per upload' });
+      }
+
+      const results = { successful: [], failed: [] };
+      
+      for (let i = 0; i < lots.length; i++) {
+        const lotData = lots[i];
+        const rowNumber = i + 1;
+        
+        try {
+          // Validate required fields
+          if (!lotData.nameOrNumber || !lotData.status || !lotData.parkId) {
+            results.failed.push({
+              row: rowNumber,
+              error: 'Missing required fields: nameOrNumber, status, parkId'
+            });
+            continue;
+          }
+
+          // Validate status enum
+          if (!['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+            results.failed.push({
+              row: rowNumber,
+              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
+            });
+            continue;
+          }
+
+          // Verify park exists
+          const park = await storage.getPark(lotData.parkId);
+          if (!park) {
+            results.failed.push({
+              row: rowNumber,
+              error: `Park with ID ${lotData.parkId} not found`
+            });
+            continue;
+          }
+
+          // Parse and validate numeric fields
+          const parsedData = {
+            nameOrNumber: String(lotData.nameOrNumber).trim(),
+            status: lotData.status,
+            parkId: lotData.parkId,
+            price: lotData.price ? String(lotData.price) : "",
+            description: lotData.description ? String(lotData.description).trim() : "",
+            bedrooms: lotData.bedrooms ? parseInt(lotData.bedrooms) || null : null,
+            bathrooms: lotData.bathrooms ? parseInt(lotData.bathrooms) || null : null,
+            sqFt: lotData.sqFt ? parseInt(lotData.sqFt) || null : null,
+            isActive: true
+          };
+
+          // Create the lot
+          const newLot = await storage.createLot(parsedData as any);
+          results.successful.push({
+            row: rowNumber,
+            id: newLot.id,
+            nameOrNumber: newLot.nameOrNumber
+          });
+
+        } catch (error) {
+          console.error(`Error creating lot at row ${rowNumber}:`, error);
+          results.failed.push({
+            row: rowNumber,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error('Bulk upload error:', error);
+      res.status(500).json({ message: 'Internal server error during bulk upload' });
+    }
+  });
+
   // Lot routes
   app.get('/api/lots', async (req: AuthRequest, res) => {
     try {

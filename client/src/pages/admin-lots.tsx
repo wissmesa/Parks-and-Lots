@@ -10,12 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { apiRequest } from "@/lib/queryClient";
-import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle } from "lucide-react";
+import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -84,7 +84,7 @@ export default function AdminLots() {
 
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [bulkUploadStep, setBulkUploadStep] = useState<'upload' | 'mapping' | 'preview' | 'importing'>('upload');
+  const [bulkUploadStep, setBulkUploadStep] = useState<'upload' | 'mapping' | 'preview' | 'importing' | 'results'>('upload');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -92,6 +92,163 @@ export default function AdminLots() {
   const [mappedData, setMappedData] = useState<any[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<any>(null);
+
+  // File upload and parsing functions
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    
+    const fileExtension = file.name.toLowerCase().split('.').pop();
+    
+    if (fileExtension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          setCsvHeaders(results.meta.fields || []);
+          setParsedData(results.data);
+          setBulkUploadStep('mapping');
+        },
+        error: (error) => {
+          toast({
+            title: "Error parsing CSV",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
+      });
+    } else if (['xlsx', 'xls'].includes(fileExtension || '')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (jsonData.length > 0) {
+            const headers = jsonData[0] as string[];
+            const rows = jsonData.slice(1);
+            const formattedData = rows.map(row => {
+              const obj: any = {};
+              headers.forEach((header, index) => {
+                obj[header] = (row as any[])[index] || '';
+              });
+              return obj;
+            });
+            
+            setCsvHeaders(headers);
+            setParsedData(formattedData);
+            setBulkUploadStep('mapping');
+          }
+        } catch (error) {
+          toast({
+            title: "Error parsing Excel file",
+            description: "Please check the file format and try again",
+            variant: "destructive"
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast({
+        title: "Unsupported file format",
+        description: "Please upload a CSV or Excel file",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleColumnMapping = () => {
+    const requiredFields = ['nameOrNumber', 'status', 'parkId'];
+    const missingFields = requiredFields.filter(field => !columnMapping[field]);
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Missing required mappings",
+        description: `Please map: ${missingFields.join(', ')}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Transform data using column mapping
+    const transformedData = parsedData.map(row => {
+      const transformed: any = {};
+      Object.entries(columnMapping).forEach(([lotField, csvField]) => {
+        if (csvField && csvField !== 'skip') {
+          transformed[lotField] = row[csvField];
+        }
+      });
+      return transformed;
+    });
+    
+    setMappedData(transformedData);
+    setBulkUploadStep('preview');
+  };
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: async (data: any[]) => {
+      return await apiRequest('POST', '/api/admin/lots/bulk', { lots: data });
+    },
+    onSuccess: async (response) => {
+      const results = await response.json();
+      setImportResults(results);
+      setImportProgress(100);
+      
+      // Refresh lots data
+      queryClient.invalidateQueries({ queryKey: ['/api/lots'] });
+      
+      // Switch to results step after a brief delay
+      setTimeout(() => {
+        setBulkUploadStep('results');
+      }, 500);
+      
+      toast({
+        title: "Bulk upload completed",
+        description: `Successfully processed ${results.successful?.length || 0} of ${mappedData.length} lots`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Bulk upload failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleStartImport = () => {
+    setBulkUploadStep('importing');
+    setImportProgress(0);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setImportProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90; // Will be set to 100% in onSuccess
+        }
+        return prev + 10;
+      });
+    }, 300);
+
+    bulkUploadMutation.mutate(mappedData);
+  };
+
+  const resetBulkUpload = () => {
+    setIsBulkUploadOpen(false);
+    setBulkUploadStep('upload');
+    setUploadedFile(null);
+    setParsedData([]);
+    setCsvHeaders([]);
+    setColumnMapping({});
+    setMappedData([]);
+    setImportProgress(0);
+    setImportResults(null);
+  };
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -775,6 +932,256 @@ export default function AdminLots() {
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Upload Dialog */}
+        <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Bulk Upload Lots</DialogTitle>
+              <DialogDescription>
+                Upload multiple lots from a CSV or Excel file
+              </DialogDescription>
+            </DialogHeader>
+
+            {bulkUploadStep === 'upload' && (
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <FileSpreadsheet className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Upload File</h3>
+                  <p className="text-gray-500 mb-4">
+                    Choose a CSV or Excel file containing lot data
+                  </p>
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="bulk-upload-file"
+                    data-testid="bulk-upload-file-input"
+                  />
+                  <label htmlFor="bulk-upload-file" className="cursor-pointer">
+                    <Button asChild>
+                      <span>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose File
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+                
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">Required Columns:</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>Lot Name/Number</li>
+                    <li>Status (FOR_RENT, FOR_SALE, or RENT_SALE)</li>
+                    <li>Park ID or Park Name</li>
+                  </ul>
+                  <h4 className="font-medium mt-3 mb-2">Optional Columns:</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                    <li>Price, Description, Bedrooms, Bathrooms, Square Feet</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {bulkUploadStep === 'mapping' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Map Columns</h3>
+                  <p className="text-sm text-gray-500">
+                    {parsedData.length} rows found
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Lot Fields</h4>
+                    <div className="space-y-2">
+                      {[
+                        { field: 'nameOrNumber', label: 'Lot Name/Number *', required: true },
+                        { field: 'status', label: 'Status *', required: true },
+                        { field: 'parkId', label: 'Park ID *', required: true },
+                        { field: 'price', label: 'Price', required: false },
+                        { field: 'description', label: 'Description', required: false },
+                        { field: 'bedrooms', label: 'Bedrooms', required: false },
+                        { field: 'bathrooms', label: 'Bathrooms', required: false },
+                        { field: 'sqFt', label: 'Square Feet', required: false }
+                      ].map(({ field, label, required }) => (
+                        <div key={field} className="flex items-center justify-between p-2 border rounded">
+                          <span className={required ? 'font-medium' : ''}>{label}</span>
+                          <Select 
+                            value={columnMapping[field] || ''} 
+                            onValueChange={(value) => setColumnMapping(prev => ({ ...prev, [field]: value }))}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Select column" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="skip">Skip</SelectItem>
+                              {csvHeaders.map(header => (
+                                <SelectItem key={header} value={header}>
+                                  {header}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Data Preview</h4>
+                    <div className="border rounded p-2 bg-gray-50 max-h-64 overflow-y-auto">
+                      {parsedData.slice(0, 3).map((row, index) => (
+                        <div key={index} className="mb-2 text-sm">
+                          <strong>Row {index + 1}:</strong>
+                          <pre className="mt-1 text-xs bg-white p-2 rounded">
+                            {JSON.stringify(row, null, 2)}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-between">
+                  <Button variant="outline" onClick={() => setBulkUploadStep('upload')}>
+                    Back
+                  </Button>
+                  <Button onClick={handleColumnMapping} data-testid="proceed-mapping">
+                    Next: Preview Data
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {bulkUploadStep === 'preview' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Preview & Import</h3>
+                  <p className="text-sm text-gray-500">
+                    {mappedData.length} lots ready for import
+                  </p>
+                </div>
+                
+                <div className="border rounded max-h-96 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name/Number</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Park</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Description</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mappedData.slice(0, 10).map((lot, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{lot.nameOrNumber || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                              {lot.status || 'N/A'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{lot.parkId || 'N/A'}</TableCell>
+                          <TableCell>{lot.price ? `$${lot.price}` : 'N/A'}</TableCell>
+                          <TableCell className="max-w-xs truncate">{lot.description || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {mappedData.length > 10 && (
+                    <div className="p-2 text-center text-sm text-gray-500 border-t">
+                      ... and {mappedData.length - 10} more lots
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-between">
+                  <Button variant="outline" onClick={() => setBulkUploadStep('mapping')}>
+                    Back to Mapping
+                  </Button>
+                  <Button onClick={handleStartImport} data-testid="start-import">
+                    Start Import
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {bulkUploadStep === 'importing' && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="inline-flex items-center gap-2 text-lg font-semibold">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Importing lots...
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Processing {mappedData.length} lots
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Progress</span>
+                    <span>{importProgress}%</span>
+                  </div>
+                  <Progress value={importProgress} className="w-full" />
+                </div>
+              </div>
+            )}
+
+            {bulkUploadStep === 'results' && (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <h3 className="text-lg font-semibold">Import Completed</h3>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {importResults?.successful?.length || 0}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Successful</div>
+                  </div>
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      {importResults?.failed?.length || 0}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Failed</div>
+                  </div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {mappedData.length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total</div>
+                  </div>
+                </div>
+                
+                {importResults?.failed?.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">Failed rows:</h4>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {importResults.failed.map((failure: any, index: number) => (
+                        <div key={index} className="text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                          <strong>Row {failure.row}:</strong> {failure.error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-center">
+                  <Button onClick={resetBulkUpload} data-testid="close-bulk-upload">
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
