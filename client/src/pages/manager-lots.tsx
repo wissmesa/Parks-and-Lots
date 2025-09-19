@@ -1582,7 +1582,7 @@ export default function ManagerLots() {
                     <div className="space-y-3">
                       <h4 className="font-medium text-blue-700">Optional Fields</h4>
                       
-                      {['status', 'price', 'description', 'specialStatus', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
+                      {['price', 'description', 'specialStatus', 'status', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
                         // Don't filter during loading
                         if (assignmentsLoading) {
                           return true;
