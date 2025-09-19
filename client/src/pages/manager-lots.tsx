@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Home, 
@@ -33,7 +35,9 @@ import {
   CheckCircle,
   Loader2,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Filter,
+  X
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -99,6 +103,72 @@ export default function ManagerLots() {
   // Sorting state
   const [sortBy, setSortBy] = useState<string>("nameOrNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Filtering state
+  const [filters, setFilters] = useState({
+    status: [] as string[],
+    visibility: [] as string[],
+    parkId: [] as string[],
+    specialStatusId: [] as string[],
+    priceMin: "",
+    priceMax: "",
+    bedroomsMin: "",
+    bedroomsMax: "",
+    bathroomsMin: "",
+    bathroomsMax: "",
+    sqFtMin: "",
+    sqFtMax: "",
+    searchText: ""
+  });
+
+  // Filter helper functions
+  const toggleFilter = (category: keyof typeof filters, value: string) => {
+    if (Array.isArray(filters[category])) {
+      const currentValues = filters[category] as string[];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter(v => v !== value)
+        : [...currentValues, value];
+      setFilters(prev => ({ ...prev, [category]: newValues }));
+    }
+  };
+
+  const updateRangeFilter = (category: string, value: string) => {
+    setFilters(prev => ({ ...prev, [category]: value }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      status: [],
+      visibility: [],
+      parkId: [],
+      specialStatusId: [],
+      priceMin: "",
+      priceMax: "",
+      bedroomsMin: "",
+      bedroomsMax: "",
+      bathroomsMin: "",
+      bathroomsMax: "",
+      sqFtMin: "",
+      sqFtMax: "",
+      searchText: ""
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.status.length > 0 ||
+           filters.visibility.length > 0 ||
+           filters.parkId.length > 0 ||
+           filters.specialStatusId.length > 0 ||
+           filters.priceMin ||
+           filters.priceMax ||
+           filters.bedroomsMin ||
+           filters.bedroomsMax ||
+           filters.bathroomsMin ||
+           filters.bathroomsMax ||
+           filters.sqFtMin ||
+           filters.sqFtMax ||
+           filters.searchText;
+  };
   
   // Form state
   const [formData, setFormData] = useState({
@@ -537,11 +607,82 @@ export default function ManagerLots() {
 
   const assignedParks = assignments || [];
 
-  // Sort lots using useMemo for performance
+  // Filter and sort lots using useMemo for performance
   const sortedLots = useMemo(() => {
     if (!lots) return [];
     
-    return [...lots].sort((a, b) => {
+    // First apply filters
+    const filteredLots = lots.filter((lot) => {
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(lot.status)) {
+        return false;
+      }
+
+      // Visibility filter
+      if (filters.visibility.length === 1) {
+        const isVisible = lot.isActive;
+        const wantsVisible = filters.visibility.includes("visible");
+        if (isVisible !== wantsVisible) return false;
+      }
+
+      // Park filter
+      if (filters.parkId.length > 0 && !filters.parkId.includes(lot.parkId)) {
+        return false;
+      }
+
+      // Special status filter
+      if (filters.specialStatusId.length > 0) {
+        const hasSpecialStatus = lot.specialStatusId && filters.specialStatusId.includes(lot.specialStatusId);
+        const wantsNone = filters.specialStatusId.includes("none");
+        if (!hasSpecialStatus && !wantsNone) return false;
+        if (hasSpecialStatus && wantsNone && lot.specialStatusId) return false;
+      }
+
+      // Price range filter
+      if (filters.priceMin || filters.priceMax) {
+        const price = parseFloat((lot.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
+        if (filters.priceMin && price < parseFloat(filters.priceMin)) return false;
+        if (filters.priceMax && price > parseFloat(filters.priceMax)) return false;
+      }
+
+      // Bedrooms range filter
+      if (filters.bedroomsMin || filters.bedroomsMax) {
+        const bedrooms = lot.bedrooms || 0;
+        if (filters.bedroomsMin && bedrooms < parseInt(filters.bedroomsMin)) return false;
+        if (filters.bedroomsMax && bedrooms > parseInt(filters.bedroomsMax)) return false;
+      }
+
+      // Bathrooms range filter
+      if (filters.bathroomsMin || filters.bathroomsMax) {
+        const bathrooms = lot.bathrooms || 0;
+        if (filters.bathroomsMin && bathrooms < parseInt(filters.bathroomsMin)) return false;
+        if (filters.bathroomsMax && bathrooms > parseInt(filters.bathroomsMax)) return false;
+      }
+
+      // Square footage range filter
+      if (filters.sqFtMin || filters.sqFtMax) {
+        const sqFt = lot.sqFt || 0;
+        if (filters.sqFtMin && sqFt < parseInt(filters.sqFtMin)) return false;
+        if (filters.sqFtMax && sqFt > parseInt(filters.sqFtMax)) return false;
+      }
+
+      // Search text filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const matches = [
+          lot.nameOrNumber.toLowerCase(),
+          lot.description?.toLowerCase() || "",
+          lot.park?.name?.toLowerCase() || "",
+          lot.specialStatus?.name?.toLowerCase() || ""
+        ].some(field => field.includes(searchLower));
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+
+    // Then apply sorting
+    const sorted = [...filteredLots].sort((a, b) => {
       let valueA: any;
       let valueB: any;
 
@@ -595,7 +736,9 @@ export default function ManagerLots() {
         return sortOrder === "asc" ? comparison : -comparison;
       }
     });
-  }, [lots, sortBy, sortOrder]);
+    
+    return sorted;
+  }, [lots, sortBy, sortOrder, filters]);
   
   if (user?.role !== 'MANAGER') {
     return (
@@ -759,42 +902,243 @@ export default function ManagerLots() {
             </div>
           </div>
 
-          {/* Sorting Controls */}
-          <div className="flex items-center justify-end gap-3 mb-6">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="manager-sortBy" className="text-sm">Sort by:</Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[160px]" id="manager-sortBy" data-testid="manager-sort-by-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nameOrNumber">Lot Name/Number</SelectItem>
-                  <SelectItem value="parkName">Park Name</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="visibility">Visibility</SelectItem>
-                  <SelectItem value="price">Price</SelectItem>
-                  <SelectItem value="bedrooms">Bedrooms</SelectItem>
-                  <SelectItem value="bathrooms">Bathrooms</SelectItem>
-                  <SelectItem value="sqFt">Square Feet</SelectItem>
-                  <SelectItem value="specialStatus">Special Status</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              className="flex items-center gap-1"
-              data-testid="manager-sort-order-toggle"
-            >
-              {sortOrder === "asc" ? (
-                <ArrowUp className="w-4 h-4" />
-              ) : (
-                <ArrowDown className="w-4 h-4" />
-              )}
-              {sortOrder === "asc" ? "Asc" : "Desc"}
-            </Button>
-          </div>
+          {/* Filter and Sort Controls */}
+          <Card className="mb-6">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">My Lots ({sortedLots.length} {(lots?.length && sortedLots.length !== lots.length) ? `of ${lots.length}` : ''})</CardTitle>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="manager-sortBy" className="text-sm">Sort by:</Label>
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-[160px]" id="manager-sortBy" data-testid="manager-sort-by-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nameOrNumber">Lot Name/Number</SelectItem>
+                        <SelectItem value="parkName">Park Name</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                        <SelectItem value="visibility">Visibility</SelectItem>
+                        <SelectItem value="price">Price</SelectItem>
+                        <SelectItem value="bedrooms">Bedrooms</SelectItem>
+                        <SelectItem value="bathrooms">Bathrooms</SelectItem>
+                        <SelectItem value="sqFt">Square Feet</SelectItem>
+                        <SelectItem value="specialStatus">Special Status</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                    className="flex items-center gap-1"
+                    data-testid="manager-sort-order-toggle"
+                  >
+                    {sortOrder === "asc" ? (
+                      <ArrowUp className="w-4 h-4" />
+                    ) : (
+                      <ArrowDown className="w-4 h-4" />
+                    )}
+                    {sortOrder === "asc" ? "Asc" : "Desc"}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Filter Controls */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Search Filter */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Search lots..."
+                      value={filters.searchText}
+                      onChange={(e) => updateRangeFilter("searchText", e.target.value)}
+                      className="w-48"
+                      data-testid="manager-search-filter"
+                    />
+                  </div>
+
+                  {/* Status Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-status-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Status {filters.status.length > 0 && `(${filters.status.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48" align="start">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Status</Label>
+                        {["FOR_RENT", "FOR_SALE", "RENT_SALE"].map((status) => (
+                          <div key={status} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`manager-status-${status}`}
+                              checked={filters.status.includes(status)}
+                              onCheckedChange={() => toggleFilter("status", status)}
+                              data-testid={`manager-status-filter-${status}`}
+                            />
+                            <Label htmlFor={`manager-status-${status}`} className="text-sm cursor-pointer">
+                              {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : "Rent/Sale"}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Visibility Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-visibility-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Visibility {filters.visibility.length > 0 && `(${filters.visibility.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48" align="start">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Visibility</Label>
+                        {["visible", "hidden"].map((visibility) => (
+                          <div key={visibility} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`manager-visibility-${visibility}`}
+                              checked={filters.visibility.includes(visibility)}
+                              onCheckedChange={() => toggleFilter("visibility", visibility)}
+                              data-testid={`manager-visibility-filter-${visibility}`}
+                            />
+                            <Label htmlFor={`manager-visibility-${visibility}`} className="text-sm cursor-pointer">
+                              {visibility === "visible" ? "Visible" : "Hidden"}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Park Filter */}
+                  {assignedParks.length > 1 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-park-filter-trigger">
+                          <Filter className="w-4 h-4" />
+                          Park {filters.parkId.length > 0 && `(${filters.parkId.length})`}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64" align="start">
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          <Label className="text-sm font-medium">Parks</Label>
+                          {assignedParks.map((assignment) => (
+                            <div key={assignment.parkId} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`manager-park-${assignment.parkId}`}
+                                checked={filters.parkId.includes(assignment.parkId)}
+                                onCheckedChange={() => toggleFilter("parkId", assignment.parkId)}
+                                data-testid={`manager-park-filter-${assignment.parkId}`}
+                              />
+                              <Label htmlFor={`manager-park-${assignment.parkId}`} className="text-sm cursor-pointer">
+                                {assignment.parkName}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+
+                  {/* Price Range Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-price-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Price {(filters.priceMin || filters.priceMax) && "✓"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Price Range</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="manager-priceMin" className="text-xs">Min</Label>
+                            <Input
+                              id="manager-priceMin"
+                              type="number"
+                              placeholder="Min price"
+                              value={filters.priceMin}
+                              onChange={(e) => updateRangeFilter("priceMin", e.target.value)}
+                              data-testid="manager-price-min-filter"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="manager-priceMax" className="text-xs">Max</Label>
+                            <Input
+                              id="manager-priceMax"
+                              type="number"
+                              placeholder="Max price"
+                              value={filters.priceMax}
+                              onChange={(e) => updateRangeFilter("priceMax", e.target.value)}
+                              data-testid="manager-price-max-filter"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Bedrooms Range Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-bedrooms-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Bedrooms {(filters.bedroomsMin || filters.bedroomsMax) && "✓"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Bedrooms Range</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="manager-bedroomsMin" className="text-xs">Min</Label>
+                            <Input
+                              id="manager-bedroomsMin"
+                              type="number"
+                              placeholder="Min"
+                              value={filters.bedroomsMin}
+                              onChange={(e) => updateRangeFilter("bedroomsMin", e.target.value)}
+                              data-testid="manager-bedrooms-min-filter"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="manager-bedroomsMax" className="text-xs">Max</Label>
+                            <Input
+                              id="manager-bedroomsMax"
+                              type="number"
+                              placeholder="Max"
+                              value={filters.bedroomsMax}
+                              onChange={(e) => updateRangeFilter("bedroomsMax", e.target.value)}
+                              data-testid="manager-bedrooms-max-filter"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Clear Filters */}
+                {hasActiveFilters() && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearAllFilters}
+                    className="flex items-center gap-1"
+                    data-testid="manager-clear-filters-button"
+                  >
+                    <X className="w-4 h-4" />
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+          </Card>
 
 
           {/* Lots Grid */}

@@ -14,8 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
-import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -85,6 +87,75 @@ export default function AdminLots() {
   // Sorting state
   const [sortBy, setSortBy] = useState<string>("nameOrNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Filtering state
+  const [filters, setFilters] = useState({
+    status: [] as string[],
+    visibility: [] as string[],
+    parkId: [] as string[],
+    companyId: [] as string[],
+    specialStatusId: [] as string[],
+    priceMin: "",
+    priceMax: "",
+    bedroomsMin: "",
+    bedroomsMax: "",
+    bathroomsMin: "",
+    bathroomsMax: "",
+    sqFtMin: "",
+    sqFtMax: "",
+    searchText: ""
+  });
+
+  // Filter helper functions
+  const toggleFilter = (category: keyof typeof filters, value: string) => {
+    if (Array.isArray(filters[category])) {
+      const currentValues = filters[category] as string[];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter(v => v !== value)
+        : [...currentValues, value];
+      setFilters(prev => ({ ...prev, [category]: newValues }));
+    }
+  };
+
+  const updateRangeFilter = (category: string, value: string) => {
+    setFilters(prev => ({ ...prev, [category]: value }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      status: [],
+      visibility: [],
+      parkId: [],
+      companyId: [],
+      specialStatusId: [],
+      priceMin: "",
+      priceMax: "",
+      bedroomsMin: "",
+      bedroomsMax: "",
+      bathroomsMin: "",
+      bathroomsMax: "",
+      sqFtMin: "",
+      sqFtMax: "",
+      searchText: ""
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.status.length > 0 ||
+           filters.visibility.length > 0 ||
+           filters.parkId.length > 0 ||
+           filters.companyId.length > 0 ||
+           filters.specialStatusId.length > 0 ||
+           filters.priceMin ||
+           filters.priceMax ||
+           filters.bedroomsMin ||
+           filters.bedroomsMax ||
+           filters.bathroomsMin ||
+           filters.bathroomsMax ||
+           filters.sqFtMin ||
+           filters.sqFtMax ||
+           filters.searchText;
+  };
 
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -468,6 +539,87 @@ export default function AdminLots() {
   const parkById = new Map(parksList.map(p => [p.id, p]));
   const companyById = new Map(companiesList.map(c => [c.id, c]));
 
+  // Filtering function
+  const filterLots = (lotsToFilter: Lot[]) => {
+    return lotsToFilter.filter((lot) => {
+      // Status filter
+      if (filters.status.length > 0 && !filters.status.includes(lot.status)) {
+        return false;
+      }
+
+      // Visibility filter
+      if (filters.visibility.length === 1) {
+        const isVisible = lot.isActive;
+        const wantsVisible = filters.visibility.includes("visible");
+        if (isVisible !== wantsVisible) return false;
+      }
+
+      // Park filter
+      if (filters.parkId.length > 0 && !filters.parkId.includes(lot.parkId)) {
+        return false;
+      }
+
+      // Company filter
+      if (filters.companyId.length > 0) {
+        const park = parkById.get(lot.parkId);
+        const companyId = park?.companyId;
+        if (!companyId || !filters.companyId.includes(companyId)) {
+          return false;
+        }
+      }
+
+      // Special status filter
+      if (filters.specialStatusId.length > 0) {
+        const hasSpecialStatus = lot.specialStatusId && filters.specialStatusId.includes(lot.specialStatusId);
+        const wantsNone = filters.specialStatusId.includes("none");
+        if (!hasSpecialStatus && !wantsNone) return false;
+        if (hasSpecialStatus && wantsNone && lot.specialStatusId) return false;
+      }
+
+      // Price range filter
+      if (filters.priceMin || filters.priceMax) {
+        const price = parseFloat((lot.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
+        if (filters.priceMin && price < parseFloat(filters.priceMin)) return false;
+        if (filters.priceMax && price > parseFloat(filters.priceMax)) return false;
+      }
+
+      // Bedrooms range filter
+      if (filters.bedroomsMin || filters.bedroomsMax) {
+        const bedrooms = lot.bedrooms || 0;
+        if (filters.bedroomsMin && bedrooms < parseInt(filters.bedroomsMin)) return false;
+        if (filters.bedroomsMax && bedrooms > parseInt(filters.bedroomsMax)) return false;
+      }
+
+      // Bathrooms range filter
+      if (filters.bathroomsMin || filters.bathroomsMax) {
+        const bathrooms = lot.bathrooms || 0;
+        if (filters.bathroomsMin && bathrooms < parseInt(filters.bathroomsMin)) return false;
+        if (filters.bathroomsMax && bathrooms > parseInt(filters.bathroomsMax)) return false;
+      }
+
+      // Square footage range filter
+      if (filters.sqFtMin || filters.sqFtMax) {
+        const sqFt = lot.sqFt || 0;
+        if (filters.sqFtMin && sqFt < parseInt(filters.sqFtMin)) return false;
+        if (filters.sqFtMax && sqFt > parseInt(filters.sqFtMax)) return false;
+      }
+
+      // Search text filter
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const matches = [
+          lot.nameOrNumber.toLowerCase(),
+          lot.description?.toLowerCase() || "",
+          parkById.get(lot.parkId)?.name?.toLowerCase() || "",
+          lot.specialStatus?.name?.toLowerCase() || ""
+        ].some(field => field.includes(searchLower));
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  };
+
   // Sorting function
   const sortLots = (lotsToSort: Lot[]) => {
     return [...lotsToSort].sort((a, b) => {
@@ -532,8 +684,9 @@ export default function AdminLots() {
     });
   };
 
-  // Apply sorting to lots list
-  const lotsList = sortLots(rawLotsList);
+  // Apply filtering and sorting to lots list
+  const filteredLots = filterLots(rawLotsList);
+  const lotsList = sortLots(filteredLots);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -678,7 +831,7 @@ export default function AdminLots() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>All Lots</CardTitle>
+              <CardTitle>All Lots ({lotsList.length} {filteredLots.length !== rawLotsList.length ? `of ${rawLotsList.length}` : ''})</CardTitle>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="sortBy" className="text-sm">Sort by:</Label>
@@ -715,6 +868,226 @@ export default function AdminLots() {
                   {sortOrder === "asc" ? "Asc" : "Desc"}
                 </Button>
               </div>
+            </div>
+            
+            {/* Filter Controls */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Search Filter */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Search lots..."
+                    value={filters.searchText}
+                    onChange={(e) => updateRangeFilter("searchText", e.target.value)}
+                    className="w-48"
+                    data-testid="search-filter"
+                  />
+                </div>
+
+                {/* Status Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="status-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Status {filters.status.length > 0 && `(${filters.status.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48" align="start">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Status</Label>
+                      {["FOR_RENT", "FOR_SALE", "RENT_SALE"].map((status) => (
+                        <div key={status} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`status-${status}`}
+                            checked={filters.status.includes(status)}
+                            onCheckedChange={() => toggleFilter("status", status)}
+                            data-testid={`status-filter-${status}`}
+                          />
+                          <Label htmlFor={`status-${status}`} className="text-sm cursor-pointer">
+                            {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : "Rent/Sale"}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Visibility Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="visibility-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Visibility {filters.visibility.length > 0 && `(${filters.visibility.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48" align="start">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Visibility</Label>
+                      {["visible", "hidden"].map((visibility) => (
+                        <div key={visibility} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`visibility-${visibility}`}
+                            checked={filters.visibility.includes(visibility)}
+                            onCheckedChange={() => toggleFilter("visibility", visibility)}
+                            data-testid={`visibility-filter-${visibility}`}
+                          />
+                          <Label htmlFor={`visibility-${visibility}`} className="text-sm cursor-pointer">
+                            {visibility === "visible" ? "Visible" : "Hidden"}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Park Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="park-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Park {filters.parkId.length > 0 && `(${filters.parkId.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      <Label className="text-sm font-medium">Parks</Label>
+                      {parksList.map((park) => (
+                        <div key={park.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`park-${park.id}`}
+                            checked={filters.parkId.includes(park.id)}
+                            onCheckedChange={() => toggleFilter("parkId", park.id)}
+                            data-testid={`park-filter-${park.id}`}
+                          />
+                          <Label htmlFor={`park-${park.id}`} className="text-sm cursor-pointer">
+                            {park.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Company Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="company-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Company {filters.companyId.length > 0 && `(${filters.companyId.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      <Label className="text-sm font-medium">Companies</Label>
+                      {companiesList.map((company) => (
+                        <div key={company.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`company-${company.id}`}
+                            checked={filters.companyId.includes(company.id)}
+                            onCheckedChange={() => toggleFilter("companyId", company.id)}
+                            data-testid={`company-filter-${company.id}`}
+                          />
+                          <Label htmlFor={`company-${company.id}`} className="text-sm cursor-pointer">
+                            {company.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Price Range Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="price-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Price {(filters.priceMin || filters.priceMax) && "✓"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Price Range</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label htmlFor="priceMin" className="text-xs">Min</Label>
+                          <Input
+                            id="priceMin"
+                            type="number"
+                            placeholder="Min price"
+                            value={filters.priceMin}
+                            onChange={(e) => updateRangeFilter("priceMin", e.target.value)}
+                            data-testid="price-min-filter"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="priceMax" className="text-xs">Max</Label>
+                          <Input
+                            id="priceMax"
+                            type="number"
+                            placeholder="Max price"
+                            value={filters.priceMax}
+                            onChange={(e) => updateRangeFilter("priceMax", e.target.value)}
+                            data-testid="price-max-filter"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Bedrooms Range Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="bedrooms-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Bedrooms {(filters.bedroomsMin || filters.bedroomsMax) && "✓"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Bedrooms Range</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label htmlFor="bedroomsMin" className="text-xs">Min</Label>
+                          <Input
+                            id="bedroomsMin"
+                            type="number"
+                            placeholder="Min"
+                            value={filters.bedroomsMin}
+                            onChange={(e) => updateRangeFilter("bedroomsMin", e.target.value)}
+                            data-testid="bedrooms-min-filter"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="bedroomsMax" className="text-xs">Max</Label>
+                          <Input
+                            id="bedroomsMax"
+                            type="number"
+                            placeholder="Max"
+                            value={filters.bedroomsMax}
+                            onChange={(e) => updateRangeFilter("bedroomsMax", e.target.value)}
+                            data-testid="bedrooms-max-filter"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Clear Filters */}
+              {hasActiveFilters() && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1"
+                  data-testid="clear-filters-button"
+                >
+                  <X className="w-4 h-4" />
+                  Clear All
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
