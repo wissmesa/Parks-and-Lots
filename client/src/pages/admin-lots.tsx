@@ -237,7 +237,7 @@ export default function AdminLots() {
   };
 
   const handleColumnMapping = () => {
-    const requiredFields = ['nameOrNumber', 'status'];
+    const requiredFields = ['nameOrNumber'];
     const missingFields = requiredFields.filter(field => !columnMapping[field] || columnMapping[field] === 'skip');
     
     // Park name is required - park ID is only an optional fallback

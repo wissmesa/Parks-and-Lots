@@ -492,8 +492,7 @@ export default function ManagerLots() {
   };
 
   const isValidMapping = () => {
-    const hasRequiredFields = columnMapping['nameOrNumber'] && columnMapping['nameOrNumber'] !== 'ignore' && 
-                             columnMapping['status'] && columnMapping['status'] !== 'ignore';
+    const hasRequiredFields = columnMapping['nameOrNumber'] && columnMapping['nameOrNumber'] !== 'ignore';
     
     // Don't validate if assignments are still loading
     if (assignmentsLoading) {
@@ -519,7 +518,7 @@ export default function ManagerLots() {
         }
       });
       return mappedRow;
-    }).filter(row => row.nameOrNumber && row.status); // Filter out incomplete rows
+    }).filter(row => row.nameOrNumber); // Filter out incomplete rows (only nameOrNumber required)
     
     setMappedData(mapped);
     setBulkUploadStep('preview');
