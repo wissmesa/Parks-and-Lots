@@ -1411,16 +1411,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           // Validate required fields
-          if (!lotData.nameOrNumber || !lotData.status) {
+          if (!lotData.nameOrNumber) {
             results.failed.push({
               row: rowNumber,
-              error: 'Missing required fields: nameOrNumber, status'
+              error: 'Missing required fields: nameOrNumber'
             });
             continue;
           }
 
-          // Validate status enum
-          if (!['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+          // Validate status enum if provided
+          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
             results.failed.push({
               row: rowNumber,
               error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
@@ -1555,16 +1555,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         try {
           // Validate required fields (park ID is automatically assigned)
-          if (!lotData.nameOrNumber || !lotData.status) {
+          if (!lotData.nameOrNumber) {
             results.failed.push({
               row: rowNumber,
-              error: 'Missing required fields: nameOrNumber, status'
+              error: 'Missing required fields: nameOrNumber'
             });
             continue;
           }
 
-          // Validate status enum
-          if (!['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+          // Validate status enum if provided
+          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
             results.failed.push({
               row: rowNumber,
               error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
