@@ -341,8 +341,8 @@ export default function Properties() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold">{lot.nameOrNumber}</h3>
-                      <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'secondary'}>
-                        {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
+                      <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                        {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
                       </Badge>
                     </div>
                     
