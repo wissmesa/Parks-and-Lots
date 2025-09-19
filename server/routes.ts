@@ -34,7 +34,28 @@ import { randomBytes, createHash } from "crypto";
 import { sendInviteEmail, sendPasswordResetEmail } from "./email";
 
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || 'http://localhost:5000';
+// Get environment-appropriate base URL
+const getFrontendBaseUrl = () => {
+  // If FRONTEND_BASE_URL is explicitly set, use it
+  if (process.env.FRONTEND_BASE_URL) {
+    return process.env.FRONTEND_BASE_URL;
+  }
+  
+  // For Replit development environment
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  
+  // For Replit production environment (when deployed)
+  if (process.env.REPL_SLUG) {
+    return `https://${process.env.REPL_SLUG}.replit.app`;
+  }
+  
+  // Fallback for local development
+  return 'http://localhost:5000';
+};
+
+const FRONTEND_BASE_URL = getFrontendBaseUrl();
 
 // Configure multer for file uploads
 const upload = multer({
