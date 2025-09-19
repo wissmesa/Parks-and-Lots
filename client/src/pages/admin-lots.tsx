@@ -1468,6 +1468,7 @@ export default function AdminLots() {
                   <h4 className="font-medium mt-3 mb-2">Optional Columns:</h4>
                   <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
                     <li>Park ID (can be used instead of Park Name)</li>
+                    <li>Special Status (creates new status if doesn't exist)</li>
                     <li>Price, Description, Bedrooms, Bathrooms, Square Feet</li>
                   </ul>
                 </div>
@@ -1492,6 +1493,7 @@ export default function AdminLots() {
                         { field: 'parkName', label: 'Park Name * (Required)', required: true },
                         { field: 'parkId', label: 'Park ID (Optional)', required: false },
                         { field: 'status', label: 'Status', required: false },
+                        { field: 'specialStatus', label: 'Special Status', required: false },
                         { field: 'price', label: 'Price', required: false },
                         { field: 'description', label: 'Description', required: false },
                         { field: 'bedrooms', label: 'Bedrooms', required: false },

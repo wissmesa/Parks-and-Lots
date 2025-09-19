@@ -1513,6 +1513,7 @@ export default function ManagerLots() {
                       <h4 className="font-semibold mb-3 text-blue-700">Optional Columns</h4>
                       <ul className="space-y-1 text-sm">
                         <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, or RENT_SALE</li>
+                        <li>• <strong>Special Status</strong> - Creates new status if doesn't exist</li>
                         <li>• <strong>Price</strong> - Rental or sale price</li>
                         <li>• <strong>Description</strong> - Lot description</li>
                         <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
@@ -1575,28 +1576,13 @@ export default function ManagerLots() {
                           </Select>
                         </div>
                       )}
-                      
-                      <div>
-                        <Label htmlFor="status-mapping">Status *</Label>
-                        <Select value={columnMapping['status'] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, status: value }))}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select CSV column for Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ignore">-- Ignore --</SelectItem>
-                            {csvHeaders.map(header => (
-                              <SelectItem key={header} value={header}>{header}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
 
                     {/* Optional fields */}
                     <div className="space-y-3">
                       <h4 className="font-medium text-blue-700">Optional Fields</h4>
                       
-                      {['price', 'description', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
+                      {['status', 'price', 'description', 'specialStatus', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
                         // Don't filter during loading
                         if (assignmentsLoading) {
                           return true;
@@ -1612,8 +1598,10 @@ export default function ManagerLots() {
                         return true;
                       }).map(field => {
                         const fieldLabels = {
+                          'status': 'Status',
                           'price': 'Price',
-                          'description': 'Description', 
+                          'description': 'Description',
+                          'specialStatus': 'Special Status',
                           'bedrooms': 'Bedrooms',
                           'bathrooms': 'Bathrooms',
                           'sqFt': 'Sq Ft',
