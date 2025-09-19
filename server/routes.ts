@@ -772,8 +772,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ busySlots: [], managerConnected: false });
       }
       
-      const managerId = assignments[0].userId;
-      console.log(`[Manager Availability] Using manager ${managerId} for lot ${lotId}`);
+      // Prioritize managers with connected Google Calendar
+      let managerId = assignments[0].userId;
+      let managerFound = false;
+      
+      for (const assignment of assignments) {
+        const isCalendarConnected = await googleCalendarService.isCalendarConnected(assignment.userId);
+        if (isCalendarConnected) {
+          managerId = assignment.userId;
+          managerFound = true;
+          console.log(`[Manager Availability] Selected manager ${managerId} (has calendar connected) for lot ${lotId}`);
+          break;
+        }
+      }
+      
+      if (!managerFound) {
+        console.log(`[Manager Availability] Using first manager ${managerId} for lot ${lotId} (no managers have calendar connected)`);
+      }
       
       // Check if manager has calendar connected
       const isConnected = await googleCalendarService.isCalendarConnected(managerId);
