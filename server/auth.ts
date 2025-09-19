@@ -81,7 +81,7 @@ export async function requireParkAccess(req: AuthRequest, res: Response, next: N
     return next();
   }
 
-  const parkId = req.params.parkId || req.body.parkId;
+  const parkId = req.params.parkId || req.params.id || req.body.parkId;
   if (!parkId) {
     return res.status(400).json({ message: 'Park ID required' });
   }
