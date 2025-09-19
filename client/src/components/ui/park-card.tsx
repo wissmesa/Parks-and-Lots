@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TreePine } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 interface Park {
   id: string;
@@ -17,13 +18,30 @@ interface ParkCardProps {
 }
 
 export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
+  const { data: photos } = useQuery({
+    queryKey: ["/api/parks", park.id, "photos"],
+  });
+
+  const parkPhotos = Array.isArray(photos) ? photos : [];
+  const hasPhotos = parkPhotos.length > 0;
+
   return (
     <Card className="overflow-hidden hover:shadow-xl transition-shadow" data-testid={`card-park-${park.id}`}>
-      <div className="h-48 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">
-        <div className="text-center">
-          <TreePine className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-2" />
-          <span className="text-green-700 dark:text-green-300 font-medium text-sm">Park Community</span>
-        </div>
+      <div className="h-48 relative overflow-hidden">
+        {hasPhotos ? (
+          <img 
+            src={parkPhotos[0].urlOrPath} 
+            alt={`${park.name} preview`}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="h-full bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">
+            <div className="text-center">
+              <TreePine className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-2" />
+              <span className="text-green-700 dark:text-green-300 font-medium text-sm">Park Community</span>
+            </div>
+          </div>
+        )}
       </div>
       <CardContent className="p-6">
         <div className="mb-2">

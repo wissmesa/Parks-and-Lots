@@ -19,6 +19,7 @@ import {
   TreePine 
 } from "lucide-react";
 import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
+import { ParkCard } from "@/components/ui/park-card";
 
 // Lot preview image component for card layout
 function LotPreviewImageCard({ lotId }: { lotId: string }) {
@@ -292,36 +293,7 @@ export default function Properties() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {parks.map((park: Park) => (
-                <Card key={park.id} className="overflow-hidden hover:shadow-xl transition-shadow">
-                  <div className="h-48 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">
-                    <div className="text-center">
-                      <TreePine className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-2" />
-                      <span className="text-green-700 dark:text-green-300 font-medium text-sm">Park Community</span>
-                    </div>
-                  </div>
-                  <CardContent className="p-6">
-                    <div className="mb-2">
-                      <h3 className="text-lg font-semibold text-foreground">{park.name}</h3>
-                    </div>
-                    <p className="text-muted-foreground text-sm mb-3 flex items-center">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {park.city}, {park.state}
-                    </p>
-                    <p className="text-foreground text-sm mb-4 line-clamp-2">
-                      {park.description || "Premium community with modern amenities"}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Available lots
-                      </div>
-                      <Link href={`/parks/${park.id}`}>
-                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                          View Details <ArrowRight className="w-4 h-4 ml-1" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ParkCard key={park.id} park={park} />
               ))}
             </div>
           </div>
