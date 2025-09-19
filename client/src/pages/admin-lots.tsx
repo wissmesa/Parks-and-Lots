@@ -1489,9 +1489,9 @@ export default function AdminLots() {
                     <div className="space-y-2">
                       {[
                         { field: 'nameOrNumber', label: 'Lot Name/Number *', required: true },
-                        { field: 'status', label: 'Status *', required: true },
                         { field: 'parkName', label: 'Park Name * (Required)', required: true },
                         { field: 'parkId', label: 'Park ID (Optional)', required: false },
+                        { field: 'status', label: 'Status', required: false },
                         { field: 'price', label: 'Price', required: false },
                         { field: 'description', label: 'Description', required: false },
                         { field: 'bedrooms', label: 'Bedrooms', required: false },

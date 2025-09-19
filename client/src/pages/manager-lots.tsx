@@ -1508,12 +1508,12 @@ export default function ManagerLots() {
                       <h4 className="font-semibold mb-3 text-green-700">Required Columns</h4>
                       <ul className="space-y-1 text-sm">
                         <li>• <strong>Lot Name/Number</strong> - Unique identifier</li>
-                        <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, or RENT_SALE</li>
                       </ul>
                     </div>
                     <div>
                       <h4 className="font-semibold mb-3 text-blue-700">Optional Columns</h4>
                       <ul className="space-y-1 text-sm">
+                        <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, or RENT_SALE</li>
                         <li>• <strong>Price</strong> - Rental or sale price</li>
                         <li>• <strong>Description</strong> - Lot description</li>
                         <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
