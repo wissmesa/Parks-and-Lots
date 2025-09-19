@@ -315,11 +315,6 @@ export default function LotDetail() {
                             alt={photo.caption || `Lot photo ${index + 1}`}
                             className="w-full h-64 md:h-96 object-cover rounded-lg" 
                           />
-                          {photo.caption && (
-                            <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                              {photo.caption}
-                            </div>
-                          )}
                         </div>
                       </CarouselItem>
                     ))}
