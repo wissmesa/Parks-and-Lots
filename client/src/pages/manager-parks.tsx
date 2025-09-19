@@ -195,6 +195,7 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       setEditingStatus(null);
       resetStatusForm();
       toast({
@@ -217,6 +218,7 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       setEditingStatus(null);
       resetStatusForm();
       toast({
@@ -239,6 +241,7 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       toast({
         title: "Success",
         description: "Special status deleted successfully",
