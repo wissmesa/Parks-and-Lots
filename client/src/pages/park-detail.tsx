@@ -394,31 +394,7 @@ export default function ParkDetail() {
               </CardContent>
             </Card>
 
-            {/* Quick Stats */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Lots</span>
-                    <span className="font-medium">{lots.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Available</span>
-                    <span className="font-medium text-accent">{lots.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Price Range</span>
-                    <span className="font-medium">
-                      {lots.length > 0 ? 
-                        `$${Math.min(...lots.map((l: Lot) => parseFloat(l.price))).toLocaleString()} - $${Math.max(...lots.map((l: Lot) => parseFloat(l.price))).toLocaleString()}` 
-                        : 'N/A'
-                      }
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            
           </div>
         </div>
       </div>
