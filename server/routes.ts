@@ -1471,6 +1471,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
+          // Handle special status if provided
+          let specialStatusId: string | null = null;
+          if (lotData.specialStatus && String(lotData.specialStatus).trim()) {
+            const specialStatusName = String(lotData.specialStatus).trim();
+            try {
+              const specialStatus = await storage.findOrCreateSpecialStatus(lotParkId, specialStatusName);
+              specialStatusId = specialStatus.id;
+            } catch (error) {
+              results.failed.push({
+                row: rowNumber,
+                error: `Failed to create/assign special status '${specialStatusName}': ${error instanceof Error ? error.message : 'Unknown error'}`
+              });
+              continue;
+            }
+          }
+
           // Parse and validate numeric fields
           const parsedData = {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
@@ -1481,6 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
             sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
+            specialStatusId,
             isActive: true
           };
 
@@ -1623,6 +1640,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lotParkId = defaultParkId!;
           }
 
+          // Handle special status if provided
+          let specialStatusId: string | null = null;
+          if (lotData.specialStatus && String(lotData.specialStatus).trim()) {
+            const specialStatusName = String(lotData.specialStatus).trim();
+            try {
+              const specialStatus = await storage.findOrCreateSpecialStatus(lotParkId, specialStatusName);
+              specialStatusId = specialStatus.id;
+            } catch (error) {
+              results.failed.push({
+                row: rowNumber,
+                error: `Failed to create/assign special status '${specialStatusName}': ${error instanceof Error ? error.message : 'Unknown error'}`
+              });
+              continue;
+            }
+          }
+
           // Parse and validate numeric fields
           const parsedData = {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
@@ -1633,6 +1666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
             sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
+            specialStatusId,
             isActive: true
           };
 
