@@ -170,8 +170,8 @@ export default function ManagerParks() {
   const handleEditStatus = (status: SpecialStatus) => {
     setEditingStatus(status);
     setStatusFormData({
-      name: status.name,
-      color: status.color,
+      name: status.name || "",
+      color: status.color || "#3B82F6",
       isActive: status.isActive
     });
   };
