@@ -195,7 +195,20 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      // Invalidate all lots-related queries across the application
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return key.some(k => 
+            typeof k === 'string' && (
+              k.includes('/lots') || 
+              k === 'lots' ||
+              k.endsWith('/lots')
+            )
+          );
+        },
+        refetchType: 'active'
+      });
       setEditingStatus(null);
       resetStatusForm();
       toast({
@@ -218,7 +231,20 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      // Invalidate all lots-related queries across the application
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return key.some(k => 
+            typeof k === 'string' && (
+              k.includes('/lots') || 
+              k === 'lots' ||
+              k.endsWith('/lots')
+            )
+          );
+        },
+        refetchType: 'active'
+      });
       setEditingStatus(null);
       resetStatusForm();
       toast({
@@ -241,7 +267,20 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      // Invalidate all lots-related queries across the application
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return key.some(k => 
+            typeof k === 'string' && (
+              k.includes('/lots') || 
+              k === 'lots' ||
+              k.endsWith('/lots')
+            )
+          );
+        },
+        refetchType: 'active'
+      });
       toast({
         title: "Success",
         description: "Special status deleted successfully",
