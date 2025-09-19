@@ -552,9 +552,41 @@ export default function ManagerParks() {
               
               <div className="space-y-6">
                 {/* Create/Edit Form */}
-                <Card>
+                <Card className={editingStatus ? "border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800" : ""}>
                   <CardHeader>
-                    <CardTitle>{editingStatus ? "Edit" : "Create"} Special Status</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      {editingStatus ? (
+                        <>
+                          <Edit className="w-5 h-5 text-orange-600" />
+                          <span className="text-orange-700 dark:text-orange-300">
+                            Editing: "{editingStatus.name}"
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-5 h-5 text-blue-600" />
+                          Create New Special Status
+                        </>
+                      )}
+                    </CardTitle>
+                    {editingStatus && (
+                      <div className="bg-orange-100 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-md p-3 mt-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full border"
+                              style={{ backgroundColor: editingStatus.color || '#3B82F6' }}
+                            />
+                            <span className="font-medium text-orange-800 dark:text-orange-200">
+                              Current: {editingStatus.name}
+                            </span>
+                            <Badge variant={editingStatus.isActive ? "default" : "secondary"} className="text-xs">
+                              {editingStatus.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleStatusSubmit} className="space-y-4">
@@ -611,17 +643,19 @@ export default function ManagerParks() {
                             resetStatusForm();
                           }}
                           data-testid="button-cancel-status"
+                          className={editingStatus ? "border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-300" : ""}
                         >
-                          Cancel
+                          {editingStatus ? "Cancel Edit" : "Cancel"}
                         </Button>
                         <Button
                           type="submit"
                           disabled={createStatusMutation.isPending || updateStatusMutation.isPending}
                           data-testid="button-save-status"
+                          className={editingStatus ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}
                         >
                           {createStatusMutation.isPending || updateStatusMutation.isPending 
                             ? "Saving..." 
-                            : editingStatus ? "Update" : "Create"}
+                            : editingStatus ? "Update Status" : "Create Status"}
                         </Button>
                       </div>
                     </form>
@@ -644,44 +678,62 @@ export default function ManagerParks() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {specialStatuses.map((status) => (
-                          <div
-                            key={status.id}
-                            className="flex items-center justify-between p-3 border rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-4 h-4 rounded-full border"
-                                style={{ backgroundColor: status.color }}
-                              />
-                              <div>
-                                <div className="font-medium">{status.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {status.isActive ? "Active" : "Inactive"} • {status.color}
+                        {specialStatuses.map((status) => {
+                          const isBeingEdited = editingStatus?.id === status.id;
+                          return (
+                            <div
+                              key={status.id}
+                              className={`flex items-center justify-between p-3 border rounded-lg transition-all duration-200 ${
+                                isBeingEdited 
+                                  ? "border-orange-300 bg-orange-50 shadow-md ring-2 ring-orange-200 dark:bg-orange-950/30 dark:border-orange-600 dark:ring-orange-800" 
+                                  : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-4 h-4 rounded-full border"
+                                  style={{ backgroundColor: status.color }}
+                                />
+                                <div>
+                                  <div className={`font-medium ${isBeingEdited ? "text-orange-900 dark:text-orange-100" : ""}`}>
+                                    {status.name}
+                                    {isBeingEdited && (
+                                      <Badge className="ml-2 bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">
+                                        Editing
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className={`text-sm ${isBeingEdited ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground"}`}>
+                                    {status.isActive ? "Active" : "Inactive"} • {status.color}
+                                  </div>
                                 </div>
                               </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={isBeingEdited ? "default" : "outline"}
+                                  onClick={() => handleEditStatus(status)}
+                                  data-testid={`button-edit-status-${status.id}`}
+                                  className={isBeingEdited ? "bg-orange-600 hover:bg-orange-700 text-white" : ""}
+                                  disabled={isBeingEdited}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  {isBeingEdited && <span className="ml-1 text-xs">Editing</span>}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleDeleteStatus(status.id)}
+                                  disabled={deleteStatusMutation.isPending || isBeingEdited}
+                                  data-testid={`button-delete-status-${status.id}`}
+                                  className={isBeingEdited ? "opacity-50 cursor-not-allowed" : ""}
+                                >
+                                  {deleteStatusMutation.isPending ? "..." : <X className="w-4 h-4" />}
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditStatus(status)}
-                                data-testid={`button-edit-status-${status.id}`}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteStatus(status.id)}
-                                disabled={deleteStatusMutation.isPending}
-                                data-testid={`button-delete-status-${status.id}`}
-                              >
-                                {deleteStatusMutation.isPending ? "..." : <X className="w-4 h-4" />}
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
