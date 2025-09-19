@@ -324,8 +324,8 @@ export default function ParkDetail() {
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-3 mb-2">
                                     <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
-                                    <Badge variant={lot.status === 'FOR_RENT' ? 'default' : 'secondary'}>
-                                      {lot.status === 'FOR_RENT' ? 'For Rent' : 'For Sale'}
+                                    <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                                      {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
                                     </Badge>
                                   </div>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
