@@ -226,25 +226,37 @@ export default function ParkDetail() {
         {/* Photo Gallery */}
         {parkPhotos.length > 0 ? (
           <div className="mb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 rounded-xl overflow-hidden">
-              <div className="lg:row-span-2">
+            {parkPhotos.length === 1 ? (
+              /* Single photo takes full width */
+              <div className="rounded-xl overflow-hidden">
                 <img 
                   src={parkPhotos[0]?.urlOrPath} 
                   alt="Park main view"
-                  className="w-full h-64 lg:h-full object-cover"
+                  className="w-full h-64 lg:h-96 object-cover"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4 lg:col-span-2">
-                {parkPhotos.slice(1, 5).map((photo, index) => (
+            ) : (
+              /* Multiple photos use grid layout */
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 rounded-xl overflow-hidden">
+                <div className="lg:row-span-2">
                   <img 
-                    key={photo.id}
-                    src={photo.urlOrPath} 
-                    alt={photo.caption || `Park view ${index + 2}`}
-                    className="w-full h-32 object-cover"
+                    src={parkPhotos[0]?.urlOrPath} 
+                    alt="Park main view"
+                    className="w-full h-64 lg:h-full object-cover"
                   />
-                ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+                  {parkPhotos.slice(1, 5).map((photo, index) => (
+                    <img 
+                      key={photo.id}
+                      src={photo.urlOrPath} 
+                      alt={photo.caption || `Park view ${index + 2}`}
+                      className="w-full h-32 object-cover"
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="mb-8 h-64 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 rounded-xl flex items-center justify-center">
