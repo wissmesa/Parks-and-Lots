@@ -109,7 +109,7 @@ export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   parkId: varchar("park_id").references(() => parks.id).notNull(),
   nameOrNumber: varchar("name_or_number").notNull(),
-  status: lotStatusEnum("status").notNull(),
+  status: lotStatusEnum("status"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   description: text("description"),
   bedrooms: integer("bedrooms"),
