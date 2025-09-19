@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { apiRequest } from "@/lib/queryClient";
-import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, ArrowUp, ArrowDown } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -81,6 +81,10 @@ export default function AdminLots() {
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<string>("nameOrNumber");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -456,13 +460,80 @@ export default function AdminLots() {
     }
   };
 
-  const lotsList = lots?.lots ?? [];
+  const rawLotsList = lots?.lots ?? [];
   const parksList = parks?.parks ?? [];
   const companiesList = companies ?? [];
   
   // Create efficient lookup maps for relationships
   const parkById = new Map(parksList.map(p => [p.id, p]));
   const companyById = new Map(companiesList.map(c => [c.id, c]));
+
+  // Sorting function
+  const sortLots = (lotsToSort: Lot[]) => {
+    return [...lotsToSort].sort((a, b) => {
+      let valueA: any;
+      let valueB: any;
+
+      switch (sortBy) {
+        case "nameOrNumber":
+          valueA = a.nameOrNumber.toLowerCase();
+          valueB = b.nameOrNumber.toLowerCase();
+          break;
+        case "status":
+          valueA = a.status;
+          valueB = b.status;
+          break;
+        case "price":
+          valueA = parseFloat(a.price) || 0;
+          valueB = parseFloat(b.price) || 0;
+          break;
+        case "bedrooms":
+          valueA = a.bedrooms || 0;
+          valueB = b.bedrooms || 0;
+          break;
+        case "bathrooms":
+          valueA = a.bathrooms || 0;
+          valueB = b.bathrooms || 0;
+          break;
+        case "sqFt":
+          valueA = a.sqFt || 0;
+          valueB = b.sqFt || 0;
+          break;
+        case "parkName":
+          valueA = parkById.get(a.parkId)?.name?.toLowerCase() || "";
+          valueB = parkById.get(b.parkId)?.name?.toLowerCase() || "";
+          break;
+        case "companyName":
+          const parkA = parkById.get(a.parkId);
+          const parkB = parkById.get(b.parkId);
+          valueA = parkA?.companyId ? companyById.get(parkA.companyId)?.name?.toLowerCase() || "" : "";
+          valueB = parkB?.companyId ? companyById.get(parkB.companyId)?.name?.toLowerCase() || "" : "";
+          break;
+        case "visibility":
+          valueA = a.isActive ? 1 : 0;
+          valueB = b.isActive ? 1 : 0;
+          break;
+        case "specialStatus":
+          valueA = a.specialStatus?.name?.toLowerCase() || "";
+          valueB = b.specialStatus?.name?.toLowerCase() || "";
+          break;
+        default:
+          valueA = a.nameOrNumber.toLowerCase();
+          valueB = b.nameOrNumber.toLowerCase();
+      }
+
+      if (typeof valueA === "string" && typeof valueB === "string") {
+        const comparison = valueA.localeCompare(valueB);
+        return sortOrder === "asc" ? comparison : -comparison;
+      } else {
+        const comparison = valueA - valueB;
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+    });
+  };
+
+  // Apply sorting to lots list
+  const lotsList = sortLots(rawLotsList);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -606,7 +677,45 @@ export default function AdminLots() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Lots</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>All Lots</CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="sortBy" className="text-sm">Sort by:</Label>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-[160px]" id="sortBy" data-testid="sort-by-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nameOrNumber">Lot Name/Number</SelectItem>
+                      <SelectItem value="parkName">Park Name</SelectItem>
+                      <SelectItem value="companyName">Company</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                      <SelectItem value="visibility">Visibility</SelectItem>
+                      <SelectItem value="price">Price</SelectItem>
+                      <SelectItem value="bedrooms">Bedrooms</SelectItem>
+                      <SelectItem value="bathrooms">Bathrooms</SelectItem>
+                      <SelectItem value="sqFt">Square Feet</SelectItem>
+                      <SelectItem value="specialStatus">Special Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  className="flex items-center gap-1"
+                  data-testid="sort-order-toggle"
+                >
+                  {sortOrder === "asc" ? (
+                    <ArrowUp className="w-4 h-4" />
+                  ) : (
+                    <ArrowDown className="w-4 h-4" />
+                  )}
+                  {sortOrder === "asc" ? "Asc" : "Desc"}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
