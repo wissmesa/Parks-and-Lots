@@ -350,6 +350,13 @@ export class GoogleCalendarService {
       }
       
       console.log(`[Google Calendar] Total busy slots found: ${allBusySlots.length}`, allBusySlots);
+      
+      // If FreeBusy API returns no busy slots, use event-based fallback for more comprehensive detection
+      if (allBusySlots.length === 0) {
+        console.log(`[Google Calendar] No busy slots found via FreeBusy API, falling back to direct event listing for more comprehensive detection`);
+        return this.getManagerBusySlotsFromEvents(userId, startDate, endDate);
+      }
+      
       return allBusySlots;
       
     } catch (error) {

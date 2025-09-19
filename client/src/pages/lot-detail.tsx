@@ -101,7 +101,7 @@ export default function LotDetail() {
 
   // REMOVED: No longer fetching database showings - Google Calendar is the single source of truth for bookings
 
-  // Fetch manager calendar availability - ALWAYS fetch fresh data
+  // Fetch manager calendar availability - ALWAYS fetch fresh data with 30-second polling
   const { data: managerAvailability } = useQuery<{
     busySlots: Array<{ start: string; end: string }>;
     managerConnected: boolean;
@@ -114,6 +114,7 @@ export default function LotDetail() {
     refetchOnMount: true, // Always refetch on mount
     refetchOnWindowFocus: true, // Refetch when window gains focus
     refetchOnReconnect: true, // Refetch on network reconnect
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
   });
 
   if (lotLoading) {
