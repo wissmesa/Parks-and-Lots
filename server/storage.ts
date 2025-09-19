@@ -69,6 +69,8 @@ export interface IStorage {
   // Special Status operations
   getSpecialStatuses(parkId: string, includeInactive?: boolean): Promise<SpecialStatus[]>;
   getSpecialStatus(id: string): Promise<SpecialStatus | undefined>;
+  getSpecialStatusByName(parkId: string, name: string): Promise<SpecialStatus | undefined>;
+  findOrCreateSpecialStatus(parkId: string, name: string): Promise<SpecialStatus>;
   createSpecialStatus(specialStatus: InsertSpecialStatus): Promise<SpecialStatus>;
   updateSpecialStatus(id: string, updates: Partial<InsertSpecialStatus>): Promise<SpecialStatus>;
   deleteSpecialStatus(id: string): Promise<void>;
@@ -825,6 +827,31 @@ export class DatabaseStorage implements IStorage {
   async getSpecialStatus(id: string): Promise<SpecialStatus | undefined> {
     const [specialStatus] = await db.select().from(specialStatuses).where(eq(specialStatuses.id, id));
     return specialStatus;
+  }
+
+  async getSpecialStatusByName(parkId: string, name: string): Promise<SpecialStatus | undefined> {
+    const [specialStatus] = await db.select().from(specialStatuses)
+      .where(and(
+        eq(specialStatuses.parkId, parkId),
+        eq(specialStatuses.name, name.trim()),
+        eq(specialStatuses.isActive, true)
+      ));
+    return specialStatus;
+  }
+
+  async findOrCreateSpecialStatus(parkId: string, name: string): Promise<SpecialStatus> {
+    // First try to find existing special status
+    const existing = await this.getSpecialStatusByName(parkId, name);
+    if (existing) {
+      return existing;
+    }
+
+    // Create new special status if it doesn't exist
+    return await this.createSpecialStatus({
+      parkId,
+      name: name.trim(),
+      isActive: true
+    });
   }
 
   async createSpecialStatus(specialStatus: InsertSpecialStatus): Promise<SpecialStatus> {
