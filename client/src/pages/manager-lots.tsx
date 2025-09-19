@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
@@ -31,7 +31,9 @@ import {
   Upload,
   FileSpreadsheet,
   CheckCircle,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -93,6 +95,10 @@ export default function ManagerLots() {
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<any>(null);
   const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Sorting state
+  const [sortBy, setSortBy] = useState<string>("nameOrNumber");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   
   // Form state
   const [formData, setFormData] = useState({
@@ -530,6 +536,66 @@ export default function ManagerLots() {
   };
 
   const assignedParks = assignments || [];
+
+  // Sort lots using useMemo for performance
+  const sortedLots = useMemo(() => {
+    if (!lots) return [];
+    
+    return [...lots].sort((a, b) => {
+      let valueA: any;
+      let valueB: any;
+
+      switch (sortBy) {
+        case "nameOrNumber":
+          valueA = a.nameOrNumber.toLowerCase();
+          valueB = b.nameOrNumber.toLowerCase();
+          break;
+        case "status":
+          valueA = a.status;
+          valueB = b.status;
+          break;
+        case "price":
+          valueA = parseFloat((a.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
+          valueB = parseFloat((b.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
+          break;
+        case "bedrooms":
+          valueA = a.bedrooms || 0;
+          valueB = b.bedrooms || 0;
+          break;
+        case "bathrooms":
+          valueA = a.bathrooms || 0;
+          valueB = b.bathrooms || 0;
+          break;
+        case "sqFt":
+          valueA = a.sqFt || 0;
+          valueB = b.sqFt || 0;
+          break;
+        case "parkName":
+          valueA = a.park?.name?.toLowerCase() || "";
+          valueB = b.park?.name?.toLowerCase() || "";
+          break;
+        case "visibility":
+          valueA = a.isActive ? 1 : 0;
+          valueB = b.isActive ? 1 : 0;
+          break;
+        case "specialStatus":
+          valueA = a.specialStatus?.name?.toLowerCase() || "";
+          valueB = b.specialStatus?.name?.toLowerCase() || "";
+          break;
+        default:
+          valueA = a.nameOrNumber.toLowerCase();
+          valueB = b.nameOrNumber.toLowerCase();
+      }
+
+      if (typeof valueA === "string" && typeof valueB === "string") {
+        const comparison = valueA.localeCompare(valueB);
+        return sortOrder === "asc" ? comparison : -comparison;
+      } else {
+        const comparison = valueA - valueB;
+        return sortOrder === "asc" ? comparison : -comparison;
+      }
+    });
+  }, [lots, sortBy, sortOrder]);
   
   if (user?.role !== 'MANAGER') {
     return (
@@ -550,7 +616,7 @@ export default function ManagerLots() {
         <ManagerSidebar />
 
         <main className="flex-1 p-8">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-foreground">My Lots</h1>
               <p className="text-muted-foreground">Manage lots in your assigned parks</p>
@@ -693,10 +759,48 @@ export default function ManagerLots() {
             </div>
           </div>
 
+          {/* Sorting Controls */}
+          <div className="flex items-center justify-end gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="manager-sortBy" className="text-sm">Sort by:</Label>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[160px]" id="manager-sortBy" data-testid="manager-sort-by-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nameOrNumber">Lot Name/Number</SelectItem>
+                  <SelectItem value="parkName">Park Name</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="visibility">Visibility</SelectItem>
+                  <SelectItem value="price">Price</SelectItem>
+                  <SelectItem value="bedrooms">Bedrooms</SelectItem>
+                  <SelectItem value="bathrooms">Bathrooms</SelectItem>
+                  <SelectItem value="sqFt">Square Feet</SelectItem>
+                  <SelectItem value="specialStatus">Special Status</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              className="flex items-center gap-1"
+              data-testid="manager-sort-order-toggle"
+            >
+              {sortOrder === "asc" ? (
+                <ArrowUp className="w-4 h-4" />
+              ) : (
+                <ArrowDown className="w-4 h-4" />
+              )}
+              {sortOrder === "asc" ? "Asc" : "Desc"}
+            </Button>
+          </div>
+
+
           {/* Lots Grid */}
           {isLoading ? (
             <div className="text-center py-8">Loading lots...</div>
-          ) : !lots || lots.length === 0 ? (
+          ) : !sortedLots || sortedLots.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <Home className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -712,7 +816,7 @@ export default function ManagerLots() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {lots.map((lot) => (
+              {sortedLots.map((lot) => (
                 <Card key={lot.id} className={!lot.isActive ? "opacity-60" : ""}>
                   <CardHeader>
                     <div className="flex items-center justify-between">

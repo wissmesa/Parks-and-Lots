@@ -484,8 +484,8 @@ export default function AdminLots() {
           valueB = b.status;
           break;
         case "price":
-          valueA = parseFloat(a.price) || 0;
-          valueB = parseFloat(b.price) || 0;
+          valueA = parseFloat((a.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
+          valueB = parseFloat((b.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
           break;
         case "bedrooms":
           valueA = a.bedrooms || 0;
