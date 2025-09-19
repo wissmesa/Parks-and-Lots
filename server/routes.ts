@@ -1320,12 +1320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body (exclude parkId from updates, allow partial updates)
       const validatedData = insertSpecialStatusSchema.omit({ parkId: true }).partial().parse(req.body);
 
-      // Debug logging to see what's being sent and validated
-      console.log('Special status update request body:', req.body);
-      console.log('Special status validated data:', validatedData);
-
       const updatedStatus = await storage.updateSpecialStatus(req.params.id, validatedData);
-      console.log('Updated special status result:', updatedStatus);
       res.json(updatedStatus);
     } catch (error: any) {
       console.error('Update special status error:', error);
