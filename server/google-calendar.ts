@@ -17,7 +17,9 @@ export class GoogleCalendarService {
 
   constructor() {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      throw new Error('Google OAuth2 credentials not configured');
+      // No lanzar error, simplemente no configurar el cliente
+      this.oauth2Client = null;
+      return;
     }
     
     this.oauth2Client = new google.auth.OAuth2(
@@ -28,6 +30,9 @@ export class GoogleCalendarService {
   }
 
   generateAuthUrl(state: string): string {
+    if (!this.oauth2Client) {
+      throw new Error('Google Calendar service not configured');
+    }
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
@@ -233,6 +238,9 @@ export class GoogleCalendarService {
   }
 
   async isCalendarConnected(userId: string): Promise<boolean> {
+    if (!this.oauth2Client) {
+      return false;
+    }
     // Check if a refresh token exists in storage (indicates connection status)
     // Don't rely on live refresh attempts to avoid false negatives during temporary failures
     const tokenData = await storage.getGoogleCalendarToken(userId);

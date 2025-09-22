@@ -18,6 +18,10 @@ import {
 } from "./auth";
 import { calendarService } from "./calendar";
 import { googleCalendarService } from "./google-calendar";
+
+// Helper function to check if Google Calendar service is available
+const isGoogleCalendarAvailable = () => googleCalendarService !== null;
+
 import { 
   insertUserSchema,
   insertCompanySchema, 
