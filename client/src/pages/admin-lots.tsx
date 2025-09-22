@@ -30,6 +30,8 @@ interface Lot {
   bedrooms: number | null;
   bathrooms: number | null;
   sqFt: number | null;
+  houseManufacturer?: string | null;
+  houseModel?: string | null;
   isActive: boolean;
   parkId: string;
   createdAt: string;
@@ -78,6 +80,8 @@ export default function AdminLots() {
     bedrooms: "",
     bathrooms: "",
     sqFt: "",
+    houseManufacturer: "",
+    houseModel: "",
     parkId: ""
   });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
@@ -95,6 +99,8 @@ export default function AdminLots() {
     parkId: [] as string[],
     companyId: [] as string[],
     specialStatusId: [] as string[],
+    houseManufacturer: [] as string[],
+    houseModel: [] as string[],
     priceMin: "",
     priceMax: "",
     bedroomsMin: "",
@@ -128,6 +134,8 @@ export default function AdminLots() {
       parkId: [],
       companyId: [],
       specialStatusId: [],
+      houseManufacturer: [],
+      houseModel: [],
       priceMin: "",
       priceMax: "",
       bedroomsMin: "",
@@ -146,6 +154,8 @@ export default function AdminLots() {
            filters.parkId.length > 0 ||
            filters.companyId.length > 0 ||
            filters.specialStatusId.length > 0 ||
+           filters.houseManufacturer.length > 0 ||
+           filters.houseModel.length > 0 ||
            filters.priceMin ||
            filters.priceMax ||
            filters.bedroomsMin ||
@@ -503,6 +513,8 @@ export default function AdminLots() {
       bedrooms: lot.bedrooms?.toString() || "",
       bathrooms: lot.bathrooms?.toString() || "",
       sqFt: lot.sqFt?.toString() || "",
+      houseManufacturer: lot.houseManufacturer || "",
+      houseModel: lot.houseModel || "",
       parkId: lot.parkId
     });
   };
@@ -576,6 +588,22 @@ export default function AdminLots() {
         if (hasSpecialStatus && wantsNone && lot.specialStatusId) return false;
       }
 
+      // House manufacturer filter
+      if (filters.houseManufacturer.length > 0) {
+        const hasManufacturer = lot.houseManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer);
+        const wantsNone = filters.houseManufacturer.includes("none");
+        if (!hasManufacturer && !wantsNone) return false;
+        if (hasManufacturer && wantsNone && lot.houseManufacturer) return false;
+      }
+
+      // House model filter
+      if (filters.houseModel.length > 0) {
+        const hasModel = lot.houseModel && filters.houseModel.includes(lot.houseModel);
+        const wantsNone = filters.houseModel.includes("none");
+        if (!hasModel && !wantsNone) return false;
+        if (hasModel && wantsNone && lot.houseModel) return false;
+      }
+
       // Price range filter
       if (filters.priceMin || filters.priceMax) {
         const price = parseFloat((lot.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
@@ -611,7 +639,9 @@ export default function AdminLots() {
           lot.nameOrNumber.toLowerCase(),
           lot.description?.toLowerCase() || "",
           parkById.get(lot.parkId)?.name?.toLowerCase() || "",
-          lot.specialStatus?.name?.toLowerCase() || ""
+          lot.specialStatus?.name?.toLowerCase() || "",
+          lot.houseManufacturer?.toLowerCase() || "",
+          lot.houseModel?.toLowerCase() || ""
         ].some(field => field.includes(searchLower));
         if (!matches) return false;
       }
@@ -802,6 +832,26 @@ export default function AdminLots() {
                         type="number"
                         value={formData.sqFt}
                         onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="houseManufacturer">House Manufacturer</Label>
+                      <Input
+                        id="houseManufacturer"
+                        value={formData.houseManufacturer}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
+                        placeholder="e.g., Clayton Homes"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="houseModel">House Model</Label>
+                      <Input
+                        id="houseModel"
+                        value={formData.houseModel}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
+                        placeholder="e.g., Heritage 3264A"
                       />
                     </div>
                   </div>
@@ -1073,6 +1123,83 @@ export default function AdminLots() {
                     </div>
                   </PopoverContent>
                 </Popover>
+                {/* House Manufacturer Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="admin-manufacturer-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Manufacturer {filters.houseManufacturer.length > 0 && `(${filters.houseManufacturer.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      <Label className="text-sm font-medium">House Manufacturer</Label>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="admin-manufacturer-none"
+                          checked={filters.houseManufacturer.includes("none")}
+                          onCheckedChange={() => toggleFilter("houseManufacturer", "none")}
+                          data-testid="admin-manufacturer-filter-none"
+                        />
+                        <Label htmlFor="admin-manufacturer-none" className="text-sm cursor-pointer">
+                          No Manufacturer
+                        </Label>
+                      </div>
+                      {Array.from(new Set(lots?.lots?.map(lot => lot.houseManufacturer).filter(Boolean) || [])).sort().map((manufacturer) => (
+                        <div key={manufacturer} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`admin-manufacturer-${manufacturer}`}
+                            checked={filters.houseManufacturer.includes(manufacturer!)}
+                            onCheckedChange={() => toggleFilter("houseManufacturer", manufacturer!)}
+                            data-testid={`admin-manufacturer-filter-${manufacturer}`}
+                          />
+                          <Label htmlFor={`admin-manufacturer-${manufacturer}`} className="text-sm cursor-pointer">
+                            {manufacturer}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* House Model Filter */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="admin-model-filter-trigger">
+                      <Filter className="w-4 h-4" />
+                      Model {filters.houseModel.length > 0 && `(${filters.houseModel.length})`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="start">
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      <Label className="text-sm font-medium">House Model</Label>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="admin-model-none"
+                          checked={filters.houseModel.includes("none")}
+                          onCheckedChange={() => toggleFilter("houseModel", "none")}
+                          data-testid="admin-model-filter-none"
+                        />
+                        <Label htmlFor="admin-model-none" className="text-sm cursor-pointer">
+                          No Model
+                        </Label>
+                      </div>
+                      {Array.from(new Set(lots?.lots?.map(lot => lot.houseModel).filter(Boolean) || [])).sort().map((model) => (
+                        <div key={model} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`admin-model-${model}`}
+                            checked={filters.houseModel.includes(model!)}
+                            onCheckedChange={() => toggleFilter("houseModel", model!)}
+                            data-testid={`admin-model-filter-${model}`}
+                          />
+                          <Label htmlFor={`admin-model-${model}`} className="text-sm cursor-pointer">
+                            {model}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Clear Filters */}
@@ -1229,7 +1356,7 @@ export default function AdminLots() {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Lot</DialogTitle>
             </DialogHeader>
@@ -1309,6 +1436,26 @@ export default function AdminLots() {
                     type="number"
                     value={formData.sqFt}
                     onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="edit-houseManufacturer">House Manufacturer</Label>
+                  <Input
+                    id="edit-houseManufacturer"
+                    value={formData.houseManufacturer}
+                    onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
+                    placeholder="e.g., Clayton Homes"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-houseModel">House Model</Label>
+                  <Input
+                    id="edit-houseModel"
+                    value={formData.houseModel}
+                    onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
+                    placeholder="e.g., Heritage 3264A"
                   />
                 </div>
               </div>

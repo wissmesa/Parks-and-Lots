@@ -115,6 +115,8 @@ export const lots = pgTable("lots", {
   bedrooms: integer("bedrooms"),
   bathrooms: integer("bathrooms"),
   sqFt: integer("sq_ft"),
+  houseManufacturer: varchar("house_manufacturer"),
+  houseModel: varchar("house_model"),
   specialStatusId: varchar("special_status_id").references(() => specialStatuses.id),
   isActive: boolean("is_active").default(true).notNull(),
 });

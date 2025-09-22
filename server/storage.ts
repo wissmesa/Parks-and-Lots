@@ -393,6 +393,8 @@ export class DatabaseStorage implements IStorage {
       bedrooms: lots.bedrooms,
       bathrooms: lots.bathrooms,
       sqFt: lots.sqFt,
+      houseManufacturer: lots.houseManufacturer,
+      houseModel: lots.houseModel,
       isActive: lots.isActive,
       parkId: lots.parkId,
       specialStatusId: lots.specialStatusId,

@@ -51,6 +51,8 @@ interface Lot {
   bedrooms: number;
   bathrooms: number;
   sqFt: number;
+  houseManufacturer?: string;
+  houseModel?: string;
   parkId: string;
   isActive: boolean;
   specialStatusId?: string | null;
@@ -110,6 +112,8 @@ export default function ManagerLots() {
     visibility: [] as string[],
     parkId: [] as string[],
     specialStatusId: [] as string[],
+    houseManufacturer: [] as string[],
+    houseModel: [] as string[],
     priceMin: "",
     priceMax: "",
     bedroomsMin: "",
@@ -142,6 +146,8 @@ export default function ManagerLots() {
       visibility: [],
       parkId: [],
       specialStatusId: [],
+      houseManufacturer: [],
+      houseModel: [],
       priceMin: "",
       priceMax: "",
       bedroomsMin: "",
@@ -159,6 +165,8 @@ export default function ManagerLots() {
            filters.visibility.length > 0 ||
            filters.parkId.length > 0 ||
            filters.specialStatusId.length > 0 ||
+           filters.houseManufacturer.length > 0 ||
+           filters.houseModel.length > 0 ||
            filters.priceMin ||
            filters.priceMax ||
            filters.bedroomsMin ||
@@ -179,6 +187,8 @@ export default function ManagerLots() {
     bedrooms: 1,
     bathrooms: 1,
     sqFt: 0,
+    houseManufacturer: '',
+    houseModel: '',
     parkId: ''
   });
 
@@ -234,6 +244,8 @@ export default function ManagerLots() {
         bedrooms: 1,
         bathrooms: 1,
         sqFt: 0,
+        houseManufacturer: '',
+        houseModel: '',
         parkId: ''
       });
       queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
@@ -250,6 +262,7 @@ export default function ManagerLots() {
   // Update lot mutation
   const updateLotMutation = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<typeof formData>) => {
+      console.log(updates, "updates");
       const response = await apiRequest("PATCH", `/api/manager/lots/${id}`, updates);
       return response.json();
     },
@@ -574,6 +587,8 @@ export default function ManagerLots() {
       bedrooms: lot.bedrooms,
       bathrooms: lot.bathrooms,
       sqFt: lot.sqFt,
+      houseManufacturer: lot.houseManufacturer || '',
+      houseModel: lot.houseModel || '',
       parkId: lot.parkId
     });
     setIsEditModalOpen(true);
@@ -637,6 +652,22 @@ export default function ManagerLots() {
         if (hasSpecialStatus && wantsNone && lot.specialStatusId) return false;
       }
 
+      // House manufacturer filter
+      if (filters.houseManufacturer.length > 0) {
+        const hasManufacturer = lot.houseManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer);
+        const wantsNone = filters.houseManufacturer.includes("none");
+        if (!hasManufacturer && !wantsNone) return false;
+        if (hasManufacturer && wantsNone && lot.houseManufacturer) return false;
+      }
+
+      // House model filter
+      if (filters.houseModel.length > 0) {
+        const hasModel = lot.houseModel && filters.houseModel.includes(lot.houseModel);
+        const wantsNone = filters.houseModel.includes("none");
+        if (!hasModel && !wantsNone) return false;
+        if (hasModel && wantsNone && lot.houseModel) return false;
+      }
+
       // Price range filter
       if (filters.priceMin || filters.priceMax) {
         const price = parseFloat((lot.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
@@ -672,7 +703,9 @@ export default function ManagerLots() {
           lot.nameOrNumber.toLowerCase(),
           lot.description?.toLowerCase() || "",
           lot.park?.name?.toLowerCase() || "",
-          lot.specialStatus?.name?.toLowerCase() || ""
+          lot.specialStatus?.name?.toLowerCase() || "",
+          lot.houseManufacturer?.toLowerCase() || "",
+          lot.houseModel?.toLowerCase() || ""
         ].some(field => field.includes(searchLower));
         if (!matches) return false;
       }
@@ -860,6 +893,27 @@ export default function ManagerLots() {
                       placeholder="e.g., 1200"
                       required
                     />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="houseManufacturer">House Manufacturer</Label>
+                      <Input
+                        id="houseManufacturer"
+                        value={formData.houseManufacturer}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
+                        placeholder="e.g., Clayton Homes"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="houseModel">House Model</Label>
+                      <Input
+                        id="houseModel"
+                        value={formData.houseModel}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
+                        placeholder="e.g., Heritage 3264A"
+                      />
+                    </div>
                   </div>
                   
                   <div>
@@ -1120,6 +1174,83 @@ export default function ManagerLots() {
                       </div>
                     </PopoverContent>
                   </Popover>
+                  {/* House Manufacturer Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-manufacturer-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Manufacturer {filters.houseManufacturer.length > 0 && `(${filters.houseManufacturer.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <Label className="text-sm font-medium">House Manufacturer</Label>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="manager-manufacturer-none"
+                            checked={filters.houseManufacturer.includes("none")}
+                            onCheckedChange={() => toggleFilter("houseManufacturer", "none")}
+                            data-testid="manager-manufacturer-filter-none"
+                          />
+                          <Label htmlFor="manager-manufacturer-none" className="text-sm cursor-pointer">
+                            No Manufacturer
+                          </Label>
+                        </div>
+                        {Array.from(new Set(lots?.map(lot => lot.houseManufacturer).filter(Boolean) || [])).sort().map((manufacturer) => (
+                          <div key={manufacturer} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`manager-manufacturer-${manufacturer}`}
+                              checked={filters.houseManufacturer.includes(manufacturer!)}
+                              onCheckedChange={() => toggleFilter("houseManufacturer", manufacturer!)}
+                              data-testid={`manager-manufacturer-filter-${manufacturer}`}
+                            />
+                            <Label htmlFor={`manager-manufacturer-${manufacturer}`} className="text-sm cursor-pointer">
+                              {manufacturer}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* House Model Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-model-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Model {filters.houseModel.length > 0 && `(${filters.houseModel.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="start">
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <Label className="text-sm font-medium">House Model</Label>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="manager-model-none"
+                            checked={filters.houseModel.includes("none")}
+                            onCheckedChange={() => toggleFilter("houseModel", "none")}
+                            data-testid="manager-model-filter-none"
+                          />
+                          <Label htmlFor="manager-model-none" className="text-sm cursor-pointer">
+                            No Model
+                          </Label>
+                        </div>
+                        {Array.from(new Set(lots?.map(lot => lot.houseModel).filter(Boolean) || [])).sort().map((model) => (
+                          <div key={model} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`manager-model-${model}`}
+                              checked={filters.houseModel.includes(model!)}
+                              onCheckedChange={() => toggleFilter("houseModel", model!)}
+                              data-testid={`manager-model-filter-${model}`}
+                            />
+                            <Label htmlFor={`manager-model-${model}`} className="text-sm cursor-pointer">
+                              {model}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* Clear Filters */}
@@ -1273,7 +1404,7 @@ export default function ManagerLots() {
 
           {/* Edit Modal */}
           <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Lot</DialogTitle>
               </DialogHeader>
@@ -1333,6 +1464,27 @@ export default function ManagerLots() {
                     onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) }))}
                     required
                   />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-houseManufacturer">House Manufacturer</Label>
+                    <Input
+                      id="edit-houseManufacturer"
+                      value={formData.houseManufacturer}
+                      onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
+                      placeholder="e.g., Clayton Homes"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-houseModel">House Model</Label>
+                    <Input
+                      id="edit-houseModel"
+                      value={formData.houseModel}
+                      onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
+                      placeholder="e.g., Heritage 3264A"
+                    />
+                  </div>
                 </div>
                 
                 <div>
