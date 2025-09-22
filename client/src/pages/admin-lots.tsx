@@ -92,6 +92,10 @@ export default function AdminLots() {
   const [sortBy, setSortBy] = useState<string>("nameOrNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
   // Filtering state
   const [filters, setFilters] = useState({
     status: [] as string[],
@@ -346,10 +350,10 @@ export default function AdminLots() {
     return null;
   }
 
-  const { data: lots, isLoading } = useQuery<{ lots: Lot[] }>({
-    queryKey: ["/api/lots", "includeInactive=true"],
+  const { data: lots, isLoading } = useQuery<{ lots: Lot[], totalCount: number, page: number, limit: number }>({
+    queryKey: ["/api/lots", "includeInactive=true", currentPage, itemsPerPage],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/lots?includeInactive=true");
+      const response = await apiRequest("GET", `/api/lots?includeInactive=true&page=${currentPage}&limit=${itemsPerPage}`);
       return response.json();
     },
     enabled: user?.role === 'ADMIN',
@@ -717,6 +721,13 @@ export default function AdminLots() {
   // Apply filtering and sorting to lots list
   const filteredLots = filterLots(rawLotsList);
   const lotsList = sortLots(filteredLots);
+  const totalPages = lots ? Math.ceil(lots.totalCount / itemsPerPage) : 0;
+
+  // Handle items per page change
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -881,7 +892,7 @@ export default function AdminLots() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>All Lots ({lotsList.length} {filteredLots.length !== rawLotsList.length ? `of ${rawLotsList.length}` : ''})</CardTitle>
+              <CardTitle>All Lots ({lotsList.length} of {lots?.totalCount || 0} total)</CardTitle>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="sortBy" className="text-sm">Sort by:</Label>
@@ -917,6 +928,20 @@ export default function AdminLots() {
                   )}
                   {sortOrder === "asc" ? "Asc" : "Desc"}
                 </Button>
+                
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="itemsPerPage" className="text-sm">Show:</Label>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => handleItemsPerPageChange(parseInt(value))}>
+                    <SelectTrigger className="w-[80px]" id="itemsPerPage" data-testid="items-per-page-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             
@@ -1350,6 +1375,52 @@ export default function AdminLots() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages} ({lots?.totalCount || 0} total lots)
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm px-2">
+                    {Math.max(1, currentPage - 2)} - {Math.min(totalPages, currentPage + 2)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
