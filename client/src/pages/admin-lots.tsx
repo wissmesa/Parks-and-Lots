@@ -129,6 +129,10 @@ export default function AdminLots() {
 
   const updateRangeFilter = (category: string, value: string) => {
     setFilters(prev => ({ ...prev, [category]: value }));
+    // Reset to first page when searching
+    if (category === "searchText") {
+      setCurrentPage(1);
+    }
   };
 
   const clearAllFilters = () => {
@@ -350,11 +354,22 @@ export default function AdminLots() {
     return null;
   }
 
-  const { data: lots, isLoading } = useQuery<{ lots: Lot[], totalCount: number, page: number, limit: number }>({
-    queryKey: ["/api/lots", "includeInactive=true", currentPage, itemsPerPage],
+  const { data: lots, isLoading } = useQuery<Lot[]>({
+    queryKey: ["/api/lots", "includeInactive=true", filters.searchText],
     queryFn: async () => {
-      const response = await apiRequest("GET", `/api/lots?includeInactive=true&page=${currentPage}&limit=${itemsPerPage}`);
-      return response.json();
+      const params = new URLSearchParams({
+        includeInactive: 'true',
+        limit: '10000'
+      });
+      
+      // Add search parameter if there's search text
+      if (filters.searchText.trim()) {
+        params.append('q', filters.searchText.trim());
+      }
+      
+      const response = await apiRequest("GET", `/api/lots?${params.toString()}`);
+      const data = await response.json();
+      return data.lots || data; // Handle both formats
     },
     enabled: user?.role === 'ADMIN',
   });
@@ -547,7 +562,7 @@ export default function AdminLots() {
     }
   };
 
-  const rawLotsList = lots?.lots ?? [];
+  const rawLotsList = lots ?? [];
   const parksList = parks?.parks ?? [];
   const companiesList = companies ?? [];
   
@@ -660,19 +675,7 @@ export default function AdminLots() {
         if (filters.sqFtMax && sqFt > parseInt(filters.sqFtMax)) return false;
       }
 
-      // Search text filter
-      if (filters.searchText) {
-        const searchLower = filters.searchText.toLowerCase();
-        const matches = [
-          lot.nameOrNumber.toLowerCase(),
-          lot.description?.toLowerCase() || "",
-          parkById.get(lot.parkId)?.name?.toLowerCase() || "",
-          lot.specialStatus?.name?.toLowerCase() || "",
-          lot.houseManufacturer?.toLowerCase() || "",
-          lot.houseModel?.toLowerCase() || ""
-        ].some(field => field.includes(searchLower));
-        if (!matches) return false;
-      }
+      // Note: Search text filtering is now handled server-side via the 'q' parameter
 
       return true;
     });
@@ -744,8 +747,14 @@ export default function AdminLots() {
 
   // Apply filtering and sorting to lots list
   const filteredLots = filterLots(rawLotsList);
-  const lotsList = sortLots(filteredLots);
-  const totalPages = lots ? Math.ceil(lots.totalCount / itemsPerPage) : 0;
+  const sortedLots = sortLots(filteredLots);
+  
+  
+  // Client-side pagination
+  const totalPages = Math.ceil(sortedLots.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const lotsList = sortedLots.slice(startIndex, endIndex);
 
   // Handle items per page change
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -939,7 +948,7 @@ export default function AdminLots() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>All Lots ({lotsList.length} of {lots?.totalCount || 0} total)</CardTitle>
+              <CardTitle>All Lots ({lotsList.length} of {filteredLots.length} filtered, {rawLotsList.length} total)</CardTitle>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="sortBy" className="text-sm">Sort by:</Label>
@@ -1438,7 +1447,7 @@ export default function AdminLots() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages} ({lots?.totalCount || 0} total lots)
+                  Page {currentPage} of {totalPages} ({filteredLots.length} filtered lots)
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
