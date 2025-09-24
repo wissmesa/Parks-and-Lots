@@ -1699,7 +1699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lot routes
-  app.get('/api/lots', async (req: AuthRequest, res) => {
+  app.get('/api/lots', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20', includeInactive } = req.query;
       
@@ -1734,7 +1734,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lots = await storage.getLotsWithParkInfo(filters);
       
       const pageNum = parseInt(page as string);
-      const limitNum = Math.min(parseInt(limit as string), 100);
+      // Allow higher limits for admins, but cap at reasonable number for others
+      const maxLimit = req.user?.role === 'ADMIN' ? 10000 : 100;
+      const limitNum = Math.min(parseInt(limit as string), maxLimit);
       const startIndex = (pageNum - 1) * limitNum;
       const endIndex = startIndex + limitNum;
       

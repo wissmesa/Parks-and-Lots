@@ -333,10 +333,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLots(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; includeInactive?: boolean }): Promise<Lot[]> {
-    let query = db.select().from(lots)
-      .innerJoin(parks, eq(lots.parkId, parks.id))
-      .innerJoin(companies, eq(parks.companyId, companies.id));
-    
     const conditions = [];
     
     if (!filters?.includeInactive) {
@@ -365,14 +361,30 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(lots.bathrooms, filters.bathrooms));
     }
 
-    const results = await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
+    let results;
+    
+    // Use left joins when including inactive entities to avoid filtering out lots
+    // with inactive parks/companies
+    if (filters?.includeInactive) {
+      results = await db.select().from(lots)
+        .leftJoin(parks, eq(lots.parkId, parks.id))
+        .leftJoin(companies, eq(parks.companyId, companies.id))
+        .where(and(...conditions))
+        .orderBy(asc(lots.nameOrNumber));
+    } else {
+      results = await db.select().from(lots)
+        .innerJoin(parks, eq(lots.parkId, parks.id))
+        .innerJoin(companies, eq(parks.companyId, companies.id))
+        .where(and(...conditions))
+        .orderBy(asc(lots.nameOrNumber));
+    }
     
     // Extract only lot data from the joined result
     return results.map(row => row.lots);
   }
 
   async getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string; includeInactive?: boolean }): Promise<any[]> {
-    let query = db.select({
+    const selectFields = {
       id: lots.id,
       nameOrNumber: lots.nameOrNumber,
       status: lots.status,
@@ -398,10 +410,7 @@ export class DatabaseStorage implements IStorage {
         color: specialStatuses.color,
         isActive: specialStatuses.isActive
       }
-    }).from(lots)
-      .innerJoin(parks, eq(lots.parkId, parks.id))
-      .innerJoin(companies, eq(parks.companyId, companies.id))
-      .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id));
+    };
     
     const conditions = [];
     
@@ -444,7 +453,44 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    return await query.where(and(...conditions)).orderBy(asc(lots.nameOrNumber));
+    // Use left joins when including inactive entities to avoid filtering out lots
+    // with inactive parks/companies
+    let result;
+    
+    if (filters?.includeInactive) {
+      if (conditions.length > 0) {
+        result = await db.select(selectFields).from(lots)
+          .leftJoin(parks, eq(lots.parkId, parks.id))
+          .leftJoin(companies, eq(parks.companyId, companies.id))
+          .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .where(and(...conditions))
+          .orderBy(asc(lots.nameOrNumber));
+      } else {
+        result = await db.select(selectFields).from(lots)
+          .leftJoin(parks, eq(lots.parkId, parks.id))
+          .leftJoin(companies, eq(parks.companyId, companies.id))
+          .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .orderBy(asc(lots.nameOrNumber));
+      }
+      console.log(`getLotsWithParkInfo (includeInactive=true): Found ${result.length} lots`);
+    } else {
+      if (conditions.length > 0) {
+        result = await db.select(selectFields).from(lots)
+          .innerJoin(parks, eq(lots.parkId, parks.id))
+          .innerJoin(companies, eq(parks.companyId, companies.id))
+          .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .where(and(...conditions))
+          .orderBy(asc(lots.nameOrNumber));
+      } else {
+        result = await db.select(selectFields).from(lots)
+          .innerJoin(parks, eq(lots.parkId, parks.id))
+          .innerJoin(companies, eq(parks.companyId, companies.id))
+          .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .orderBy(asc(lots.nameOrNumber));
+      }
+      console.log(`getLotsWithParkInfo (includeInactive=false): Found ${result.length} lots`);
+    }
+    return result;
   }
 
   async getLot(id: string): Promise<Lot | undefined> {

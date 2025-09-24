@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
+import { LotCalculator } from "@/components/ui/lot-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,13 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiRequest } from "@/lib/queryClient";
-import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, ArrowUp, ArrowDown, Filter, X } from "lucide-react";
+import { Home, Plus, Edit, Trash2, DollarSign, Camera, Eye, EyeOff, Tag, Upload, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, ArrowUp, ArrowDown, Filter, X, MoreHorizontal, Calculator } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
@@ -85,6 +87,7 @@ export default function AdminLots() {
     parkId: ""
   });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [showCalculator, setShowCalculator] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
 
@@ -583,10 +586,21 @@ export default function AdminLots() {
       }
 
       // Visibility filter
-      if (filters.visibility.length === 1) {
+      if (filters.visibility.length > 0) {
         const isVisible = lot.isActive;
         const wantsVisible = filters.visibility.includes("visible");
-        if (isVisible !== wantsVisible) return false;
+        const wantsHidden = filters.visibility.includes("hidden");
+        
+        // If both visible and hidden are selected, show all lots
+        if (wantsVisible && wantsHidden) {
+          // Show all lots
+        } else if (wantsVisible && !isVisible) {
+          // User wants visible lots but this lot is hidden
+          return false;
+        } else if (wantsHidden && isVisible) {
+          // User wants hidden lots but this lot is visible
+          return false;
+        }
       }
 
       // Park filter
@@ -1389,53 +1403,68 @@ export default function AdminLots() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(lot)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowPhotos(lot.id)}
-                            title="Manage Photos"
-                          >
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAssignSpecialStatus(lot)}
-                            title="Assign Special Status"
-                            data-testid={`assign-special-status-${lot.id}`}
-                          >
-                            <Tag className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => toggleMutation.mutate(lot.id)}
-                            disabled={toggleMutation.isPending}
-                            title={lot.isActive ? "Hide lot" : "Show lot"}
-                            data-testid={`toggle-lot-${lot.id}`}
-                          >
-                            {lot.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              if (confirm("Are you sure you want to delete this lot?")) {
-                                deleteMutation.mutate(lot.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid={`button-edit-lot-${lot.id}`}
+            >
+              Actions
+              <MoreHorizontal className="w-4 h-4 ml-2" />
+            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(lot)}
+                              data-testid={`edit-details-lot-${lot.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowPhotos(lot.id)}
+                              data-testid={`button-photos-lot-${lot.id}`}
+                            >
+                              <Camera className="w-4 h-4 mr-2" />
+                              Manage Photos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowCalculator(lot.id)}
+                              data-testid={`button-calculator-lot-${lot.id}`}
+                            >
+                              <Calculator className="w-4 h-4 mr-2" />
+                              Calculator
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAssignSpecialStatus(lot)}
+                              data-testid={`assign-special-status-${lot.id}`}
+                            >
+                              <Tag className="w-4 h-4 mr-2" />
+                              Assign Special Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => toggleMutation.mutate(lot.id)}
+                              disabled={toggleMutation.isPending}
+                              data-testid={`toggle-lot-${lot.id}`}
+                            >
+                              {lot.isActive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                              {lot.isActive ? 'Hide Lot' : 'Show Lot'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this lot?")) {
+                                  deleteMutation.mutate(lot.id);
+                                }
+                              }}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`button-delete-lot-${lot.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Lot
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1655,8 +1684,19 @@ export default function AdminLots() {
                 entityName={lotsList.find(l => l.id === showPhotos)?.nameOrNumber || 'Lot'}
               />
             )}
+
           </DialogContent>
         </Dialog>
+
+        {/* Calculator Dialog */}
+        {showCalculator && (
+          <LotCalculator
+            isOpen={!!showCalculator}
+            onClose={() => setShowCalculator(null)}
+            lotPrice={parseFloat(lotsList.find(l => l.id === showCalculator)?.price || '0')}
+            lotName={lotsList.find(l => l.id === showCalculator)?.nameOrNumber || 'Lot'}
+          />
+        )}
 
         {/* Special Status Assignment Dialog */}
         <Dialog open={!!assigningSpecialStatus} onOpenChange={(open) => !open && setAssigningSpecialStatus(null)}>

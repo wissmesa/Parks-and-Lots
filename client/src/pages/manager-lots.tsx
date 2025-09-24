@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
+import { LotCalculator } from "@/components/ui/lot-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +39,9 @@ import {
   ArrowUp,
   ArrowDown,
   Filter,
-  X
+  X,
+  MoreHorizontal,
+  Calculator
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -87,6 +91,7 @@ export default function ManagerLots() {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [showCalculator, setShowCalculator] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
 
@@ -639,10 +644,21 @@ export default function ManagerLots() {
       }
 
       // Visibility filter
-      if (filters.visibility.length === 1) {
+      if (filters.visibility.length > 0) {
         const isVisible = lot.isActive;
         const wantsVisible = filters.visibility.includes("visible");
-        if (isVisible !== wantsVisible) return false;
+        const wantsHidden = filters.visibility.includes("hidden");
+        
+        // If both visible and hidden are selected, show all lots
+        if (wantsVisible && wantsHidden) {
+          // Show all lots
+        } else if (wantsVisible && !isVisible) {
+          // User wants visible lots but this lot is hidden
+          return false;
+        } else if (wantsHidden && isVisible) {
+          // User wants hidden lots but this lot is visible
+          return false;
+        }
       }
 
       // Park filter
@@ -1388,53 +1404,65 @@ export default function ManagerLots() {
                         </p>
                       )}
                       
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleActive(lot.id)}
-                          className={`${lot.isActive ? 'text-accent' : 'text-muted-foreground'}`}
-                          disabled={toggleLotActiveMutation.isPending}
-                          data-testid={`button-toggle-lot-${lot.id}`}
-                        >
-                          {lot.isActive ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
-                          {lot.isActive ? 'Disable' : 'Enable'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowPhotos(lot.id)}
-                          title="Manage Photos"
-                          data-testid={`button-photos-lot-${lot.id}`}
-                        >
-                          <Camera className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAssignSpecialStatus(lot)}
-                          title="Assign Special Status"
-                          data-testid={`button-assign-special-status-${lot.id}`}
-                        >
-                          <Tag className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(lot)}
-                          data-testid={`button-edit-lot-${lot.id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(lot.id)}
-                          className="text-destructive hover:text-destructive"
-                          data-testid={`button-delete-lot-${lot.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <div className="flex justify-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+             <Button
+               variant="outline"
+               size="sm"
+               data-testid={`button-edit-lot-${lot.id}`}
+             >
+               Actions
+               <MoreHorizontal className="w-4 h-4 ml-2" />
+             </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(lot)}
+                              data-testid={`edit-details-lot-${lot.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowPhotos(lot.id)}
+                              data-testid={`button-photos-lot-${lot.id}`}
+                            >
+                              <Camera className="w-4 h-4 mr-2" />
+                              Manage Photos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowCalculator(lot.id)}
+                              data-testid={`button-calculator-lot-${lot.id}`}
+                            >
+                              <Calculator className="w-4 h-4 mr-2" />
+                              Calculator
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAssignSpecialStatus(lot)}
+                              data-testid={`button-assign-special-status-${lot.id}`}
+                            >
+                              <Tag className="w-4 h-4 mr-2" />
+                              Assign Special Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleToggleActive(lot.id)}
+                              disabled={toggleLotActiveMutation.isPending}
+                              data-testid={`button-toggle-lot-${lot.id}`}
+                            >
+                              {lot.isActive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                              {lot.isActive ? 'Hide Lot' : 'Show Lot'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(lot.id)}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`button-delete-lot-${lot.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Lot
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardContent>
@@ -1589,8 +1617,19 @@ export default function ManagerLots() {
                   entityName={lots?.find(l => l.id === showPhotos)?.nameOrNumber || 'Lot'}
                 />
               )}
+
             </DialogContent>
           </Dialog>
+
+          {/* Calculator Dialog */}
+          {showCalculator && (
+            <LotCalculator
+              isOpen={!!showCalculator}
+              onClose={() => setShowCalculator(null)}
+              lotPrice={parseFloat(lots?.find(l => l.id === showCalculator)?.price || '0')}
+              lotName={lots?.find(l => l.id === showCalculator)?.nameOrNumber || 'Lot'}
+            />
+          )}
 
           {/* Special Status Assignment Dialog */}
           <Dialog open={!!assigningSpecialStatus} onOpenChange={(open) => !open && setAssigningSpecialStatus(null)}>
