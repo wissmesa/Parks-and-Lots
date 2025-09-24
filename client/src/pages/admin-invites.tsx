@@ -121,7 +121,7 @@ export default function AdminInvites() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -192,7 +192,8 @@ export default function AdminInvites() {
                 <p className="text-sm text-muted-foreground">Send your first manager invitation</p>
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
@@ -277,6 +278,7 @@ export default function AdminInvites() {
                   })}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

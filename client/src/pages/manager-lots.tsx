@@ -816,10 +816,10 @@ export default function ManagerLots() {
       <div className="flex">
         <ManagerSidebar />
 
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">My Lots</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">My Lots</h1>
               <p className="text-muted-foreground">Manage lots in your assigned parks</p>
             </div>
             

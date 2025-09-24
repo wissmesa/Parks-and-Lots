@@ -187,7 +187,7 @@ export default function AdminManagers() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -225,7 +225,8 @@ export default function AdminManagers() {
                 <p className="text-sm text-muted-foreground">Send invites to add managers</p>
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Manager</TableHead>
@@ -304,6 +305,7 @@ export default function AdminManagers() {
                   })}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>

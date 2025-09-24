@@ -756,11 +756,11 @@ export default function AdminLots() {
   return (
     <div className="flex min-h-screen bg-background">
       <AdminSidebar />
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
                 <Home className="w-8 h-8" />
                 Lots
               </h1>

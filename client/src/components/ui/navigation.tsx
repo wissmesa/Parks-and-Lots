@@ -1,14 +1,15 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { MapPin, Menu } from "lucide-react";
-import { useState } from "react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { MapPin } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Check if user is currently on admin/manager pages
+  const isOnAdminPage = location.startsWith('/admin');
+  const isOnManagerPage = location.startsWith('/manager');
 
   const handleLogout = async () => {
     try {
@@ -18,28 +19,6 @@ export function Navigation() {
     }
   };
 
-  const navigationItems: { href: string; label: string; public: boolean }[] = [];
-
-  const NavLinks = ({ mobile = false, onClose = () => {} }) => (
-    <>
-      {navigationItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={onClose}
-          className={`${
-            mobile 
-              ? "block px-3 py-2 text-base font-medium" 
-              : "inline-flex"
-          } text-muted-foreground hover:text-foreground transition-colors ${
-            location === item.href ? "text-foreground" : ""
-          }`}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </>
-  );
 
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
@@ -52,32 +31,43 @@ export function Navigation() {
               </div>
               <span className="text-xl font-bold text-foreground">Parks & Lots</span>
             </Link>
-            <nav className="hidden md:flex space-x-6">
-              <NavLinks />
-            </nav>
           </div>
           
           <div className="flex items-center space-x-4">
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground hidden sm:block">
                   Welcome, {user?.fullName}
                 </span>
                 {user?.role === 'ADMIN' && (
                   <Link href="/admin">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={isOnAdminPage ? "hidden md:inline-flex" : ""}
+                    >
                       Admin Panel
                     </Button>
                   </Link>
                 )}
                 {user?.role === 'MANAGER' && (
                   <Link href="/manager">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={isOnManagerPage ? "hidden md:inline-flex" : ""}
+                    >
                       Manager Panel
                     </Button>
                   </Link>
                 )}
-                <Button onClick={handleLogout} variant="outline" size="sm" data-testid="button-sign-out">
+                <Button 
+                  onClick={handleLogout} 
+                  variant="outline" 
+                  size="sm" 
+                  data-testid="button-sign-out"
+                  className={(isOnAdminPage || isOnManagerPage) ? "hidden md:inline-flex" : ""}
+                >
                   Sign Out
                 </Button>
               </div>
@@ -88,21 +78,6 @@ export function Navigation() {
                 </Button>
               </Link>
             )}
-            
-            <div className="md:hidden">
-              <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right">
-                  <nav className="flex flex-col space-y-4 mt-8">
-                    <NavLinks mobile onClose={() => setIsMenuOpen(false)} />
-                  </nav>
-                </SheetContent>
-              </Sheet>
-            </div>
           </div>
         </div>
       </div>

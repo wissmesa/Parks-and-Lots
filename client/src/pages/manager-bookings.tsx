@@ -161,7 +161,7 @@ export default function ManagerBookings() {
   return (
     <div className="flex min-h-screen bg-background">
       <ManagerSidebar />
-      <div className="flex-1 p-8">
+      <div className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -299,7 +299,8 @@ export default function ManagerBookings() {
                   </p>
                 </div>
               ) : (
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Client</TableHead>
@@ -403,6 +404,7 @@ export default function ManagerBookings() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

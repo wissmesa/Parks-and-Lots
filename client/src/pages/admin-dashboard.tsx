@@ -129,11 +129,11 @@ export default function AdminDashboard() {
         <AdminSidebar />
 
         {/* Main Content */}
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
           {/* Dashboard Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
               <p className="text-muted-foreground">Manage your parks and lots platform</p>
             </div>
             
