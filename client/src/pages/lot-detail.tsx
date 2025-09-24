@@ -22,7 +22,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE';
+  status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
   description?: string;
   bedrooms?: number;
@@ -341,9 +341,19 @@ export default function LotDetail() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h1 className="text-2xl font-bold">{lot.nameOrNumber}</h1>
-                  <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
-                    {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    {(() => {
+                      // Handle both array and single status formats
+                      const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                      return statusArray.length > 0 ? statusArray.map((s, index) => (
+                        <Badge key={index} variant="secondary">
+                          {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                        </Badge>
+                      )) : (
+                        <Badge variant="secondary">No Status</Badge>
+                      );
+                    })()}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

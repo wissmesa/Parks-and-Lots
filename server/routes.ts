@@ -1424,10 +1424,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Validate status enum if provided
-          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].includes(lotData.status)) {
             results.failed.push({
               row: rowNumber,
-              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
+              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, RENT_TO_OWN, or CONTRACT_FOR_DEED'
             });
             continue;
           }
@@ -1585,10 +1585,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Validate status enum if provided
-          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_SALE'].includes(lotData.status)) {
+          if (lotData.status && !['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].includes(lotData.status)) {
             results.failed.push({
               row: rowNumber,
-              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, or RENT_SALE'
+              error: 'Invalid status. Must be: FOR_RENT, FOR_SALE, RENT_TO_OWN, or CONTRACT_FOR_DEED'
             });
             continue;
           }

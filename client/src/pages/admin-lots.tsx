@@ -24,7 +24,7 @@ import * as XLSX from "xlsx";
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
+  status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
   description: string | null;
   bedrooms: number | null;
@@ -74,7 +74,7 @@ export default function AdminLots() {
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
   const [formData, setFormData] = useState({
     nameOrNumber: "",
-    status: "FOR_RENT" as 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE',
+    status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
     price: "",
     description: "",
     bedrooms: "",
@@ -511,7 +511,7 @@ export default function AdminLots() {
     setEditingLot(lot);
     setFormData({
       nameOrNumber: lot.nameOrNumber,
-      status: lot.status,
+      status: Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []),
       price: lot.price,
       description: lot.description || "",
       bedrooms: lot.bedrooms?.toString() || "",
@@ -559,8 +559,12 @@ export default function AdminLots() {
   const filterLots = (lotsToFilter: Lot[]) => {
     return lotsToFilter.filter((lot) => {
       // Status filter
-      if (filters.status.length > 0 && !filters.status.includes(lot.status)) {
-        return false;
+      if (filters.status.length > 0) {
+        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+        const hasMatchingStatus = filters.status.some(filterStatus => statusArray.includes(filterStatus));
+        if (!hasMatchingStatus) {
+          return false;
+        }
       }
 
       // Visibility filter
@@ -594,18 +598,38 @@ export default function AdminLots() {
 
       // House manufacturer filter
       if (filters.houseManufacturer.length > 0) {
-        const hasManufacturer = lot.houseManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer);
         const wantsNone = filters.houseManufacturer.includes("none");
-        if (!hasManufacturer && !wantsNone) return false;
-        if (hasManufacturer && wantsNone && lot.houseManufacturer) return false;
+        const hasManufacturer = lot.houseManufacturer && lot.houseManufacturer.trim() !== "";
+        const manufacturerMatches = hasManufacturer && lot.houseManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer);
+        
+        // If "none" is selected, show lots without manufacturer OR lots with matching manufacturers
+        if (wantsNone && !hasManufacturer) {
+          // Show lots without manufacturer when "none" is selected
+        } else if (!wantsNone && !manufacturerMatches) {
+          // Hide lots that don't match any selected manufacturer (and "none" is not selected)
+          return false;
+        } else if (wantsNone && hasManufacturer && !manufacturerMatches) {
+          // Hide lots with manufacturer when "none" is selected but manufacturer doesn't match other selections
+          return false;
+        }
       }
 
       // House model filter
       if (filters.houseModel.length > 0) {
-        const hasModel = lot.houseModel && filters.houseModel.includes(lot.houseModel);
         const wantsNone = filters.houseModel.includes("none");
-        if (!hasModel && !wantsNone) return false;
-        if (hasModel && wantsNone && lot.houseModel) return false;
+        const hasModel = lot.houseModel && lot.houseModel.trim() !== "";
+        const modelMatches = hasModel && lot.houseModel && filters.houseModel.includes(lot.houseModel);
+        
+        // If "none" is selected, show lots without model OR lots with matching models
+        if (wantsNone && !hasModel) {
+          // Show lots without model when "none" is selected
+        } else if (!wantsNone && !modelMatches) {
+          // Hide lots that don't match any selected model (and "none" is not selected)
+          return false;
+        } else if (wantsNone && hasModel && !modelMatches) {
+          // Hide lots with model when "none" is selected but model doesn't match other selections
+          return false;
+        }
       }
 
       // Price range filter
@@ -795,16 +819,39 @@ export default function AdminLots() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label htmlFor="status">Status</Label>
-                      <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="FOR_RENT">For Rent</SelectItem>
-                          <SelectItem value="FOR_SALE">For Sale</SelectItem>
-                          <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'FOR_RENT', label: 'For Rent' },
+                          { value: 'FOR_SALE', label: 'For Sale' },
+                          { value: 'RENT_TO_OWN', label: 'Rent to Own' },
+                          { value: 'CONTRACT_FOR_DEED', label: 'Contract for Deed' }
+                        ].map((statusOption) => (
+                          <div key={statusOption.value} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`status-${statusOption.value}`}
+                              checked={formData.status.includes(statusOption.value as any)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    status: [...prev.status, statusOption.value as any] 
+                                  }));
+                                } else {
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    status: prev.status.filter(s => s !== statusOption.value) 
+                                  }));
+                                }
+                              }}
+                              className="rounded"
+                            />
+                            <label htmlFor={`status-${statusOption.value}`} className="text-sm">
+                              {statusOption.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <Label htmlFor="price">Price</Label>
@@ -970,7 +1017,7 @@ export default function AdminLots() {
                   <PopoverContent className="w-48" align="start">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Status</Label>
-                      {["FOR_RENT", "FOR_SALE", "RENT_SALE"].map((status) => (
+                      {["FOR_RENT", "FOR_SALE", "RENT_TO_OWN", "CONTRACT_FOR_DEED"].map((status) => (
                         <div key={status} className="flex items-center space-x-2">
                           <Checkbox
                             id={`status-${status}`}
@@ -979,7 +1026,7 @@ export default function AdminLots() {
                             data-testid={`status-filter-${status}`}
                           />
                           <Label htmlFor={`status-${status}`} className="text-sm cursor-pointer">
-                            {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : "Rent/Sale"}
+                            {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : status === "RENT_TO_OWN" ? "Rent to Own" : "Contract for Deed"}
                           </Label>
                         </div>
                       ))}
@@ -1300,9 +1347,19 @@ export default function AdminLots() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'RENT_SALE' ? 'secondary' : 'outline'}>
-                          {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            // Handle both array and single status formats
+                            const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                            return statusArray.length > 0 ? statusArray.map((s, index) => (
+                              <Badge key={index} variant="secondary">
+                                {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                              </Badge>
+                            )) : (
+                              <Badge variant="secondary">No Status</Badge>
+                            );
+                          })()}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={lot.isActive ? 'default' : 'secondary'}>
@@ -1459,16 +1516,39 @@ export default function AdminLots() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label htmlFor="edit-status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FOR_RENT">For Rent</SelectItem>
-                      <SelectItem value="FOR_SALE">For Sale</SelectItem>
-                      <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'FOR_RENT', label: 'For Rent' },
+                      { value: 'FOR_SALE', label: 'For Sale' },
+                      { value: 'RENT_TO_OWN', label: 'Rent to Own' },
+                      { value: 'CONTRACT_FOR_DEED', label: 'Contract for Deed' }
+                    ].map((statusOption) => (
+                      <div key={statusOption.value} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`edit-status-${statusOption.value}`}
+                          checked={formData.status.includes(statusOption.value as any)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                status: [...prev.status, statusOption.value as any] 
+                              }));
+                            } else {
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                status: prev.status.filter(s => s !== statusOption.value) 
+                              }));
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <label htmlFor={`edit-status-${statusOption.value}`} className="text-sm">
+                          {statusOption.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="edit-price">Price</Label>
@@ -1680,7 +1760,7 @@ export default function AdminLots() {
                   <h4 className="font-medium mb-2">Required Columns:</h4>
                   <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
                     <li>Lot Name/Number</li>
-                    <li>Status (FOR_RENT, FOR_SALE, or RENT_SALE)</li>
+                    <li>Status (FOR_RENT, FOR_SALE, RENT_TO_OWN, or CONTRACT_FOR_DEED)</li>
                     <li>Park Name (preferred - easier than Park ID)</li>
                   </ul>
                   <h4 className="font-medium mt-3 mb-2">Optional Columns:</h4>
@@ -1792,7 +1872,7 @@ export default function AdminLots() {
                         <TableRow key={index}>
                           <TableCell>{lot.nameOrNumber || 'N/A'}</TableCell>
                           <TableCell>
-                            <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
+                            <Badge variant="secondary">
                               {lot.status || 'N/A'}
                             </Badge>
                           </TableCell>

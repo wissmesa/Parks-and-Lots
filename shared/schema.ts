@@ -17,7 +17,7 @@ import { z } from "zod";
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER']);
-export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_SALE']);
+export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
 export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'BLOCKED']);
@@ -109,7 +109,7 @@ export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   parkId: varchar("park_id").references(() => parks.id).notNull(),
   nameOrNumber: varchar("name_or_number").notNull(),
-  status: lotStatusEnum("status"),
+  status: lotStatusEnum("status").array(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   description: text("description"),
   bedrooms: integer("bedrooms"),

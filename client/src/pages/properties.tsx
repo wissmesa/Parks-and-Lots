@@ -68,7 +68,7 @@ interface Park {
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE' | 'RENT_SALE';
+  status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
   description: string | null;
   bedrooms: number | null;
@@ -251,7 +251,8 @@ export default function Properties() {
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="FOR_RENT">For Rent</SelectItem>
                     <SelectItem value="FOR_SALE">For Sale</SelectItem>
-                    <SelectItem value="RENT_SALE">Rent/Sale</SelectItem>
+                    <SelectItem value="RENT_TO_OWN">Rent to Own</SelectItem>
+                    <SelectItem value="CONTRACT_FOR_DEED">Contract for Deed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -313,9 +314,19 @@ export default function Properties() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold">{lot.nameOrNumber}</h3>
-                      <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
-                        {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          // Handle both array and single status formats
+                          const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                          return statusArray.length > 0 ? statusArray.map((s, index) => (
+                            <Badge key={index} variant="secondary">
+                              {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                            </Badge>
+                          )) : (
+                            <Badge variant="secondary">No Status</Badge>
+                          );
+                        })()}
+                      </div>
                     </div>
                     
                     <div className="flex items-center text-muted-foreground text-sm mb-3">

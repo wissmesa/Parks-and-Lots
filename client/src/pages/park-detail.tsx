@@ -74,7 +74,7 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
 interface Lot {
   id: string;
   nameOrNumber: string;
-  status: 'FOR_RENT' | 'FOR_SALE';
+  status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
   description?: string;
   bedrooms?: number;
@@ -297,6 +297,8 @@ export default function ParkDetail() {
                         <SelectItem value="all">All Lots</SelectItem>
                         <SelectItem value="FOR_RENT">For Rent</SelectItem>
                         <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                        <SelectItem value="RENT_TO_OWN">Rent to Own</SelectItem>
+                        <SelectItem value="CONTRACT_FOR_DEED">Contract for Deed</SelectItem>
                       </SelectContent>
                     </Select>
                     <Select value={sizeFilter} onValueChange={setSizeFilter}>
@@ -336,9 +338,19 @@ export default function ParkDetail() {
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-3 mb-2">
                                     <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
-                                    <Badge variant={lot.status === 'FOR_RENT' ? 'default' : lot.status === 'FOR_SALE' ? 'secondary' : 'outline'}>
-                                      {lot.status === 'FOR_RENT' ? 'For Rent' : lot.status === 'FOR_SALE' ? 'For Sale' : 'Rent/Sale'}
-                                    </Badge>
+                                    <div className="flex flex-wrap gap-1">
+                                      {(() => {
+                                        // Handle both array and single status formats
+                                        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                                        return statusArray.length > 0 ? statusArray.map((s, index) => (
+                                          <Badge key={index} variant="secondary">
+                                            {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                                          </Badge>
+                                        )) : (
+                                          <Badge variant="secondary">No Status</Badge>
+                                        );
+                                      })()}
+                                    </div>
                                   </div>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
                                     {lot.bedrooms && (

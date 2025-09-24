@@ -1,0 +1,1 @@
+ALTER TABLE "lots" ALTER COLUMN "status" SET DATA TYPE lot_status[];
