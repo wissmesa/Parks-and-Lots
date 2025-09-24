@@ -7,9 +7,10 @@ export function Navigation() {
   const [location] = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
   
-  // Check if user is currently on admin/manager pages
+  // Check if user is currently on admin/manager/owner-tenant pages
   const isOnAdminPage = location.startsWith('/admin');
   const isOnManagerPage = location.startsWith('/manager');
+  const isOnOwnerTenantPage = location.startsWith('/owner-tenant');
 
   const handleLogout = async () => {
     try {
@@ -61,12 +62,23 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
+                {user?.role === 'OWNER_TENANT' && (
+                  <Link href="/owner-tenant">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={isOnOwnerTenantPage ? "hidden md:inline-flex" : ""}
+                    >
+                      My Dashboard
+                    </Button>
+                  </Link>
+                )}
                 <Button 
                   onClick={handleLogout} 
                   variant="outline" 
                   size="sm" 
                   data-testid="button-sign-out"
-                  className={(isOnAdminPage || isOnManagerPage) ? "hidden md:inline-flex" : ""}
+                  className={(isOnAdminPage || isOnManagerPage || isOnOwnerTenantPage) ? "hidden md:inline-flex" : ""}
                 >
                   Sign Out
                 </Button>

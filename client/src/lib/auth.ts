@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER';
+  role: 'ADMIN' | 'MANAGER' | 'OWNER_TENANT';
 }
 
 interface AuthTokens {
@@ -56,6 +56,11 @@ export class AuthManager {
   static isManager(): boolean {
     const user = this.getUser();
     return user?.role === 'MANAGER';
+  }
+
+  static isOwnerTenant(): boolean {
+    const user = this.getUser();
+    return user?.role === 'OWNER_TENANT';
   }
 
   static getAuthHeaders(): Record<string, string> {

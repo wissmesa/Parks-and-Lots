@@ -58,7 +58,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-export function requireRole(role: 'ADMIN' | 'MANAGER') {
+export function requireRole(role: 'ADMIN' | 'MANAGER' | 'OWNER_TENANT') {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -114,7 +114,40 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return res.status(404).json({ message: 'Lot not found' });
   }
 
-  const assignments = await storage.getManagerAssignments(req.user.id, lot.parkId);
+  // Check manager access
+  if (req.user.role === 'MANAGER') {
+    const assignments = await storage.getManagerAssignments(req.user.id, lot.parkId);
+    if (assignments.length === 0) {
+      return res.status(403).json({ message: 'Access denied to this lot' });
+    }
+  }
+
+  // Check owner/tenant access
+  if (req.user.role === 'OWNER_TENANT') {
+    const assignments = await storage.getOwnerTenantAssignments(req.user.id, lotId);
+    if (assignments.length === 0) {
+      return res.status(403).json({ message: 'Access denied to this lot' });
+    }
+  }
+
+  next();
+}
+
+export async function requireOwnerTenantAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (req.user.role !== 'OWNER_TENANT') {
+    return res.status(403).json({ message: 'Owner/Tenant access required' });
+  }
+
+  const lotId = req.params.lotId || req.params.id || req.body.lotId;
+  if (!lotId) {
+    return res.status(400).json({ message: 'Lot ID required' });
+  }
+
+  const assignments = await storage.getOwnerTenantAssignments(req.user.id, lotId);
   if (assignments.length === 0) {
     return res.status(403).json({ message: 'Access denied to this lot' });
   }

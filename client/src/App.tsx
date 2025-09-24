@@ -25,6 +25,8 @@ import ManagerDashboard from "@/pages/manager-dashboard";
 import ManagerParks from "@/pages/manager-parks";
 import ManagerLots from "@/pages/manager-lots";
 import ManagerBookings from "@/pages/manager-bookings";
+import ManagerOwnerTenants from "@/pages/manager-owner-tenants";
+import OwnerTenantDashboard from "@/pages/owner-tenant-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -78,6 +80,14 @@ function Router() {
         )} />
         <Route path="/manager/bookings" component={() => (
           <RequireRole role="MANAGER"><ManagerBookings /></RequireRole>
+        )} />
+        <Route path="/manager/owner-tenants" component={() => (
+          <RequireRole role="MANAGER"><ManagerOwnerTenants /></RequireRole>
+        )} />
+        
+        {/* Protected owner/tenant routes */}
+        <Route path="/owner-tenant" component={() => (
+          <RequireRole role="OWNER_TENANT"><OwnerTenantDashboard /></RequireRole>
         )} />
         
         {/* Fallback to 404 */}

@@ -16,7 +16,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'OWNER_TENANT']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
@@ -78,6 +78,20 @@ export const managerAssignments = pgTable("manager_assignments", {
   parkId: varchar("park_id").references(() => parks.id).notNull(),
 }, (table) => ({
   uniqueAssignment: unique().on(table.userId, table.parkId),
+}));
+
+// Owner/Tenant assignments (many-to-many)
+export const ownerTenantAssignments = pgTable("owner_tenant_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  lotId: varchar("lot_id").references(() => lots.id).notNull(),
+  relationshipType: varchar("relationship_type").notNull(), // 'OWNER' or 'TENANT'
+  startDate: timestamp("start_date").defaultNow().notNull(),
+  endDate: timestamp("end_date"), // null for current assignments
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueAssignment: unique().on(table.userId, table.lotId),
 }));
 
 // Google Calendar integration for managers
@@ -176,6 +190,7 @@ export const oauthAccounts = pgTable("oauth_accounts", {
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managerAssignments: many(managerAssignments),
+  ownerTenantAssignments: many(ownerTenantAssignments),
   showings: many(showings),
   oauthAccounts: many(oauthAccounts),
 }));
@@ -215,6 +230,7 @@ export const lotsRelations = relations(lots, ({ one, many }) => ({
   showings: many(showings),
   availability: many(availability),
   photos: many(photos),
+  ownerTenantAssignments: many(ownerTenantAssignments),
 }));
 
 export const showingsRelations = relations(showings, ({ one }) => ({
@@ -236,6 +252,17 @@ export const managerAssignmentsRelations = relations(managerAssignments, ({ one 
   park: one(parks, {
     fields: [managerAssignments.parkId],
     references: [parks.id],
+  }),
+}));
+
+export const ownerTenantAssignmentsRelations = relations(ownerTenantAssignments, ({ one }) => ({
+  user: one(users, {
+    fields: [ownerTenantAssignments.userId],
+    references: [users.id],
+  }),
+  lot: one(lots, {
+    fields: [ownerTenantAssignments.lotId],
+    references: [lots.id],
   }),
 }));
 
@@ -319,6 +346,11 @@ export const insertSpecialStatusSchema = createInsertSchema(specialStatuses).omi
   createdAt: true,
 });
 
+export const insertOwnerTenantAssignmentSchema = createInsertSchema(ownerTenantAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const bookingSchema = z.object({
   clientName: z.string().min(1),
   clientEmail: z.string().email(),
@@ -348,5 +380,7 @@ export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type SpecialStatus = typeof specialStatuses.$inferSelect;
 export type InsertSpecialStatus = z.infer<typeof insertSpecialStatusSchema>;
+export type OwnerTenantAssignment = typeof ownerTenantAssignments.$inferSelect;
+export type InsertOwnerTenantAssignment = z.infer<typeof insertOwnerTenantAssignmentSchema>;
 export type BookingRequest = z.infer<typeof bookingSchema>;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;

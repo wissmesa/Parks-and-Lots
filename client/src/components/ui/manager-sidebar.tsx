@@ -9,7 +9,8 @@ import {
   Menu,
   X,
   LogOut,
-  Shield
+  Shield,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -25,6 +26,7 @@ export function ManagerSidebar() {
     { href: "/manager/parks", icon: TreePine, label: "My Parks" },
     { href: "/manager/lots", icon: Home, label: "My Lots" },
     { href: "/manager/bookings", icon: Calendar, label: "Bookings" },
+    { href: "/manager/owner-tenants", icon: Users, label: "Owners/Tenants" },
   ];
 
   const handleLogout = async () => {

@@ -8,6 +8,7 @@ import {
   photos, 
   invites,
   managerAssignments,
+  ownerTenantAssignments,
   oauthAccounts,
   googleCalendarTokens,
   specialStatuses,
@@ -31,6 +32,8 @@ import {
   type InsertGoogleCalendarToken,
   type SpecialStatus,
   type InsertSpecialStatus,
+  type OwnerTenantAssignment,
+  type InsertOwnerTenantAssignment,
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
@@ -119,6 +122,11 @@ export interface IStorage {
   getManagerAssignments(userId?: string, parkId?: string): Promise<any[]>;
   assignManagerToPark(userId: string, parkId: string): Promise<void>;
   removeManagerFromPark(userId: string, parkId: string): Promise<void>;
+  
+  // Owner/Tenant assignment operations
+  getOwnerTenantAssignments(userId?: string, lotId?: string): Promise<any[]>;
+  assignOwnerTenantToLot(userId: string, lotId: string, relationshipType: 'OWNER' | 'TENANT'): Promise<void>;
+  removeOwnerTenantFromLot(userId: string, lotId: string): Promise<void>;
   
   // OAuth operations
   getOAuthAccount(userId: string, provider: string): Promise<OAuthAccount | undefined>;
@@ -722,6 +730,53 @@ export class DatabaseStorage implements IStorage {
   async removeManagerFromPark(userId: string, parkId: string): Promise<void> {
     await db.delete(managerAssignments)
       .where(and(eq(managerAssignments.userId, userId), eq(managerAssignments.parkId, parkId)));
+  }
+
+  async getOwnerTenantAssignments(userId?: string, lotId?: string): Promise<any[]> {
+    let query = db.select({
+      id: ownerTenantAssignments.id,
+      userId: ownerTenantAssignments.userId,
+      lotId: ownerTenantAssignments.lotId,
+      relationshipType: ownerTenantAssignments.relationshipType,
+      startDate: ownerTenantAssignments.startDate,
+      endDate: ownerTenantAssignments.endDate,
+      isActive: ownerTenantAssignments.isActive,
+      userName: users.fullName,
+      userEmail: users.email,
+      lotName: lots.nameOrNumber,
+      parkName: parks.name,
+    }).from(ownerTenantAssignments)
+      .leftJoin(users, eq(ownerTenantAssignments.userId, users.id))
+      .leftJoin(lots, eq(ownerTenantAssignments.lotId, lots.id))
+      .leftJoin(parks, eq(lots.parkId, parks.id));
+
+    const conditions = [];
+    if (userId) {
+      conditions.push(eq(ownerTenantAssignments.userId, userId));
+    }
+    if (lotId) {
+      conditions.push(eq(ownerTenantAssignments.lotId, lotId));
+    }
+
+    if (conditions.length > 0) {
+      return await query.where(and(...conditions));
+    }
+
+    return await query;
+  }
+
+  async assignOwnerTenantToLot(userId: string, lotId: string, relationshipType: 'OWNER' | 'TENANT'): Promise<void> {
+    await db.insert(ownerTenantAssignments).values({ 
+      userId, 
+      lotId, 
+      relationshipType,
+      isActive: true 
+    });
+  }
+
+  async removeOwnerTenantFromLot(userId: string, lotId: string): Promise<void> {
+    await db.delete(ownerTenantAssignments)
+      .where(and(eq(ownerTenantAssignments.userId, userId), eq(ownerTenantAssignments.lotId, lotId)));
   }
 
   async getAllManagerAssignments(): Promise<any[]> {
