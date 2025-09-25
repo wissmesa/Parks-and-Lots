@@ -1832,14 +1832,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/lots/:id', async (req, res) => {
     try {
+      console.log(`Fetching lot with ID: ${req.params.id}`);
       const lot = await storage.getLot(req.params.id);
       if (!lot) {
+        console.log(`Lot not found: ${req.params.id}`);
         return res.status(404).json({ message: 'Lot not found' });
       }
+      console.log(`Successfully fetched lot: ${lot.nameOrNumber}`);
       res.json(lot);
     } catch (error) {
       console.error('Get lot error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        lotId: req.params.id
+      });
+      res.status(500).json({ 
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 

@@ -494,20 +494,73 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLot(id: string): Promise<Lot | undefined> {
-    const results = await db.select()
-      .from(lots)
-      .innerJoin(parks, eq(lots.parkId, parks.id))
-      .innerJoin(companies, eq(parks.companyId, companies.id))
-      .where(and(
-        eq(lots.id, id),
-        eq(lots.isActive, true),
-        eq(parks.isActive, true),
-        eq(companies.isActive, true)
-      ));
-    
-    if (results.length === 0) return undefined;
-    
-    return results[0].lots;
+    try {
+      const results = await db.select()
+        .from(lots)
+        .innerJoin(parks, eq(lots.parkId, parks.id))
+        .innerJoin(companies, eq(parks.companyId, companies.id))
+        .where(and(
+          eq(lots.id, id),
+          eq(lots.isActive, true),
+          eq(parks.isActive, true),
+          eq(companies.isActive, true)
+        ));
+      
+      if (results.length === 0) return undefined;
+      
+      return results[0].lots;
+    } catch (error) {
+      console.error('Error in getLot:', error);
+      console.error('Lot ID:', id);
+      
+      // If the error is due to missing columns, try a simpler query with only core fields
+      if (error instanceof Error && error.message && error.message.includes('column')) {
+        console.log('Attempting fallback query with core fields only');
+        try {
+          const fallbackResults = await db.select({
+            id: lots.id,
+            nameOrNumber: lots.nameOrNumber,
+            status: lots.status,
+            price: lots.price,
+            description: lots.description,
+            bedrooms: lots.bedrooms,
+            bathrooms: lots.bathrooms,
+            sqFt: lots.sqFt,
+            houseManufacturer: lots.houseManufacturer,
+            houseModel: lots.houseModel,
+            parkId: lots.parkId,
+            isActive: lots.isActive,
+            specialStatusId: lots.specialStatusId
+          })
+          .from(lots)
+          .innerJoin(parks, eq(lots.parkId, parks.id))
+          .innerJoin(companies, eq(parks.companyId, companies.id))
+          .where(and(
+            eq(lots.id, id),
+            eq(lots.isActive, true),
+            eq(parks.isActive, true),
+            eq(companies.isActive, true)
+          ));
+          
+          if (fallbackResults.length === 0) return undefined;
+          
+          // Add missing price fields with default values for backward compatibility
+          const result = fallbackResults[0];
+          return {
+            ...result,
+            priceForRent: null,
+            priceForSale: null,
+            priceRentToOwn: null,
+            priceContractForDeed: null
+          };
+        } catch (fallbackError) {
+          console.error('Fallback query also failed:', fallbackError);
+          throw fallbackError;
+        }
+      }
+      
+      throw error;
+    }
   }
 
   async getLotAny(id: string): Promise<Lot | undefined> {
