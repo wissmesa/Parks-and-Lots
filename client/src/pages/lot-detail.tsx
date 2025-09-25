@@ -86,9 +86,26 @@ export default function LotDetail() {
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
   const [showCalculatorSelection, setShowCalculatorSelection] = useState<boolean>(false);
 
-  const { data: lot, isLoading: lotLoading } = useQuery<Lot>({
+  const { data: lot, isLoading: lotLoading, error: lotError } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
+    queryFn: async () => {
+      if (!id) throw new Error('No lot ID provided');
+      
+      const response = await fetch(`/api/lots/${id}`);
+      if (!response.ok) {
+        console.error('Failed to fetch lot:', {
+          url: `/api/lots/${id}`,
+          status: response.status,
+          statusText: response.statusText
+        });
+        throw new Error(`Failed to fetch lot: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    },
     enabled: !!id,
+    retry: 3,
   });
 
   const { data: park } = useQuery<Park>({
@@ -135,6 +152,33 @@ export default function LotDetail() {
     );
   }
 
+  if (lotError) {
+    console.error('Lot loading error:', lotError);
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <h2 className="text-xl font-semibold mb-2">Error loading lot</h2>
+            <p className="text-muted-foreground mb-4">
+              {lotError instanceof Error ? lotError.message : 'Failed to load lot details'}
+            </p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Lot ID: {id || 'Not provided'}
+            </p>
+            <div className="space-x-2">
+              <Button onClick={() => window.location.reload()} variant="outline">
+                Try Again
+              </Button>
+              <Link href="/parks">
+                <Button>Browse Parks</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!lot) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -142,6 +186,9 @@ export default function LotDetail() {
           <CardContent className="p-8 text-center">
             <h2 className="text-xl font-semibold mb-2">Lot not found</h2>
             <p className="text-muted-foreground mb-4">The lot you're looking for doesn't exist.</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              Lot ID: {id || 'Not provided'}
+            </p>
             <Link href="/parks">
               <Button>Browse Parks</Button>
             </Link>
