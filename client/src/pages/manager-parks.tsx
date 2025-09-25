@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal } from "lucide-react";
 
 interface Park {
   id: string;
@@ -366,35 +367,42 @@ export default function ManagerParks() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => park && handleEdit(park)}
-                              disabled={!park}
-                              data-testid={`button-edit-park-${park?.id || 'unknown'}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => park?.id && setShowPhotos(park.id)}
-                              disabled={!park?.id}
-                              data-testid={`button-manage-photos-${park?.id || 'unknown'}`}
-                            >
-                              <Camera className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => park && setManageSpecialStatuses(park)}
-                              disabled={!park}
-                              data-testid={`button-manage-special-statuses-${park?.id || 'unknown'}`}
-                            >
-                              <Tag className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!park}
+                                data-testid={`park-actions-${park?.id || 'unknown'}`}
+                              >
+                                Actions
+                                <MoreHorizontal className="w-4 h-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => park && handleEdit(park)}
+                                data-testid={`edit-park-${park?.id || 'unknown'}`}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Park
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => park?.id && setShowPhotos(park.id)}
+                                data-testid={`manage-photos-${park?.id || 'unknown'}`}
+                              >
+                                <Camera className="w-4 h-4 mr-2" />
+                                Manage Photos
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => park && setManageSpecialStatuses(park)}
+                                data-testid={`manage-special-statuses-${park?.id || 'unknown'}`}
+                              >
+                                <Tag className="w-4 h-4 mr-2" />
+                                Manage Special Statuses
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}

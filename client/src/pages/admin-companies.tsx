@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, Plus, Edit, Trash2, Camera, TreePine } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal } from "lucide-react";
 
 interface Company {
   id: string;
@@ -388,48 +389,53 @@ export default function AdminCompanies() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(company)}
-                            title="Edit Company"
-                            data-testid={`edit-company-${company.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAssignParks(company)}
-                            title="Assign Parks"
-                            data-testid={`assign-parks-${company.id}`}
-                          >
-                            <TreePine className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowPhotos(company.id)}
-                            title="Manage Photos"
-                            data-testid={`manage-photos-${company.id}`}
-                          >
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              if (confirm("Are you sure you want to delete this company?")) {
-                                deleteMutation.mutate(company.id);
-                              }
-                            }}
-                            title="Delete Company"
-                            data-testid={`delete-company-${company.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`company-actions-${company.id}`}
+                            >
+                              Actions
+                              <MoreHorizontal className="w-4 h-4 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(company)}
+                              data-testid={`edit-company-${company.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Company
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAssignParks(company)}
+                              data-testid={`assign-parks-${company.id}`}
+                            >
+                              <TreePine className="w-4 h-4 mr-2" />
+                              Assign Parks
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowPhotos(company.id)}
+                              data-testid={`manage-photos-${company.id}`}
+                            >
+                              <Camera className="w-4 h-4 mr-2" />
+                              Manage Photos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this company?")) {
+                                  deleteMutation.mutate(company.id);
+                                }
+                              }}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`delete-company-${company.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Company
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -4,7 +4,9 @@ import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BookingForm } from "@/components/ui/booking-form";
+import { LotCalculator } from "@/components/ui/lot-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ChevronRight, 
@@ -15,7 +17,8 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Home
+  Home,
+  Calculator
 } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
@@ -78,6 +81,10 @@ export default function LotDetail() {
   
   // State for selected time slot to pass to booking form
   const [selectedSlot, setSelectedSlot] = useState<{date: string, time: string} | null>(null);
+  
+  // Calculator states
+  const [showCalculator, setShowCalculator] = useState<boolean>(false);
+  const [showCalculatorSelection, setShowCalculatorSelection] = useState<boolean>(false);
 
   const { data: lot, isLoading: lotLoading } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
@@ -514,7 +521,27 @@ export default function LotDetail() {
 
           {/* Booking Form Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24">
+            <div className="sticky top-24 space-y-4">
+              {/* Calculator Card */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-center">Payment Calculator</h3>
+                    <p className="text-sm text-muted-foreground text-center">
+                      Calculate payment terms for different purchase options
+                    </p>
+                    <Button 
+                      onClick={() => setShowCalculatorSelection(true)}
+                      className="w-full"
+                      variant="outline"
+                    >
+                      <Calculator className="w-4 h-4 mr-2" />
+                      Calculate Payments
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
               <BookingForm 
                 lotId={lot.id} 
                 selectedSlot={selectedSlot}
@@ -532,6 +559,83 @@ export default function LotDetail() {
           </div>
         </div>
       </div>
+
+      {/* Calculator Selection Dialog */}
+      <Dialog open={showCalculatorSelection} onOpenChange={setShowCalculatorSelection}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Calculation Type</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Choose which payment calculation you'd like to perform for {lot?.nameOrNumber || 'this lot'}
+            </p>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 py-4">
+            <Button
+              variant="outline"
+              className="h-auto p-4 justify-start"
+              onClick={() => {
+                // Do nothing - placeholder
+                setShowCalculatorSelection(false);
+              }}
+            >
+              <div className="text-left">
+                <div className="font-medium">For Rent</div>
+                <div className="text-sm text-muted-foreground">Calculate monthly rental payments</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto p-4 justify-start"
+              onClick={() => {
+                // Do nothing - placeholder
+                setShowCalculatorSelection(false);
+              }}
+            >
+              <div className="text-left">
+                <div className="font-medium">For Sale</div>
+                <div className="text-sm text-muted-foreground">Calculate purchase financing options</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto p-4 justify-start"
+              onClick={() => {
+                // Do nothing - placeholder
+                setShowCalculatorSelection(false);
+              }}
+            >
+              <div className="text-left">
+                <div className="font-medium">Rent to Own</div>
+                <div className="text-sm text-muted-foreground">Calculate rent-to-own terms</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto p-4 justify-start"
+              onClick={() => {
+                // Open the actual calculator for Contract for Deed
+                setShowCalculatorSelection(false);
+                setShowCalculator(true);
+              }}
+            >
+              <div className="text-left">
+                <div className="font-medium">Contract for Deed</div>
+                <div className="text-sm text-muted-foreground">Calculate contract payment terms</div>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Calculator Dialog */}
+      {showCalculator && lot && (
+        <LotCalculator
+          isOpen={showCalculator}
+          onClose={() => setShowCalculator(false)}
+          lotPrice={parseFloat(lot.price || '0')}
+          lotName={lot.nameOrNumber || 'Lot'}
+        />
+      )}
     </div>
   );
 }

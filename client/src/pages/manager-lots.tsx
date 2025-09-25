@@ -92,6 +92,7 @@ export default function ManagerLots() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [showCalculator, setShowCalculator] = useState<string | null>(null);
+  const [showCalculatorSelection, setShowCalculatorSelection] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
 
@@ -187,7 +188,11 @@ export default function ManagerLots() {
   const [formData, setFormData] = useState({
     nameOrNumber: '',
     status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
-    price: '',
+    price: '', // Legacy price field
+    priceForRent: '',
+    priceForSale: '',
+    priceRentToOwn: '',
+    priceContractForDeed: '',
     description: '',
     bedrooms: 1,
     bathrooms: 1,
@@ -245,6 +250,10 @@ export default function ManagerLots() {
         nameOrNumber: '',
         status: [],
         price: '',
+        priceForRent: '',
+        priceForSale: '',
+        priceRentToOwn: '',
+        priceContractForDeed: '',
         description: '',
         bedrooms: 1,
         bathrooms: 1,
@@ -588,6 +597,10 @@ export default function ManagerLots() {
       nameOrNumber: lot.nameOrNumber,
       status: Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []),
       price: lot.price,
+      priceForRent: (lot as any).priceForRent || '',
+      priceForSale: (lot as any).priceForSale || '',
+      priceRentToOwn: (lot as any).priceRentToOwn || '',
+      priceContractForDeed: (lot as any).priceContractForDeed || '',
       description: lot.description,
       bedrooms: lot.bedrooms,
       bathrooms: lot.bathrooms,
@@ -888,15 +901,55 @@ export default function ManagerLots() {
                     />
                   </div>
                   
-                  <div>
-                    <Label htmlFor="price">Price ($)</Label>
-                    <Input
-                      id="price"
-                      value={formData.price}
-                      onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                      placeholder="e.g., 150000"
-                      required
-                    />
+                  {/* Price fields for each status */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Prices by Status</Label>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="priceForRent">For Rent ($)</Label>
+                        <Input
+                          id="priceForRent"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceForRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                          placeholder="Monthly rent amount"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="priceForSale">For Sale ($)</Label>
+                        <Input
+                          id="priceForSale"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceForSale}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                          placeholder="Sale price"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
+                        <Input
+                          id="priceRentToOwn"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceRentToOwn}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                          placeholder="Monthly rent-to-own amount"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
+                        <Input
+                          id="priceContractForDeed"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceContractForDeed}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                          placeholder="Monthly contract payment"
+                        />
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -1341,89 +1394,118 @@ export default function ManagerLots() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
               {sortedLots.map((lot) => (
-                <Card key={lot.id} className={!lot.isActive ? "opacity-60" : ""}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{lot.nameOrNumber}</CardTitle>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {(() => {
-                          const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                          return statusArray.length > 0 ? statusArray.map((status, index) => (
-                            <Badge key={index} variant="secondary">
-                              {status === 'FOR_RENT' ? 'For Rent' : status === 'FOR_SALE' ? 'For Sale' : status === 'RENT_TO_OWN' ? 'Rent to Own' : status === 'CONTRACT_FOR_DEED' ? 'Contract for Deed' : status}
-                            </Badge>
-                          )) : (
-                            <Badge variant="secondary">No Status</Badge>
-                          );
-                        })()}
-                        <Badge variant={lot.isActive ? 'default' : 'destructive'}>
-                          {lot.isActive ? 'Visible' : 'Hidden'}
-                        </Badge>
+                <Card key={lot.id} className={`transition-all hover:shadow-md ${!lot.isActive ? "opacity-60" : ""}`}>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <CardTitle className="text-xl font-bold mb-1">{lot.nameOrNumber}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{lot.park.name}</p>
                       </div>
+                      <Badge variant={lot.isActive ? 'default' : 'destructive'} className="ml-2">
+                        {lot.isActive ? 'Visible' : 'Hidden'}
+                      </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">{lot.park.name}</p>
+                    
+                    {/* Status badges */}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {(() => {
+                        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                        return statusArray.length > 0 ? statusArray.map((status, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {status === 'FOR_RENT' ? 'For Rent' : status === 'FOR_SALE' ? 'For Sale' : status === 'RENT_TO_OWN' ? 'Rent to Own' : status === 'CONTRACT_FOR_DEED' ? 'Contract for Deed' : status}
+                          </Badge>
+                        )) : (
+                          <Badge variant="outline" className="text-xs">No Status</Badge>
+                        );
+                      })()}
+                    </div>
+                    
+                    {/* Special status */}
                     {lot.specialStatus && (
-                      <div className="flex items-center gap-1 mt-1">
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
                         <div
-                          className="w-2 h-2 rounded-full border"
+                          className="w-3 h-3 rounded-full border"
                           style={{ backgroundColor: lot.specialStatus.color }}
                         />
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-sm font-medium">
                           {lot.specialStatus.name}
                         </span>
                       </div>
                     )}
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-semibold">${parseInt(lot.price).toLocaleString()}</span>
+                  
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      {/* Price - most prominent */}
+                      <div className="flex items-center justify-center p-3 bg-primary/10 rounded-lg">
+                        <DollarSign className="w-5 h-5 text-primary mr-2" />
+                        <span className="text-2xl font-bold text-primary">${parseInt(lot.price).toLocaleString()}</span>
                       </div>
                       
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-1">
-                          <Bed className="w-4 h-4" />
-                          <span>{lot.bedrooms}</span>
+                      {/* Property details in a clean grid */}
+                      <div className="grid grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg">
+                        <div className="text-center">
+                          <Bed className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                          <div className="text-sm font-medium">{lot.bedrooms}</div>
+                          <div className="text-xs text-muted-foreground">bed{lot.bedrooms !== 1 ? 's' : ''}</div>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <Bath className="w-4 h-4" />
-                          <span>{lot.bathrooms}</span>
+                        <div className="text-center">
+                          <Bath className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                          <div className="text-sm font-medium">{lot.bathrooms}</div>
+                          <div className="text-xs text-muted-foreground">bath{lot.bathrooms !== 1 ? 's' : ''}</div>
                         </div>
-                        <div className="flex items-center space-x-1">
-                          <Ruler className="w-4 h-4" />
-                          <span>{lot.sqFt} ft²</span>
+                        <div className="text-center">
+                          <Ruler className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
+                          <div className="text-sm font-medium">{lot.sqFt}</div>
+                          <div className="text-xs text-muted-foreground">sq ft</div>
                         </div>
                       </div>
                       
+                      {/* House details if available */}
+                      {(lot.houseManufacturer || lot.houseModel) && (
+                        <div className="text-sm text-muted-foreground">
+                          {lot.houseManufacturer && (
+                            <div><strong>Manufacturer:</strong> {lot.houseManufacturer}</div>
+                          )}
+                          {lot.houseModel && (
+                            <div><strong>Model:</strong> {lot.houseModel}</div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Description */}
                       {lot.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
+                        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
                           {lot.description}
                         </p>
                       )}
                       
-                      <div className="flex justify-center">
+                      {/* Actions - cleaner button layout */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(lot)}
+                          className="flex-1"
+                          data-testid={`edit-details-lot-${lot.id}`}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-             <Button
-               variant="outline"
-               size="sm"
-               data-testid={`button-edit-lot-${lot.id}`}
-             >
-               Actions
-               <MoreHorizontal className="w-4 h-4 ml-2" />
-             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="px-3"
+                              data-testid={`button-more-actions-${lot.id}`}
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleEdit(lot)}
-                              data-testid={`edit-details-lot-${lot.id}`}
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Details
-                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setShowPhotos(lot.id)}
                               data-testid={`button-photos-lot-${lot.id}`}
@@ -1432,7 +1514,7 @@ export default function ManagerLots() {
                               Manage Photos
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setShowCalculator(lot.id)}
+                              onClick={() => setShowCalculatorSelection(lot.id)}
                               data-testid={`button-calculator-lot-${lot.id}`}
                             >
                               <Calculator className="w-4 h-4 mr-2" />
@@ -1443,7 +1525,7 @@ export default function ManagerLots() {
                               data-testid={`button-assign-special-status-${lot.id}`}
                             >
                               <Tag className="w-4 h-4 mr-2" />
-                              Assign Special Status
+                              Special Status
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleActive(lot.id)}
@@ -1488,14 +1570,55 @@ export default function ManagerLots() {
                   />
                 </div>
                 
-                <div>
-                  <Label htmlFor="edit-price">Price ($)</Label>
-                  <Input
-                    id="edit-price"
-                    value={formData.price}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                    required
-                  />
+                {/* Price fields for each status */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Prices by Status</Label>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <Label htmlFor="edit-priceForRent">For Rent ($)</Label>
+                      <Input
+                        id="edit-priceForRent"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceForRent}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                        placeholder="Monthly rent amount"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceForSale">For Sale ($)</Label>
+                      <Input
+                        id="edit-priceForSale"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceForSale}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                        placeholder="Sale price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceRentToOwn">Rent to Own ($)</Label>
+                      <Input
+                        id="edit-priceRentToOwn"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceRentToOwn}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                        placeholder="Monthly rent-to-own amount"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceContractForDeed">Contract for Deed ($)</Label>
+                      <Input
+                        id="edit-priceContractForDeed"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceContractForDeed}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                        placeholder="Monthly contract payment"
+                      />
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -1618,6 +1741,74 @@ export default function ManagerLots() {
                 />
               )}
 
+            </DialogContent>
+          </Dialog>
+
+          {/* Calculator Selection Dialog */}
+          <Dialog open={!!showCalculatorSelection} onOpenChange={(open) => !open && setShowCalculatorSelection(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Select Calculation Type</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  Choose which status calculation you'd like to perform for {lots?.find(l => l.id === showCalculatorSelection)?.nameOrNumber || 'this lot'}
+                </p>
+              </DialogHeader>
+              <div className="grid grid-cols-1 gap-3 py-4">
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 justify-start"
+                  onClick={() => {
+                    // Do nothing - placeholder
+                    setShowCalculatorSelection(null);
+                  }}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">For Rent</div>
+                    <div className="text-sm text-muted-foreground">Calculate monthly rental payments</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 justify-start"
+                  onClick={() => {
+                    // Do nothing - placeholder
+                    setShowCalculatorSelection(null);
+                  }}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">For Sale</div>
+                    <div className="text-sm text-muted-foreground">Calculate purchase financing options</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 justify-start"
+                  onClick={() => {
+                    // Do nothing - placeholder
+                    setShowCalculatorSelection(null);
+                  }}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">Rent to Own</div>
+                    <div className="text-sm text-muted-foreground">Calculate rent-to-own terms</div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto p-4 justify-start"
+                  onClick={() => {
+                    // Open the actual calculator for Contract for Deed
+                    const lotId = showCalculatorSelection;
+                    setShowCalculatorSelection(null);
+                    setShowCalculator(lotId);
+                  }}
+                >
+                  <div className="text-left">
+                    <div className="font-medium">Contract for Deed</div>
+                    <div className="text-sm text-muted-foreground">Calculate contract payment terms</div>
+                  </div>
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
 

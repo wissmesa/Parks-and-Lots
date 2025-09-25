@@ -142,16 +142,38 @@ export default function ParkDetail() {
     enabled: !!id,
   });
 
-  const { data: lotsData, isLoading: lotsLoading } = useQuery({
+  const { data: lotsData, isLoading: lotsLoading, error: lotsError } = useQuery({
     queryKey: ["/api/lots", id, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (id) params.set('parkId', id);
       if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
       
-      const url = `/api/lots${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      const url = `/api/public/lots${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Details:', {
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText
+        });
+        throw new Error(`${response.status}: ${response.statusText}`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const responseText = await response.text();
+        console.error('Non-JSON Response:', {
+          url,
+          contentType,
+          responseText: responseText.substring(0, 200) + '...'
+        });
+        throw new Error('Server returned non-JSON response. Please check server logs.');
+      }
+      
       return response.json();
     },
     enabled: !!id,
@@ -164,6 +186,7 @@ export default function ParkDetail() {
 
   const lots = (lotsData?.lots || []) as Lot[];
   const parkPhotos = (photos || []) as any[];
+
 
   if (parkLoading) {
     return (
@@ -319,9 +342,17 @@ export default function ParkDetail() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                     <p className="mt-2 text-muted-foreground">Loading lots...</p>
                   </div>
+                ) : lotsError ? (
+                  <div className="text-center py-8">
+                    <p className="text-red-600">Error loading lots: {lotsError.message}</p>
+                    <p className="text-sm text-muted-foreground mt-2">Please try refreshing the page</p>
+                  </div>
                 ) : filteredLots.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">No lots available with current filters.</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Found {lots.length} total lots for this park
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">

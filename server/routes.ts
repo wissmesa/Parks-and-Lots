@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import path from "path";
@@ -1698,7 +1698,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Lot routes
+  // Public lot routes (no authentication required for client viewing)
+  app.get('/api/public/lots', async (req: Request, res: Response) => {
+    console.log('Public lots endpoint hit:', req.url, req.query);
+    
+    try {
+      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20' } = req.query;
+      
+      // Handle price range parameter (e.g. "100000-200000", "300000+", "0-100000")
+      let parsedMinPrice, parsedMaxPrice;
+      if (price && price !== 'all') {
+        const priceStr = price as string;
+        if (priceStr.includes('-')) {
+          const [min, max] = priceStr.split('-').map(p => parseFloat(p));
+          parsedMinPrice = min;
+          parsedMaxPrice = max;
+        } else if (priceStr.endsWith('+')) {
+          parsedMinPrice = parseFloat(priceStr.replace('+', ''));
+        }
+      }
+      
+      const filters = {
+        parkId: parkId as string,
+        status: status as string,
+        minPrice: minPrice ? parseFloat(minPrice as string) : parsedMinPrice,
+        maxPrice: maxPrice ? parseFloat(maxPrice as string) : parsedMaxPrice,
+        bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
+        bathrooms: bathrooms ? parseInt(bathrooms as string) : undefined,
+        state: state as string,
+        q: q as string,
+        includeInactive: false // Only show active lots for public view
+      };
+
+      console.log('Fetching lots with filters:', filters);
+      
+      // Test database connection first
+      if (!storage) {
+        throw new Error('Storage not initialized');
+      }
+      
+      const lots = await storage.getLotsWithParkInfo(filters);
+      console.log(`Found ${lots.length} lots`);
+      
+      const pageNum = parseInt(page as string);
+      const limitNum = Math.min(parseInt(limit as string), 100);
+      const offset = (pageNum - 1) * limitNum;
+      
+      const paginatedLots = lots.slice(offset, offset + limitNum);
+      
+      const response = {
+        lots: paginatedLots,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: lots.length,
+          pages: Math.ceil(lots.length / limitNum)
+        }
+      };
+      
+      console.log('Sending response:', { 
+        totalLots: lots.length, 
+        paginatedCount: paginatedLots.length,
+        responseSize: JSON.stringify(response).length 
+      });
+      
+      res.setHeader('Content-Type', 'application/json');
+      res.status(200).json(response);
+      
+    } catch (error) {
+      console.error('Error in public lots endpoint:', error);
+      console.error('Error stack:', error.stack);
+      
+      res.status(500).setHeader('Content-Type', 'application/json').json({ 
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // Lot routes (authenticated)
   app.get('/api/lots', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20', includeInactive } = req.query;

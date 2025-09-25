@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag } from "lucide-react";
+import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag, MoreHorizontal } from "lucide-react";
 
 interface Park {
   id: string;
@@ -74,6 +75,7 @@ export default function AdminParks() {
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [assigningLots, setAssigningLots] = useState<Park | null>(null);
   const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
+  const [lotSearchText, setLotSearchText] = useState("");
   const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
   const [editingStatus, setEditingStatus] = useState<SpecialStatus | null>(null);
   const [statusFormData, setStatusFormData] = useState({
@@ -99,9 +101,9 @@ export default function AdminParks() {
   });
 
   const { data: lots } = useQuery<{ lots: Lot[] }>({
-    queryKey: ["/api/lots", "includeInactive=true"],
+    queryKey: ["/api/lots", "includeInactive=true", "limit=10000"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/lots?includeInactive=true");
+      const response = await apiRequest("GET", "/api/lots?includeInactive=true&limit=10000");
       return response.json();
     },
     enabled: user?.role === 'ADMIN',
@@ -246,6 +248,7 @@ export default function AdminParks() {
 
   const handleAssignLots = (park: Park) => {
     setAssigningLots(park);
+    setLotSearchText(""); // Reset search when opening dialog
     // Pre-select lots already assigned to this park
     const currentLots = lotsByParkId.get(park.id) || [];
     setSelectedLotIds(currentLots.map(lot => lot.id));
@@ -293,6 +296,17 @@ export default function AdminParks() {
   const parksList = parks?.parks ?? [];
   const companiesList = companies ?? [];
   const lotsList = lots?.lots ?? [];
+  
+  // Filter lots for assignment dialog
+  const filteredLotsForAssignment = lotsList.filter(lot => {
+    if (!lotSearchText) return true;
+    const searchLower = lotSearchText.toLowerCase();
+    return (
+      lot.nameOrNumber.toLowerCase().includes(searchLower) ||
+      lot.description?.toLowerCase().includes(searchLower) ||
+      parksList.find(p => p.id === lot.parkId)?.name.toLowerCase().includes(searchLower)
+    );
+  });
 
   // Special status queries and mutations
   const { data: specialStatuses = [], isLoading: statusesLoading } = useQuery<SpecialStatus[]>({
@@ -540,57 +554,60 @@ export default function AdminParks() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEdit(park)}
-                            title="Edit Park"
-                            data-testid={`edit-park-${park.id}`}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAssignLots(park)}
-                            title="Assign Lots"
-                            data-testid={`assign-lots-${park.id}`}
-                          >
-                            <Home className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowPhotos(park.id)}
-                            title="Manage Photos"
-                            data-testid={`manage-photos-${park.id}`}
-                          >
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setManageSpecialStatuses(park)}
-                            title="Manage Special Statuses"
-                            data-testid={`manage-special-statuses-${park.id}`}
-                          >
-                            <Tag className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              if (confirm("Are you sure you want to delete this park?")) {
-                                deleteMutation.mutate(park.id);
-                              }
-                            }}
-                            title="Delete Park"
-                            data-testid={`delete-park-${park.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`park-actions-${park.id}`}
+                            >
+                              Actions
+                              <MoreHorizontal className="w-4 h-4 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleEdit(park)}
+                              data-testid={`edit-park-${park.id}`}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Park
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAssignLots(park)}
+                              data-testid={`assign-lots-${park.id}`}
+                            >
+                              <Home className="w-4 h-4 mr-2" />
+                              Assign Lots
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setShowPhotos(park.id)}
+                              data-testid={`manage-photos-${park.id}`}
+                            >
+                              <Camera className="w-4 h-4 mr-2" />
+                              Manage Photos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setManageSpecialStatuses(park)}
+                              data-testid={`manage-special-statuses-${park.id}`}
+                            >
+                              <Tag className="w-4 h-4 mr-2" />
+                              Manage Special Statuses
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this park?")) {
+                                  deleteMutation.mutate(park.id);
+                                }
+                              }}
+                              className="text-destructive focus:text-destructive"
+                              data-testid={`delete-park-${park.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Park
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -783,54 +800,114 @@ export default function AdminParks() {
 
         {/* Lot Assignment Dialog */}
         <Dialog open={!!assigningLots} onOpenChange={(open) => !open && setAssigningLots(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>
                 Assign Lots to {assigningLots?.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Select lots to assign to this park:
-              </p>
-              <div className="max-h-60 overflow-y-auto space-y-2">
-                {lotsList.map(lot => (
-                  <div key={lot.id} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id={`lot-${lot.id}`}
-                      checked={selectedLotIds.includes(lot.id)}
-                      onChange={(e) => handleLotSelection(lot.id, e.target.checked)}
-                      className="rounded border-gray-300"
-                      data-testid={`checkbox-lot-${lot.id}`}
-                    />
-                    <Label htmlFor={`lot-${lot.id}`} className="text-sm cursor-pointer">
-                      {lot.nameOrNumber}
-                      {lot.parkId !== assigningLots?.id && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          (Currently: {parksList.find(p => p.id === lot.parkId)?.name || 'Unassigned'})
-                        </span>
-                      )}
-                    </Label>
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Select lots to assign to this park. You can search to find specific lots.
+                </p>
+                
+                {/* Search Input */}
+                <div className="relative">
+                  <Input
+                    placeholder="Search lots by name, description, or current park..."
+                    value={lotSearchText}
+                    onChange={(e) => setLotSearchText(e.target.value)}
+                    className="mb-3"
+                  />
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Showing {filteredLotsForAssignment.length} of {lotsList.length} lots
+                    {selectedLotIds.length > 0 && ` • ${selectedLotIds.length} selected`}
                   </div>
-                ))}
+                </div>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAssigningLots(null)}
-                  data-testid="cancel-assign-lots"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmLotAssignment}
-                  disabled={assignLotsMutation.isPending}
-                  data-testid="confirm-assign-lots"
-                >
-                  {assignLotsMutation.isPending ? "Assigning..." : "Assign Lots"}
-                </Button>
+              
+              {/* Lots List */}
+              <div className="max-h-96 overflow-y-auto space-y-2 border rounded-md p-3">
+                {filteredLotsForAssignment.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {lotSearchText ? 'No lots found matching your search.' : 'No lots available.'}
+                  </div>
+                ) : (
+                  filteredLotsForAssignment.map(lot => (
+                    <div key={lot.id} className="flex items-start space-x-2 p-2 hover:bg-muted/50 rounded">
+                      <input
+                        type="checkbox"
+                        id={`lot-${lot.id}`}
+                        checked={selectedLotIds.includes(lot.id)}
+                        onChange={(e) => handleLotSelection(lot.id, e.target.checked)}
+                        className="rounded border-gray-300 mt-1"
+                        data-testid={`checkbox-lot-${lot.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Label htmlFor={`lot-${lot.id}`} className="text-sm font-medium cursor-pointer block">
+                          {lot.nameOrNumber}
+                        </Label>
+                        {lot.description && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {lot.description}
+                          </p>
+                        )}
+                        {lot.parkId !== assigningLots?.id && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            Currently assigned to: {parksList.find(p => p.id === lot.parkId)?.name || 'Unassigned'}
+                          </p>
+                        )}
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {lot.bedrooms} bed • {lot.bathrooms} bath • {lot.sqFt} sq ft
+                          {lot.price && ` • $${parseInt(lot.price).toLocaleString()}`}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex justify-between items-center pt-2 border-t">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentlyAssigned = lotsList.filter(lot => lot.parkId === assigningLots?.id).map(lot => lot.id);
+                      setSelectedLotIds(currentlyAssigned);
+                    }}
+                  >
+                    Reset to Current
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedLotIds([])}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAssigningLots(null)}
+                    data-testid="cancel-assign-lots"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmLotAssignment}
+                    disabled={assignLotsMutation.isPending}
+                    data-testid="confirm-assign-lots"
+                  >
+                    {assignLotsMutation.isPending ? "Assigning..." : "Assign Lots"}
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>

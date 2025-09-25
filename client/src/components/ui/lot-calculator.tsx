@@ -115,7 +115,9 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
 
   // Goal Seek algorithm using Newton-Raphson method
   const runGoalSeek = async (config: GoalSeekConfig): Promise<GoalSeekResult> => {
-    const { targetField, changingField, targetValue, maxIterations, tolerance } = config;
+    const { targetField, changingField, targetValue } = config;
+    const maxIterations = 1000; // Default max iterations
+    const tolerance = 0.01; // Default tolerance
     
     let currentData = { ...data };
     let currentValue = currentData[changingField] as number;
@@ -571,33 +573,6 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="maxIterations">Max Iterations</Label>
-                    <Input
-                      id="maxIterations"
-                      type="number"
-                      value={goalSeekConfig.maxIterations}
-                      onChange={(e) => setGoalSeekConfig(prev => ({ ...prev, maxIterations: parseInt(e.target.value) || 100 }))}
-                      className="mt-1"
-                      min="1"
-                      max="1000"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tolerance">Tolerance</Label>
-                    <Input
-                      id="tolerance"
-                      type="number"
-                      step="0.001"
-                      value={goalSeekConfig.tolerance}
-                      onChange={(e) => setGoalSeekConfig(prev => ({ ...prev, tolerance: parseFloat(e.target.value) || 0.01 }))}
-                      className="mt-1"
-                      min="0.001"
-                      max="10"
-                    />
-                  </div>
-                </div>
 
                 <div className="flex justify-center pt-4">
                   <Button 

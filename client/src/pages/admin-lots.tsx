@@ -77,7 +77,11 @@ export default function AdminLots() {
   const [formData, setFormData] = useState({
     nameOrNumber: "",
     status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
-    price: "",
+    price: "", // Legacy price field
+    priceForRent: "",
+    priceForSale: "",
+    priceRentToOwn: "",
+    priceContractForDeed: "",
     description: "",
     bedrooms: "",
     bathrooms: "",
@@ -88,6 +92,7 @@ export default function AdminLots() {
   });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [showCalculator, setShowCalculator] = useState<string | null>(null);
+  const [showCalculatorSelection, setShowCalculatorSelection] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
 
@@ -515,12 +520,18 @@ export default function AdminLots() {
   const resetForm = () => {
     setFormData({
       nameOrNumber: "",
-      status: "FOR_RENT",
+      status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
       price: "",
+      priceForRent: "",
+      priceForSale: "",
+      priceRentToOwn: "",
+      priceContractForDeed: "",
       description: "",
       bedrooms: "",
       bathrooms: "",
       sqFt: "",
+      houseManufacturer: "",
+      houseModel: "",
       parkId: ""
     });
   };
@@ -531,6 +542,10 @@ export default function AdminLots() {
       nameOrNumber: lot.nameOrNumber,
       status: Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []),
       price: lot.price,
+      priceForRent: (lot as any).priceForRent || "",
+      priceForSale: (lot as any).priceForSale || "",
+      priceRentToOwn: (lot as any).priceRentToOwn || "",
+      priceContractForDeed: (lot as any).priceContractForDeed || "",
       description: lot.description || "",
       bedrooms: lot.bedrooms?.toString() || "",
       bathrooms: lot.bathrooms?.toString() || "",
@@ -876,15 +891,55 @@ export default function AdminLots() {
                         ))}
                       </div>
                     </div>
-                    <div>
-                      <Label htmlFor="price">Price</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={formData.price}
-                        onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                        required
-                      />
+                    {/* Price fields for each status */}
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Prices by Status</Label>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div>
+                          <Label htmlFor="priceForRent">For Rent ($)</Label>
+                          <Input
+                            id="priceForRent"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceForRent}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                            placeholder="Monthly rent amount"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="priceForSale">For Sale ($)</Label>
+                          <Input
+                            id="priceForSale"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceForSale}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                            placeholder="Sale price"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
+                          <Input
+                            id="priceRentToOwn"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceRentToOwn}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                            placeholder="Monthly rent-to-own amount"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
+                          <Input
+                            id="priceContractForDeed"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceContractForDeed}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                            placeholder="Monthly contract payment"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
@@ -1430,7 +1485,7 @@ export default function AdminLots() {
                               Manage Photos
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setShowCalculator(lot.id)}
+                              onClick={() => setShowCalculatorSelection(lot.id)}
                               data-testid={`button-calculator-lot-${lot.id}`}
                             >
                               <Calculator className="w-4 h-4 mr-2" />
@@ -1588,15 +1643,55 @@ export default function AdminLots() {
                     ))}
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="edit-price">Price</Label>
-                  <Input
-                    id="edit-price"
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                    required
-                  />
+                {/* Price fields for each status */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Prices by Status</Label>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <Label htmlFor="edit-priceForRent">For Rent ($)</Label>
+                      <Input
+                        id="edit-priceForRent"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceForRent}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                        placeholder="Monthly rent amount"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceForSale">For Sale ($)</Label>
+                      <Input
+                        id="edit-priceForSale"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceForSale}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                        placeholder="Sale price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceRentToOwn">Rent to Own ($)</Label>
+                      <Input
+                        id="edit-priceRentToOwn"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceRentToOwn}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                        placeholder="Monthly rent-to-own amount"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-priceContractForDeed">Contract for Deed ($)</Label>
+                      <Input
+                        id="edit-priceContractForDeed"
+                        type="number"
+                        step="0.01"
+                        value={formData.priceContractForDeed}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                        placeholder="Monthly contract payment"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -1685,6 +1780,74 @@ export default function AdminLots() {
               />
             )}
 
+          </DialogContent>
+        </Dialog>
+
+        {/* Calculator Selection Dialog */}
+        <Dialog open={!!showCalculatorSelection} onOpenChange={(open) => !open && setShowCalculatorSelection(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Select Calculation Type</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Choose which status calculation you'd like to perform for {lotsList.find(l => l.id === showCalculatorSelection)?.nameOrNumber || 'this lot'}
+              </p>
+            </DialogHeader>
+            <div className="grid grid-cols-1 gap-3 py-4">
+              <Button
+                variant="outline"
+                className="h-auto p-4 justify-start"
+                onClick={() => {
+                  // Do nothing - placeholder
+                  setShowCalculatorSelection(null);
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-medium">For Rent</div>
+                  <div className="text-sm text-muted-foreground">Calculate monthly rental payments</div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto p-4 justify-start"
+                onClick={() => {
+                  // Do nothing - placeholder
+                  setShowCalculatorSelection(null);
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-medium">For Sale</div>
+                  <div className="text-sm text-muted-foreground">Calculate purchase financing options</div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto p-4 justify-start"
+                onClick={() => {
+                  // Do nothing - placeholder
+                  setShowCalculatorSelection(null);
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-medium">Rent to Own</div>
+                  <div className="text-sm text-muted-foreground">Calculate rent-to-own terms</div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto p-4 justify-start"
+                onClick={() => {
+                  // Open the actual calculator for Contract for Deed
+                  const lotId = showCalculatorSelection;
+                  setShowCalculatorSelection(null);
+                  setShowCalculator(lotId);
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-medium">Contract for Deed</div>
+                  <div className="text-sm text-muted-foreground">Calculate contract payment terms</div>
+                </div>
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 

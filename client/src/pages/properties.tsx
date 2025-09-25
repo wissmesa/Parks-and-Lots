@@ -139,7 +139,7 @@ export default function Properties() {
       if (priceRange && priceRange !== 'all') params.set('price', priceRange);
       
       const url = `/api/parks${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
       return response.json();
     },
@@ -156,8 +156,8 @@ export default function Properties() {
       if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
       if (priceRange && priceRange !== 'all') params.set('price', priceRange);
       
-      const url = `/api/lots${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url, { credentials: 'include' });
+      const url = `/api/public/lots${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
       return response.json();
     },
