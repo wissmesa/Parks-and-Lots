@@ -358,56 +358,73 @@ export default function ParkDetail() {
                   <div className="space-y-4">
                     {filteredLots.map((lot: Lot) => (
                       <Link key={lot.id} href={`/lots/${lot.id}`} className="block" data-testid={`link-lot-${lot.id}`}>
-                        <div className="border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer" data-testid={`card-lot-${lot.id}`}>
-                          <div className="flex">
+                        <div className="border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer bg-card" data-testid={`card-lot-${lot.id}`}>
+                          <div className="flex flex-col sm:flex-row">
                             {/* Preview Image */}
-                            <LotPreviewImage lotId={lot.id} />
+                            <div className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0">
+                              <LotPreviewImage lotId={lot.id} />
+                            </div>
                             
                             {/* Lot Details */}
-                            <div className="flex-1 p-4">
-                              <div className="flex items-start justify-between h-full">
-                                <div className="flex-1">
-                                  <div className="flex items-center space-x-3 mb-2">
-                                    <h4 className="font-semibold text-foreground">{lot.nameOrNumber}</h4>
-                                    <div className="flex flex-wrap gap-1">
-                                      {(() => {
-                                        // Handle both array and single status formats
-                                        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                                        return statusArray.length > 0 ? statusArray.map((s, index) => (
-                                          <Badge key={index} variant="secondary">
-                                            {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
-                                          </Badge>
-                                        )) : (
-                                          <Badge variant="secondary">No Status</Badge>
-                                        );
-                                      })()}
-                                    </div>
+                            <div className="flex-1 p-4 sm:p-6">
+                              <div className="flex flex-col h-full">
+                                {/* Header Section - Lot Name */}
+                                <div className="mb-3">
+                                  <h4 className="text-xl font-bold text-foreground mb-3">{lot.nameOrNumber}</h4>
+                                  
+                                  {/* Status badges - separate row for better spacing */}
+                                  <div className="flex flex-wrap gap-2 mb-4">
+                                    {(() => {
+                                      // Handle both array and single status formats
+                                      const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                                      return statusArray.length > 0 ? statusArray.map((s, index) => (
+                                        <Badge key={index} variant="secondary" className="text-xs font-medium px-3 py-1">
+                                          {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                                        </Badge>
+                                      )) : (
+                                        <Badge variant="outline" className="text-xs px-3 py-1">No Status</Badge>
+                                      );
+                                    })()}
                                   </div>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-muted-foreground mb-3">
-                                    {lot.bedrooms && (
-                                      <div className="flex items-center">
-                                        <Bed className="w-4 h-4 mr-2" />
-                                        {lot.bedrooms} bed
-                                      </div>
-                                    )}
-                                    {lot.bathrooms && (
-                                      <div className="flex items-center">
-                                        <Bath className="w-4 h-4 mr-2" />
-                                        {lot.bathrooms} bath
-                                      </div>
-                                    )}
-                                    {lot.sqFt && (
-                                      <div className="flex items-center">
-                                        <Ruler className="w-4 h-4 mr-2" />
-                                        {lot.sqFt.toLocaleString()} sq ft
-                                      </div>
-                                    )}
+                                </div>
+                                
+                                {/* Price - prominent display */}
+                                <div className="mb-4">
+                                  <div className="flex items-center text-2xl font-bold text-primary">
+                                    <DollarSign className="w-6 h-6 mr-1" />
+                                    <span>{parseFloat(lot.price).toLocaleString()}</span>
+                                    {(() => {
+                                      const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                                      return statusArray.includes('FOR_RENT') ? <span className="text-lg ml-1">/mo</span> : null;
+                                    })()}
+                                  </div>
+                                </div>
+                                
+                                {/* Property Details */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-muted-foreground mb-4">
+                                  {lot.bedrooms && (
                                     <div className="flex items-center">
-                                      <DollarSign className="w-4 h-4 mr-2" />
-                                      ${parseFloat(lot.price).toLocaleString()}{lot.status === 'FOR_RENT' ? '/mo' : ''}
+                                      <Bed className="w-4 h-4 mr-2 flex-shrink-0" />
+                                      <span>{lot.bedrooms} bed{lot.bedrooms !== 1 ? 's' : ''}</span>
                                     </div>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground">
+                                  )}
+                                  {lot.bathrooms && (
+                                    <div className="flex items-center">
+                                      <Bath className="w-4 h-4 mr-2 flex-shrink-0" />
+                                      <span>{lot.bathrooms} bath{lot.bathrooms !== 1 ? 's' : ''}</span>
+                                    </div>
+                                  )}
+                                  {lot.sqFt && (
+                                    <div className="flex items-center">
+                                      <Ruler className="w-4 h-4 mr-2 flex-shrink-0" />
+                                      <span>{lot.sqFt.toLocaleString()} sq ft</span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Description */}
+                                <div className="flex-1">
+                                  <p className="text-sm text-muted-foreground leading-relaxed">
                                     {lot.description || "Spacious unit with modern amenities"}
                                   </p>
                                 </div>

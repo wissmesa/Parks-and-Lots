@@ -309,67 +309,81 @@ export default function Properties() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
-                <Card key={lot.id} className="hover:shadow-lg transition-shadow">
+                <Card key={lot.id} className="hover:shadow-lg transition-all duration-200 bg-card">
                   <LotPreviewImageCard lotId={lot.id} />
                   <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold">{lot.nameOrNumber}</h3>
-                      <div className="flex flex-wrap gap-1">
+                    {/* Header Section - Lot Name */}
+                    <div className="mb-4">
+                      <h3 className="text-xl font-bold text-foreground mb-3">{lot.nameOrNumber}</h3>
+                      
+                      {/* Status badges - separate row for better mobile layout */}
+                      <div className="flex flex-wrap gap-2 mb-4">
                         {(() => {
                           // Handle both array and single status formats
                           const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
                           return statusArray.length > 0 ? statusArray.map((s, index) => (
-                            <Badge key={index} variant="secondary">
+                            <Badge key={index} variant="secondary" className="text-xs font-medium px-3 py-1">
                               {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
                             </Badge>
                           )) : (
-                            <Badge variant="secondary">No Status</Badge>
+                            <Badge variant="outline" className="text-xs px-3 py-1">No Status</Badge>
                           );
                         })()}
                       </div>
                     </div>
                     
-                    <div className="flex items-center text-muted-foreground text-sm mb-3">
-                      <MapPin className="w-4 h-4 mr-1" />
-                      {lot.park ? `${lot.park.name}, ${lot.park.city}` : 'Location not specified'}
+                    {/* Location */}
+                    <div className="flex items-center text-muted-foreground text-sm mb-4">
+                      <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
+                      <span>{lot.park ? `${lot.park.name}, ${lot.park.city}` : 'Location not specified'}</span>
                     </div>
                     
-                    <div className="flex items-center space-x-2 mb-3">
-                      <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-bold text-lg">${parseInt(lot.price).toLocaleString()}</span>
+                    {/* Price - prominent display */}
+                    <div className="mb-4">
+                      <div className="flex items-center text-2xl font-bold text-primary">
+                        <DollarSign className="w-6 h-6 mr-1" />
+                        <span>{parseInt(lot.price).toLocaleString()}</span>
+                        {(() => {
+                          const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                          return statusArray.includes('FOR_RENT') ? <span className="text-lg ml-1">/mo</span> : null;
+                        })()}
+                      </div>
                     </div>
                     
+                    {/* Property Details */}
                     {(lot.bedrooms || lot.bathrooms || lot.sqFt) && (
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-3">
+                      <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground mb-4">
                         {lot.bedrooms && (
-                          <div className="flex items-center space-x-1">
-                            <Bed className="w-4 h-4" />
-                            <span>{lot.bedrooms}</span>
+                          <div className="flex items-center">
+                            <Bed className="w-4 h-4 mr-2 flex-shrink-0" />
+                            <span>{lot.bedrooms} bed{lot.bedrooms !== 1 ? 's' : ''}</span>
                           </div>
                         )}
                         {lot.bathrooms && (
-                          <div className="flex items-center space-x-1">
-                            <Bath className="w-4 h-4" />
-                            <span>{lot.bathrooms}</span>
+                          <div className="flex items-center">
+                            <Bath className="w-4 h-4 mr-2 flex-shrink-0" />
+                            <span>{lot.bathrooms} bath{lot.bathrooms !== 1 ? 's' : ''}</span>
                           </div>
                         )}
                         {lot.sqFt && (
-                          <div className="flex items-center space-x-1">
-                            <Ruler className="w-4 h-4" />
-                            <span>{lot.sqFt} ft²</span>
+                          <div className="flex items-center">
+                            <Ruler className="w-4 h-4 mr-2 flex-shrink-0" />
+                            <span>{lot.sqFt.toLocaleString()} sq ft</span>
                           </div>
                         )}
                       </div>
                     )}
                     
+                    {/* Description */}
                     {lot.description && (
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                      <p className="text-sm text-muted-foreground mb-6 line-clamp-2 leading-relaxed">
                         {lot.description}
                       </p>
                     )}
                     
+                    {/* View Details Button */}
                     <Link href={`/lots/${lot.id}`}>
-                      <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                      <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium py-2.5">
                         View Details
                       </Button>
                     </Link>

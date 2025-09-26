@@ -298,17 +298,37 @@ export default function LotDetail() {
         // REMOVED: Database showing checks - Google Calendar is now the single source of truth for bookings
         
         // Check if manager is busy using UTC-based slot key to match Google Calendar busy slots  
+        // Try both timezone approaches to handle potential timezone inconsistencies
+        
+        // Approach 1: Local time converted to UTC (for timezone-aware comparison)
         const localSlotTime = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
-        const slotKey = generateUTCSlotKey(localSlotTime);
-        const isManagerBusy = busySlotSet.has(slotKey);
+        const localSlotKey = generateUTCSlotKey(localSlotTime);
+        const isManagerBusyLocal = busySlotSet.has(localSlotKey);
+        
+        // Approach 2: Treat display time as UTC directly (for UTC-based comparison)
+        const utcAsLocalTime = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute));
+        const utcAsLocalKey = generateUTCSlotKey(utcAsLocalTime);
+        const isManagerBusyUTCAsLocal = busySlotSet.has(utcAsLocalKey);
+        
+        // Use whichever approach finds busy slots (fallback strategy)
+        const isManagerBusy = isManagerBusyLocal || isManagerBusyUTCAsLocal;
         
         // DEBUG: Logging for availability calculation
         console.log(`[AVAILABILITY] ${daySchedule.dayName} ${hour}:${minute.toString().padStart(2, '0')} slot check:`, {
-          slotKey,
-          isManagerBusy,
+          localSlotTime: localSlotTime.toString(),
+          localSlotTimeISO: localSlotTime.toISOString(),
+          localSlotKey,
+          isManagerBusyLocal,
+          utcAsLocalTime: utcAsLocalTime.toString(),
+          utcAsLocalTimeISO: utcAsLocalTime.toISOString(),
+          utcAsLocalKey,
+          isManagerBusyUTCAsLocal,
+          isManagerBusy: isManagerBusy,
           hasBlockage,
           finalAvailable: !hasBlockage && !isManagerBusy,
-          managerConnected: managerAvailability?.managerConnected
+          managerConnected: managerAvailability?.managerConnected,
+          busySlotSetSize: busySlotSet.size,
+          sampleBusySlotKeys: Array.from(busySlotSet).slice(0, 5) // Show first 5 for debugging
         });
         
         // Format time display (9:00am, 9:30am, 10:00am, etc.)

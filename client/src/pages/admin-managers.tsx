@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, Plus, Trash2, UserPlus, Settings, Edit } from "lucide-react";
+import { Users, Plus, Trash2, UserPlus, Settings, Edit, MoreHorizontal } from "lucide-react";
 
 interface Manager {
   id: string;
@@ -266,39 +267,46 @@ export default function AdminManagers() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditManager(manager)}
-                              data-testid={`button-edit-manager-${manager.id}`}
-                              title="Edit name"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleAssignParks(manager)}
-                              data-testid={`button-assign-parks-${manager.id}`}
-                              title="Assign parks"
-                            >
-                              <Settings className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to remove ${manager.fullName}?`)) {
-                                  deleteManagerMutation.mutate(manager.id);
-                                }
-                              }}
-                              data-testid={`button-delete-manager-${manager.id}`}
-                              title="Delete manager"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                data-testid={`manager-actions-${manager.id}`}
+                              >
+                                Actions
+                                <MoreHorizontal className="w-4 h-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleEditManager(manager)}
+                                data-testid={`button-edit-manager-${manager.id}`}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Manager
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleAssignParks(manager)}
+                                data-testid={`button-assign-parks-${manager.id}`}
+                              >
+                                <Settings className="w-4 h-4 mr-2" />
+                                Assign Parks
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to remove ${manager.fullName}?`)) {
+                                    deleteManagerMutation.mutate(manager.id);
+                                  }
+                                }}
+                                data-testid={`button-delete-manager-${manager.id}`}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Manager
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
@@ -312,31 +320,66 @@ export default function AdminManagers() {
 
         {/* Assign Parks Dialog */}
         <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Assign Parks to {selectedManager?.fullName}</DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                Select parks to assign to this manager. Current assignments for each park are shown below.
+              </p>
             </DialogHeader>
             <div className="space-y-4">
               <div>
                 <Label>Select Parks</Label>
-                <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
-                  {parksList.map((park: Park) => (
-                    <div key={park.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`park-${park.id}`}
-                        checked={selectedParkIds.includes(park.id)}
-                        onChange={() => handleParkToggle(park.id)}
-                        className="rounded"
-                      />
-                      <Label htmlFor={`park-${park.id}`} className="flex-1 text-sm">
-                        {park.name}
-                      </Label>
-                    </div>
-                  ))}
+                <div className="mt-2 space-y-3 max-h-80 overflow-y-auto">
+                  {parksList.map((park: Park) => {
+                    // Find all managers currently assigned to this park
+                    const currentAssignments = Array.isArray(assignments) 
+                      ? assignments.filter((a: any) => a.parkId === park.id)
+                      : [];
+                    
+                    const currentManagers = currentAssignments.map((assignment: any) => {
+                      const manager = managersList.find((m: Manager) => m.id === assignment.userId);
+                      return manager?.fullName || 'Unknown Manager';
+                    });
+
+                    return (
+                      <div key={park.id} className="border border-border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            id={`park-${park.id}`}
+                            checked={selectedParkIds.includes(park.id)}
+                            onChange={() => handleParkToggle(park.id)}
+                            className="rounded mt-1"
+                          />
+                          <div className="flex-1">
+                            <Label htmlFor={`park-${park.id}`} className="text-sm font-medium cursor-pointer">
+                              {park.name}
+                            </Label>
+                            <div className="mt-1">
+                              {currentManagers.length === 0 ? (
+                                <Badge variant="outline" className="text-xs">
+                                  No current assignments
+                                </Badge>
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="text-xs text-muted-foreground mr-1">Currently assigned to:</span>
+                                  {currentManagers.map((managerName, index) => (
+                                    <Badge key={index} variant="secondary" className="text-xs">
+                                      {managerName}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="flex justify-end space-x-2">
+              <div className="flex justify-end space-x-2 pt-4 border-t">
                 <Button
                   variant="outline"
                   onClick={() => setIsAssignModalOpen(false)}
