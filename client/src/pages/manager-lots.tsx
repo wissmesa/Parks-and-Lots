@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -693,16 +693,14 @@ export default function ManagerLots() {
       if (filters.houseManufacturer.length > 0) {
         const wantsNone = filters.houseManufacturer.includes("none");
         const hasManufacturer = lot.houseManufacturer && lot.houseManufacturer.trim() !== "";
-        const manufacturerMatches = hasManufacturer && lot.houseManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer);
+        const manufacturerMatches = hasManufacturer && filters.houseManufacturer.includes(lot.houseManufacturer!);
         
-        // If "none" is selected, show lots without manufacturer OR lots with matching manufacturers
-        if (wantsNone && !hasManufacturer) {
-          // Show lots without manufacturer when "none" is selected
-        } else if (!wantsNone && !manufacturerMatches) {
-          // Hide lots that don't match any selected manufacturer (and "none" is not selected)
-          return false;
-        } else if (wantsNone && hasManufacturer && !manufacturerMatches) {
-          // Hide lots with manufacturer when "none" is selected but manufacturer doesn't match other selections
+        // Show lot if:
+        // 1. "none" is selected AND lot has no manufacturer, OR
+        // 2. lot has manufacturer AND that manufacturer is in the selected filters
+        const shouldShow = (wantsNone && !hasManufacturer) || manufacturerMatches;
+        
+        if (!shouldShow) {
           return false;
         }
       }
@@ -711,16 +709,14 @@ export default function ManagerLots() {
       if (filters.houseModel.length > 0) {
         const wantsNone = filters.houseModel.includes("none");
         const hasModel = lot.houseModel && lot.houseModel.trim() !== "";
-        const modelMatches = hasModel && lot.houseModel && filters.houseModel.includes(lot.houseModel);
+        const modelMatches = hasModel && filters.houseModel.includes(lot.houseModel!);
         
-        // If "none" is selected, show lots without model OR lots with matching models
-        if (wantsNone && !hasModel) {
-          // Show lots without model when "none" is selected
-        } else if (!wantsNone && !modelMatches) {
-          // Hide lots that don't match any selected model (and "none" is not selected)
-          return false;
-        } else if (wantsNone && hasModel && !modelMatches) {
-          // Hide lots with model when "none" is selected but model doesn't match other selections
+        // Show lot if:
+        // 1. "none" is selected AND lot has no model, OR
+        // 2. lot has model AND that model is in the selected filters
+        const shouldShow = (wantsNone && !hasModel) || modelMatches;
+        
+        if (!shouldShow) {
           return false;
         }
       }
@@ -1562,169 +1558,198 @@ export default function ManagerLots() {
 
           {/* Edit Modal */}
           <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <DialogHeader>
-                <DialogTitle>Edit Lot</DialogTitle>
+                <DialogTitle className="text-lg sm:text-xl">Edit Lot {editingLot?.nameOrNumber}</DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  Update lot information and pricing details
+                </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleEditSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="edit-nameOrNumber">Lot Name/Number</Label>
-                  <Input
-                    id="edit-nameOrNumber"
-                    value={formData.nameOrNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nameOrNumber: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                {/* Price fields for each status */}
-                <div className="space-y-3">
-                  <Label className="text-base font-medium">Prices by Status</Label>
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <Label htmlFor="edit-priceForRent">For Rent ($)</Label>
-                      <Input
-                        id="edit-priceForRent"
-                        type="number"
-                        step="0.01"
-                        value={formData.priceForRent}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                        placeholder="Monthly rent amount"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-priceForSale">For Sale ($)</Label>
-                      <Input
-                        id="edit-priceForSale"
-                        type="number"
-                        step="0.01"
-                        value={formData.priceForSale}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                        placeholder="Sale price"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-priceRentToOwn">Rent to Own ($)</Label>
-                      <Input
-                        id="edit-priceRentToOwn"
-                        type="number"
-                        step="0.01"
-                        value={formData.priceRentToOwn}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                        placeholder="Monthly rent-to-own amount"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit-priceContractForDeed">Contract for Deed ($)</Label>
-                      <Input
-                        id="edit-priceContractForDeed"
-                        type="number"
-                        step="0.01"
-                        value={formData.priceContractForDeed}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                        placeholder="Monthly contract payment"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleEditSubmit} className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Basic Information</h3>
                   <div>
-                    <Label htmlFor="edit-bedrooms">Bedrooms</Label>
+                    <Label htmlFor="edit-nameOrNumber">Lot Name/Number *</Label>
                     <Input
-                      id="edit-bedrooms"
-                      type="number"
-                      min="1"
-                      value={formData.bedrooms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) }))}
+                      id="edit-nameOrNumber"
+                      value={formData.nameOrNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nameOrNumber: e.target.value }))}
                       required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-bathrooms">Bathrooms</Label>
-                    <Input
-                      id="edit-bathrooms"
-                      type="number"
-                      min="1"
-                      value={formData.bathrooms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseInt(e.target.value) }))}
-                      required
+                      className="mt-1"
                     />
                   </div>
                 </div>
-                
-                <div>
-                  <Label htmlFor="edit-sqFt">Square Feet</Label>
-                  <Input
-                    id="edit-sqFt"
-                    type="number"
-                    min="1"
-                    value={formData.sqFt}
-                    onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) }))}
-                    required
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-houseManufacturer">House Manufacturer</Label>
-                    <Input
-                      id="edit-houseManufacturer"
-                      value={formData.houseManufacturer}
-                      onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
-                      placeholder="e.g., Clayton Homes"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-houseModel">House Model</Label>
-                    <Input
-                      id="edit-houseModel"
-                      value={formData.houseModel}
-                      onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
-                      placeholder="e.g., Heritage 3264A"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <Label>Status (Select multiple)</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].map((status) => (
-                      <div key={status} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`edit-status-${status}`}
-                          checked={formData.status.includes(status as any)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setFormData(prev => ({ ...prev, status: [...prev.status, status as any] }));
-                            } else {
-                              setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== status) }));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`edit-status-${status}`} className="text-sm cursor-pointer">
-                          {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : status === "RENT_TO_OWN" ? "Rent to Own" : "Contract for Deed"}
-                        </Label>
+
+                {/* Status and Pricing Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Status & Pricing</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-base font-medium">Available Status Options</Label>
+                      <div className="mt-3 space-y-3 p-3 border rounded-lg bg-muted/20">
+                        {['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].map((status) => (
+                          <div key={status} className="flex items-center space-x-3">
+                            <Checkbox
+                              id={`edit-status-${status}`}
+                              checked={formData.status.includes(status as any)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setFormData(prev => ({ ...prev, status: [...prev.status, status as any] }));
+                                } else {
+                                  setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== status) }));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`edit-status-${status}`} className="text-sm font-medium cursor-pointer">
+                              {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : status === "RENT_TO_OWN" ? "Rent to Own" : "Contract for Deed"}
+                            </Label>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                    
+                    <div>
+                      <Label className="text-base font-medium">Pricing by Status</Label>
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <Label htmlFor="edit-priceForRent" className="text-sm">For Rent ($/month)</Label>
+                          <Input
+                            id="edit-priceForRent"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceForRent}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                            placeholder="Monthly rent amount"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-priceForSale" className="text-sm">For Sale ($)</Label>
+                          <Input
+                            id="edit-priceForSale"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceForSale}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                            placeholder="Sale price"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-priceRentToOwn" className="text-sm">Rent to Own ($/month)</Label>
+                          <Input
+                            id="edit-priceRentToOwn"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceRentToOwn}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                            placeholder="Monthly rent-to-own amount"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-priceContractForDeed" className="text-sm">Contract for Deed ($/month)</Label>
+                          <Input
+                            id="edit-priceContractForDeed"
+                            type="number"
+                            step="0.01"
+                            value={formData.priceContractForDeed}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                            placeholder="Monthly contract payment"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                
-                <div>
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={3}
-                  />
+
+                {/* Property Details Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium border-b pb-2">Property Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="edit-bedrooms">Bedrooms *</Label>
+                      <Input
+                        id="edit-bedrooms"
+                        type="number"
+                        min="1"
+                        value={formData.bedrooms}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) }))}
+                        required
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-bathrooms">Bathrooms *</Label>
+                      <Input
+                        id="edit-bathrooms"
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={formData.bathrooms}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseInt(e.target.value) }))}
+                        required
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-sqFt">Square Feet *</Label>
+                      <Input
+                        id="edit-sqFt"
+                        type="number"
+                        min="1"
+                        value={formData.sqFt}
+                        onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) }))}
+                        required
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-houseManufacturer">House Manufacturer</Label>
+                      <Input
+                        id="edit-houseManufacturer"
+                        value={formData.houseManufacturer}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseManufacturer: e.target.value }))}
+                        placeholder="e.g., Clayton Homes"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-houseModel">House Model</Label>
+                      <Input
+                        id="edit-houseModel"
+                        value={formData.houseModel}
+                        onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
+                        placeholder="e.g., Heritage 3264A"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                      placeholder="Additional details about the lot..."
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
-                
-                <div className="flex space-x-3">
-                  <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="flex-1">
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-4 border-t">
+                  <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)} className="order-2 sm:order-1">
                     Cancel
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={updateLotMutation.isPending}>
+                  <Button type="submit" disabled={updateLotMutation.isPending} className="order-1 sm:order-2">
                     {updateLotMutation.isPending ? "Updating..." : "Update Lot"}
                   </Button>
                 </div>

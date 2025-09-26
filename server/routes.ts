@@ -391,6 +391,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/manager/lots/:id', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
     try {
+      console.log('=== MANAGER LOT UPDATE DEBUG ===');
+      console.log('Lot ID:', req.params.id);
+      console.log('Raw request body:', JSON.stringify(req.body, null, 2));
+      console.log('Request body keys:', Object.keys(req.body));
+      console.log('Request body types:', Object.keys(req.body).map(key => `${key}: ${typeof req.body[key]}`));
+      
       // Verify manager owns the lot (through park assignment)
       const lot = await storage.getLot(req.params.id);
       if (!lot) {
@@ -404,12 +410,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You can only edit lots in your assigned parks' });
       }
       
-      const updates = insertLotSchema.partial().parse(req.body);
-      const updatedLot = await storage.updateLot(req.params.id, updates);
+      // Clean up empty strings in the request body
+      const cleanedBody = { ...req.body };
+      Object.keys(cleanedBody).forEach(key => {
+        if (cleanedBody[key] === '') {
+          cleanedBody[key] = null;
+        }
+      });
+      
+      console.log('Cleaned body:', JSON.stringify(cleanedBody, null, 2));
+      
+      // Try validation with detailed error reporting
+      const validation = insertLotSchema.partial().safeParse(cleanedBody);
+      if (!validation.success) {
+        console.log('❌ Schema validation failed:');
+        console.log('Validation errors:', JSON.stringify(validation.error.errors, null, 2));
+        return res.status(400).json({ 
+          message: 'Schema validation failed', 
+          errors: validation.error.errors,
+          receivedData: cleanedBody
+        });
+      }
+      
+      console.log('✅ Schema validation passed');
+      console.log('Validated updates:', JSON.stringify(validation.data, null, 2));
+      
+      const updatedLot = await storage.updateLot(req.params.id, validation.data);
+      console.log('✅ Database update successful');
       res.json(updatedLot);
     } catch (error) {
-      console.error('Update lot error:', error);
-      res.status(400).json({ message: 'Invalid lot data' });
+      console.error('❌ Update lot error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      if (error instanceof Error) {
+        res.status(400).json({ 
+          message: error.message,
+          errorType: error.constructor.name,
+          stack: error.stack
+        });
+      } else {
+        res.status(400).json({ 
+          message: 'Unknown error occurred',
+          error: String(error)
+        });
+      }
     }
   });
 
@@ -1869,12 +1913,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/lots/:id', authenticateToken, requireLotAccess, async (req, res) => {
     try {
-      const updates = insertLotSchema.partial().parse(req.body);
-      const lot = await storage.updateLot(req.params.id, updates);
+      console.log('=== ADMIN LOT UPDATE DEBUG ===');
+      console.log('Lot ID:', req.params.id);
+      console.log('Raw request body:', JSON.stringify(req.body, null, 2));
+      console.log('Request body keys:', Object.keys(req.body));
+      console.log('Request body types:', Object.keys(req.body).map(key => `${key}: ${typeof req.body[key]}`));
+      
+      // Clean up empty strings in the request body
+      const cleanedBody = { ...req.body };
+      Object.keys(cleanedBody).forEach(key => {
+        if (cleanedBody[key] === '') {
+          cleanedBody[key] = null;
+        }
+      });
+      
+      console.log('Cleaned body:', JSON.stringify(cleanedBody, null, 2));
+      
+      // Try validation with detailed error reporting
+      const validation = insertLotSchema.partial().safeParse(cleanedBody);
+      if (!validation.success) {
+        console.log('❌ Schema validation failed:');
+        console.log('Validation errors:', JSON.stringify(validation.error.errors, null, 2));
+        return res.status(400).json({ 
+          message: 'Schema validation failed', 
+          errors: validation.error.errors,
+          receivedData: cleanedBody
+        });
+      }
+      
+      console.log('✅ Schema validation passed');
+      console.log('Validated updates:', JSON.stringify(validation.data, null, 2));
+      
+      const lot = await storage.updateLot(req.params.id, validation.data);
+      console.log('✅ Database update successful');
       res.json(lot);
     } catch (error) {
-      console.error('Update lot error:', error);
-      res.status(400).json({ message: 'Invalid lot data' });
+      console.error('❌ Update lot error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
+      if (error instanceof Error) {
+        res.status(400).json({ 
+          message: error.message,
+          errorType: error.constructor.name,
+          stack: error.stack
+        });
+      } else {
+        res.status(400).json({ 
+          message: 'Unknown error occurred',
+          error: String(error)
+        });
+      }
     }
   });
 
