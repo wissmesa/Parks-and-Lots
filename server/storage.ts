@@ -11,6 +11,8 @@ import {
   oauthAccounts,
   googleCalendarTokens,
   specialStatuses,
+  tenants,
+  payments,
   type User, 
   type InsertUser,
   type Company,
@@ -31,6 +33,10 @@ import {
   type InsertGoogleCalendarToken,
   type SpecialStatus,
   type InsertSpecialStatus,
+  type Tenant,
+  type InsertTenant,
+  type Payment,
+  type InsertPayment,
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
@@ -128,6 +134,22 @@ export interface IStorage {
   getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined>;
   createOrUpdateGoogleCalendarToken(userId: string, token: InsertGoogleCalendarToken): Promise<GoogleCalendarToken>;
   deleteGoogleCalendarToken(userId: string): Promise<void>;
+  
+  // Tenant operations
+  getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<Tenant[]>;
+  getTenant(id: string): Promise<Tenant | undefined>;
+  createTenant(tenant: InsertTenant): Promise<Tenant>;
+  updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant>;
+  deleteTenant(id: string): Promise<void>;
+  getTenantsWithLotInfo(filters?: { status?: string; parkId?: string; q?: string }): Promise<any[]>;
+  
+  // Payment operations
+  getPayments(filters?: { tenantId?: string; lotId?: string; status?: string; type?: string }): Promise<Payment[]>;
+  getPayment(id: string): Promise<Payment | undefined>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, updates: Partial<InsertPayment>): Promise<Payment>;
+  deletePayment(id: string): Promise<void>;
+  getPaymentsWithTenantInfo(filters?: { status?: string; parkId?: string; overdue?: boolean }): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -958,6 +980,264 @@ export class DatabaseStorage implements IStorage {
     
     // Then delete the special status
     await db.delete(specialStatuses).where(eq(specialStatuses.id, id));
+  }
+
+  // Tenant operations
+  async getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<Tenant[]> {
+    const conditions = [];
+
+    if (filters?.lotId) {
+      conditions.push(eq(tenants.lotId, filters.lotId));
+    }
+
+    if (filters?.status) {
+      conditions.push(eq(tenants.status, filters.status as any));
+    }
+
+    if (filters?.q) {
+      const searchTerm = `%${filters.q}%`;
+      conditions.push(
+        or(
+          ilike(tenants.firstName, searchTerm),
+          ilike(tenants.lastName, searchTerm),
+          ilike(tenants.email, searchTerm),
+          ilike(tenants.phone, searchTerm)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      return db.select().from(tenants).where(and(...conditions)).orderBy(desc(tenants.createdAt));
+    }
+
+    return db.select().from(tenants).orderBy(desc(tenants.createdAt));
+  }
+
+  async getTenant(id: string): Promise<Tenant | undefined> {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return tenant;
+  }
+
+  async createTenant(tenant: InsertTenant): Promise<Tenant> {
+    console.log('Storage createTenant called with:', tenant);
+    
+    // Extra cleanup to ensure no empty strings go to numeric fields
+    const cleanTenant = {
+      ...tenant,
+      monthlyRent: tenant.monthlyRent === '' ? null : tenant.monthlyRent,
+      securityDeposit: tenant.securityDeposit === '' ? null : tenant.securityDeposit,
+      emergencyContactName: tenant.emergencyContactName === '' ? null : tenant.emergencyContactName,
+      emergencyContactPhone: tenant.emergencyContactPhone === '' ? null : tenant.emergencyContactPhone,
+      notes: tenant.notes === '' ? null : tenant.notes,
+      updatedAt: new Date(),
+    };
+    
+    console.log('Cleaned tenant for DB:', cleanTenant);
+    
+    const [result] = await db.insert(tenants).values(cleanTenant).returning();
+    return result;
+  }
+
+  async updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant> {
+    const [result] = await db.update(tenants)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(tenants.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteTenant(id: string): Promise<void> {
+    // First delete associated payments
+    await db.delete(payments).where(eq(payments.tenantId, id));
+    
+    // Then delete the tenant
+    await db.delete(tenants).where(eq(tenants.id, id));
+  }
+
+  async getTenantsWithLotInfo(filters?: { status?: string; parkId?: string; q?: string }): Promise<any[]> {
+    const baseQuery = db.select({
+      id: tenants.id,
+      firstName: tenants.firstName,
+      lastName: tenants.lastName,
+      email: tenants.email,
+      phone: tenants.phone,
+      emergencyContactName: tenants.emergencyContactName,
+      emergencyContactPhone: tenants.emergencyContactPhone,
+      status: tenants.status,
+      leaseStartDate: tenants.leaseStartDate,
+      leaseEndDate: tenants.leaseEndDate,
+      monthlyRent: tenants.monthlyRent,
+      securityDeposit: tenants.securityDeposit,
+      notes: tenants.notes,
+      createdAt: tenants.createdAt,
+      updatedAt: tenants.updatedAt,
+      lot: {
+        id: lots.id,
+        nameOrNumber: lots.nameOrNumber,
+        description: lots.description,
+        parkId: lots.parkId,
+      },
+      park: {
+        id: parks.id,
+        name: parks.name,
+        city: parks.city,
+        state: parks.state,
+      },
+    })
+    .from(tenants)
+    .leftJoin(lots, eq(tenants.lotId, lots.id))
+    .leftJoin(parks, eq(lots.parkId, parks.id));
+
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(tenants.status, filters.status as any));
+    }
+
+    if (filters?.parkId) {
+      conditions.push(eq(parks.id, filters.parkId));
+    }
+
+    if (filters?.q) {
+      const searchTerm = `%${filters.q}%`;
+      conditions.push(
+        or(
+          ilike(tenants.firstName, searchTerm),
+          ilike(tenants.lastName, searchTerm),
+          ilike(tenants.email, searchTerm),
+          ilike(tenants.phone, searchTerm),
+          ilike(lots.nameOrNumber, searchTerm),
+          ilike(parks.name, searchTerm)
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      return baseQuery.where(and(...conditions)).orderBy(desc(tenants.createdAt));
+    }
+
+    return baseQuery.orderBy(desc(tenants.createdAt));
+  }
+
+  // Payment operations
+  async getPayments(filters?: { tenantId?: string; lotId?: string; status?: string; type?: string }): Promise<Payment[]> {
+    const conditions = [];
+
+    if (filters?.tenantId) {
+      conditions.push(eq(payments.tenantId, filters.tenantId));
+    }
+
+    if (filters?.lotId) {
+      conditions.push(eq(payments.lotId, filters.lotId));
+    }
+
+    if (filters?.status) {
+      conditions.push(eq(payments.status, filters.status as any));
+    }
+
+    if (filters?.type) {
+      conditions.push(eq(payments.type, filters.type as any));
+    }
+
+    if (conditions.length > 0) {
+      return db.select().from(payments).where(and(...conditions)).orderBy(desc(payments.dueDate));
+    }
+
+    return db.select().from(payments).orderBy(desc(payments.dueDate));
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment;
+  }
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [result] = await db.insert(payments).values({
+      ...payment,
+      updatedAt: new Date(),
+    }).returning();
+    return result;
+  }
+
+  async updatePayment(id: string, updates: Partial<InsertPayment>): Promise<Payment> {
+    const [result] = await db.update(payments)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(payments.id, id))
+      .returning();
+    return result;
+  }
+
+  async deletePayment(id: string): Promise<void> {
+    await db.delete(payments).where(eq(payments.id, id));
+  }
+
+  async getPaymentsWithTenantInfo(filters?: { status?: string; parkId?: string; overdue?: boolean }): Promise<any[]> {
+    const baseQuery = db.select({
+      id: payments.id,
+      type: payments.type,
+      amount: payments.amount,
+      dueDate: payments.dueDate,
+      paidDate: payments.paidDate,
+      status: payments.status,
+      description: payments.description,
+      notes: payments.notes,
+      createdAt: payments.createdAt,
+      updatedAt: payments.updatedAt,
+      tenant: {
+        id: tenants.id,
+        firstName: tenants.firstName,
+        lastName: tenants.lastName,
+        email: tenants.email,
+        phone: tenants.phone,
+        status: tenants.status,
+      },
+      lot: {
+        id: lots.id,
+        nameOrNumber: lots.nameOrNumber,
+        parkId: lots.parkId,
+      },
+      park: {
+        id: parks.id,
+        name: parks.name,
+        city: parks.city,
+        state: parks.state,
+      },
+    })
+    .from(payments)
+    .leftJoin(tenants, eq(payments.tenantId, tenants.id))
+    .leftJoin(lots, eq(payments.lotId, lots.id))
+    .leftJoin(parks, eq(lots.parkId, parks.id));
+
+    const conditions = [];
+
+    if (filters?.status) {
+      conditions.push(eq(payments.status, filters.status as any));
+    }
+
+    if (filters?.parkId) {
+      conditions.push(eq(parks.id, filters.parkId));
+    }
+
+    if (filters?.overdue) {
+      conditions.push(
+        and(
+          eq(payments.status, 'OVERDUE'),
+          lte(payments.dueDate, new Date())
+        )
+      );
+    }
+
+    if (conditions.length > 0) {
+      return baseQuery.where(and(...conditions)).orderBy(desc(payments.dueDate));
+    }
+
+    return baseQuery.orderBy(desc(payments.dueDate));
   }
 }
 

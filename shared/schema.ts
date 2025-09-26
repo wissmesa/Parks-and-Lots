@@ -21,6 +21,9 @@ export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
 export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'BLOCKED']);
+export const tenantStatusEnum = pgEnum('tenant_status', ['ACTIVE', 'INACTIVE', 'PENDING', 'TERMINATED']);
+export const paymentStatusEnum = pgEnum('payment_status', ['PENDING', 'PAID', 'OVERDUE', 'PARTIAL']);
+export const paymentTypeEnum = pgEnum('payment_type', ['RENT', 'DEPOSIT', 'LATE_FEE', 'MAINTENANCE', 'UTILITY', 'OTHER']);
 
 // Users table
 export const users = pgTable("users", {
@@ -177,6 +180,47 @@ export const oauthAccounts = pgTable("oauth_accounts", {
   externalCalendarId: varchar("external_calendar_id"),
 });
 
+// Tenants table
+export const tenants = pgTable("tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lotId: varchar("lot_id").references(() => lots.id).notNull(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  email: varchar("email").notNull(),
+  phone: varchar("phone").notNull(),
+  emergencyContactName: varchar("emergency_contact_name"),
+  emergencyContactPhone: varchar("emergency_contact_phone"),
+  status: tenantStatusEnum("status").default('PENDING').notNull(),
+  leaseStartDate: timestamp("lease_start_date"),
+  leaseEndDate: timestamp("lease_end_date"),
+  monthlyRent: decimal("monthly_rent", { precision: 10, scale: 2 }),
+  securityDeposit: decimal("security_deposit", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  lotTenantIdx: index("lot_tenant_idx").on(table.lotId, table.status),
+}));
+
+// Payments table
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id).notNull(),
+  lotId: varchar("lot_id").references(() => lots.id).notNull(),
+  type: paymentTypeEnum("type").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  paidDate: timestamp("paid_date"),
+  status: paymentStatusEnum("status").default('PENDING').notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tenantPaymentIdx: index("tenant_payment_idx").on(table.tenantId, table.dueDate),
+  lotPaymentIdx: index("lot_payment_idx").on(table.lotId, table.dueDate),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   managerAssignments: many(managerAssignments),
@@ -219,6 +263,8 @@ export const lotsRelations = relations(lots, ({ one, many }) => ({
   showings: many(showings),
   availability: many(availability),
   photos: many(photos),
+  tenants: many(tenants),
+  payments: many(payments),
 }));
 
 export const showingsRelations = relations(showings, ({ one }) => ({
@@ -265,6 +311,25 @@ export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
   user: one(users, {
     fields: [oauthAccounts.userId],
     references: [users.id],
+  }),
+}));
+
+export const tenantsRelations = relations(tenants, ({ one, many }) => ({
+  lot: one(lots, {
+    fields: [tenants.lotId],
+    references: [lots.id],
+  }),
+  payments: many(payments),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [payments.tenantId],
+    references: [tenants.id],
+  }),
+  lot: one(lots, {
+    fields: [payments.lotId],
+    references: [lots.id],
   }),
 }));
 
@@ -323,6 +388,18 @@ export const insertSpecialStatusSchema = createInsertSchema(specialStatuses).omi
   createdAt: true,
 });
 
+export const insertTenantSchema = createInsertSchema(tenants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const bookingSchema = z.object({
   clientName: z.string().min(1),
   clientEmail: z.string().email(),
@@ -352,5 +429,9 @@ export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type SpecialStatus = typeof specialStatuses.$inferSelect;
 export type InsertSpecialStatus = z.infer<typeof insertSpecialStatusSchema>;
+export type Tenant = typeof tenants.$inferSelect;
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type BookingRequest = z.infer<typeof bookingSchema>;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
