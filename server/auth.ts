@@ -58,13 +58,18 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-export function requireRole(role: 'ADMIN' | 'MANAGER') {
+export function requireRole(role: 'ADMIN' | 'MANAGER' | 'TENANT') {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    if (req.user.role !== role && req.user.role !== 'ADMIN') {
+    // Allow admins to access any role's endpoints (except tenant for privacy)
+    if (req.user.role === 'ADMIN' && role !== 'TENANT') {
+      return next();
+    }
+
+    if (req.user.role !== role) {
       return res.status(403).json({ message: 'Insufficient permissions' });
     }
 

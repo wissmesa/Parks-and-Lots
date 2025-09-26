@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Star, ArrowRight } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Park {
   id: string;
@@ -15,8 +16,25 @@ interface Park {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
+
+  // Auto-redirect authenticated users to their respective panels
+  if (user?.role === 'ADMIN') {
+    window.location.href = '/admin';
+    return null;
+  }
+  
+  if (user?.role === 'MANAGER') {
+    window.location.href = '/manager';
+    return null;
+  }
+
+  if (user?.role === 'OWNER_TENANT') {
+    window.location.href = '/OWNER_TENANT';
+    return null;
+  }
 
   const { data: parksData } = useQuery({
     queryKey: ["/api/parks", "limit-6"],

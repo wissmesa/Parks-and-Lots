@@ -71,8 +71,8 @@ export function LotHistoryDialog({ isOpen, onClose, lotId, lotName }: LotHistory
     enabled: isOpen && !!lotId,
   });
 
-  // For now, we'll use showings as "tenant interactions" 
-  // This can be extended later when actual tenant/payment tables are added
+  // For now, we'll use showings as "OWNER_TENANT interactions" 
+  // This can be extended later when actual OWNER_TENANT/payment tables are added
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString();
   };
@@ -104,7 +104,7 @@ export function LotHistoryDialog({ isOpen, onClose, lotId, lotName }: LotHistory
   const completedShowings = showings?.filter(s => s.status === 'COMPLETED') || [];
   const allShowings = showings || [];
   const activeTenants = tenants?.filter(t => t.status === 'ACTIVE') || [];
-  const currentTenant = activeTenants[0]; // Assuming one active tenant per lot
+  const currentTenant = activeTenants[0]; // Assuming one active OWNER_TENANT per lot
   const totalPayments = payments?.length || 0;
   const paidPayments = payments?.filter(p => p.status === 'PAID')?.length || 0;
   const overduePayments = payments?.filter(p => p.status === 'OVERDUE')?.length || 0;
@@ -299,8 +299,8 @@ export function LotHistoryDialog({ isOpen, onClose, lotId, lotName }: LotHistory
               </p>
               <div className="text-sm text-muted-foreground bg-muted p-4 rounded-lg">
                 <FileText className="inline h-4 w-4 mr-2" />
-                This section will display historical tenant payments, lease information, 
-                and financial transactions once the tenant management system is implemented.
+                This section will display historical OWNER_TENANT payments, lease information, 
+                and financial transactions once the OWNER_TENANT management system is implemented.
               </div>
             </div>
           </TabsContent>

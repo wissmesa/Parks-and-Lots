@@ -18,6 +18,9 @@ async function runMigration() {
     console.log('Adding CONTRACT_FOR_DEED enum value...');
     await client.query("ALTER TYPE lot_status ADD VALUE IF NOT EXISTS 'CONTRACT_FOR_DEED'");
     
+    console.log('Adding OWNER_TENANT user role...');
+    await client.query("ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'OWNER_TENANT'");
+    
     // Step 2: Update existing RENT_SALE values to RENT_TO_OWN
     console.log('Updating existing RENT_SALE values to RENT_TO_OWN...');
     const updateResult = await client.query("UPDATE lots SET status = 'RENT_TO_OWN' WHERE status = 'RENT_SALE'");

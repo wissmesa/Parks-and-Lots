@@ -31,7 +31,7 @@ import {
   X
 } from "lucide-react";
 
-interface Tenant {
+interface OWNER_TENANT {
   id: string;
   firstName: string;
   lastName: string;
@@ -86,7 +86,7 @@ export default function ManagerTenants() {
     phone: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
-    status: "PENDING" as Tenant['status'],
+    status: "PENDING" as OWNER_TENANT['status'],
     lotId: "",
     leaseStartDate: "",
     leaseEndDate: "",
@@ -105,11 +105,11 @@ export default function ManagerTenants() {
       
       const response = await apiRequest('GET', `/api/tenants?${params}`);
       const data = await response.json();
-      return data.tenants as Tenant[];
+      return data.tenants as OWNER_TENANT[];
     },
   });
 
-  // Fetch lots for tenant creation (only manager's assigned parks)
+  // Fetch lots for OWNER_TENANT creation (only manager's assigned parks)
   const { data: lots } = useQuery({
     queryKey: ['manager-lots-for-tenants'],
     queryFn: async () => {
@@ -120,7 +120,7 @@ export default function ManagerTenants() {
     enabled: showCreateModal,
   });
 
-  // Create tenant mutation
+  // Create OWNER_TENANT mutation
   const createTenantMutation = useMutation({
     mutationFn: async (tenantData: any) => {
       const payload = {
@@ -131,21 +131,21 @@ export default function ManagerTenants() {
       
       const response = await apiRequest('POST', '/api/tenants', payload);
       const data = await response.json();
-      return data.tenant;
+      return data.OWNER_TENANT;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setShowCreateModal(false);
       resetForm();
       toast({
-        title: "Tenant Created",
-        description: "New tenant has been successfully created.",
+        title: "OWNER_TENANT Created",
+        description: "New OWNER_TENANT has been successfully created.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create tenant",
+        description: error.message || "Failed to create OWNER_TENANT",
         variant: "destructive",
       });
     },
@@ -176,7 +176,7 @@ export default function ManagerTenants() {
     if (!formData.lotId) {
       toast({
         title: "Validation Error",
-        description: "Please select a lot for the tenant.",
+        description: "Please select a lot for the OWNER_TENANT.",
         variant: "destructive",
       });
       return;
@@ -246,21 +246,21 @@ export default function ManagerTenants() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                   <Users className="h-8 w-8" />
-                  Tenant Management
+                  OWNER_TENANT Management
                 </h1>
-                <p className="text-gray-600 mt-2">Manage tenant information, leases, and payments</p>
+                <p className="text-gray-600 mt-2">Manage OWNER_TENANT information, leases, and payments</p>
               </div>
               
               <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Tenant
+                    Add OWNER_TENANT
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add New Tenant</DialogTitle>
+                    <DialogTitle>Add New OWNER_TENANT</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -303,7 +303,7 @@ export default function ManagerTenants() {
                       </div>
                       <div>
                         <Label htmlFor="status">Status</Label>
-                        <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Tenant['status'] }))}>
+                        <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as OWNER_TENANT['status'] }))}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -420,7 +420,7 @@ export default function ManagerTenants() {
                         type="submit"
                         disabled={createTenantMutation.isPending}
                       >
-                        {createTenantMutation.isPending ? 'Creating...' : 'Create Tenant'}
+                        {createTenantMutation.isPending ? 'Creating...' : 'Create OWNER_TENANT'}
                       </Button>
                     </div>
                   </form>
@@ -493,19 +493,19 @@ export default function ManagerTenants() {
                     <p className="text-muted-foreground mb-4">
                       {searchTerm || statusFilter !== 'all' 
                         ? 'No tenants match your current filters.'
-                        : 'Get started by adding your first tenant to your assigned lots.'
+                        : 'Get started by adding your first OWNER_TENANT to your assigned lots.'
                       }
                     </p>
                     <Button onClick={() => setShowCreateModal(true)}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Tenant
+                      Add OWNER_TENANT
                     </Button>
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Tenant</TableHead>
+                        <TableHead>OWNER_TENANT</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Lot</TableHead>
                         <TableHead>Location</TableHead>
@@ -516,53 +516,53 @@ export default function ManagerTenants() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTenants.map((tenant) => (
-                        <TableRow key={tenant.id}>
+                      {filteredTenants.map((OWNER_TENANT) => (
+                        <TableRow key={OWNER_TENANT.id}>
                           <TableCell>
                             <button
-                              onClick={() => setSelectedTenant(tenant.id)}
+                              onClick={() => setSelectedTenant(OWNER_TENANT.id)}
                               className="font-medium text-left hover:text-primary hover:underline transition-colors"
                             >
-                              {tenant.firstName} {tenant.lastName}
+                              {OWNER_TENANT.firstName} {OWNER_TENANT.lastName}
                             </button>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <div className="flex items-center gap-1 text-sm">
                                 <Mail className="h-3 w-3" />
-                                {tenant.email}
+                                {OWNER_TENANT.email}
                               </div>
                               <div className="flex items-center gap-1 text-sm">
                                 <Phone className="h-3 w-3" />
-                                {tenant.phone}
+                                {OWNER_TENANT.phone}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="font-medium">
-                              {tenant.lot?.nameOrNumber || 'N/A'}
+                              {OWNER_TENANT.lot?.nameOrNumber || 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
-                              {tenant.park ? `${tenant.park.name}, ${tenant.park.city}` : 'N/A'}
+                              {OWNER_TENANT.park ? `${OWNER_TENANT.park.name}, ${OWNER_TENANT.park.city}` : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={getStatusBadgeVariant(tenant.status)} className="flex items-center gap-1 w-fit">
-                              {getStatusIcon(tenant.status)}
-                              {tenant.status}
+                            <Badge variant={getStatusBadgeVariant(OWNER_TENANT.status)} className="flex items-center gap-1 w-fit">
+                              {getStatusIcon(OWNER_TENANT.status)}
+                              {OWNER_TENANT.status}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {tenant.monthlyRent ? formatCurrency(tenant.monthlyRent) : 'N/A'}
+                            {OWNER_TENANT.monthlyRent ? formatCurrency(OWNER_TENANT.monthlyRent) : 'N/A'}
                           </TableCell>
                           <TableCell>
-                            {tenant.leaseStartDate && tenant.leaseEndDate ? (
+                            {OWNER_TENANT.leaseStartDate && OWNER_TENANT.leaseEndDate ? (
                               <div className="text-sm">
-                                <div>{formatDate(tenant.leaseStartDate)}</div>
-                                <div className="text-muted-foreground">to {formatDate(tenant.leaseEndDate)}</div>
+                                <div>{formatDate(OWNER_TENANT.leaseStartDate)}</div>
+                                <div className="text-muted-foreground">to {formatDate(OWNER_TENANT.leaseEndDate)}</div>
                               </div>
                             ) : (
                               'N/A'
@@ -572,7 +572,7 @@ export default function ManagerTenants() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedTenant(tenant.id)}
+                              onClick={() => setSelectedTenant(OWNER_TENANT.id)}
                             >
                               <User className="h-4 w-4 mr-1" />
                               View
@@ -589,7 +589,7 @@ export default function ManagerTenants() {
         </main>
       </div>
 
-      {/* Tenant Detail Dialog */}
+      {/* OWNER_TENANT Detail Dialog */}
       {selectedTenant && (
         <TenantDetailDialog
           isOpen={!!selectedTenant}

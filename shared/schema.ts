@@ -16,7 +16,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'TENANT']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
@@ -323,7 +323,7 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
-  tenant: one(tenants, {
+  OWNER_TENANT: one(tenants, {
     fields: [payments.tenantId],
     references: [tenants.id],
   }),
@@ -429,7 +429,7 @@ export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type SpecialStatus = typeof specialStatuses.$inferSelect;
 export type InsertSpecialStatus = z.infer<typeof insertSpecialStatusSchema>;
-export type Tenant = typeof tenants.$inferSelect;
+export type OWNER_TENANT = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;

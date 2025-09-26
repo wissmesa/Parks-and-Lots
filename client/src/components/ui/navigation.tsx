@@ -7,6 +7,11 @@ export function Navigation() {
   const [location] = useLocation();
   const { user, logout, isAuthenticated } = useAuth();
   
+  // Debug logging
+  console.log('Navigation - user:', user);
+  console.log('Navigation - isAuthenticated:', isAuthenticated);
+  console.log('Navigation - user role:', user?.role);
+  
   // Check if user is currently on admin/manager pages
   const isOnAdminPage = location.startsWith('/admin');
   const isOnManagerPage = location.startsWith('/manager');
@@ -58,6 +63,16 @@ export function Navigation() {
                       className={isOnManagerPage ? "hidden md:inline-flex" : ""}
                     >
                       Manager Panel
+                    </Button>
+                  </Link>
+                )}
+                {user?.role === 'OWNER_TENANT' && (
+                  <Link href="/OWNER_TENANT">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                    >
+                      My Dashboard
                     </Button>
                   </Link>
                 )}

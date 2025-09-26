@@ -33,7 +33,7 @@ import {
   type InsertGoogleCalendarToken,
   type SpecialStatus,
   type InsertSpecialStatus,
-  type Tenant,
+  type OWNER_TENANT,
   type InsertTenant,
   type Payment,
   type InsertPayment,
@@ -135,11 +135,11 @@ export interface IStorage {
   createOrUpdateGoogleCalendarToken(userId: string, token: InsertGoogleCalendarToken): Promise<GoogleCalendarToken>;
   deleteGoogleCalendarToken(userId: string): Promise<void>;
   
-  // Tenant operations
-  getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<Tenant[]>;
-  getTenant(id: string): Promise<Tenant | undefined>;
-  createTenant(tenant: InsertTenant): Promise<Tenant>;
-  updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant>;
+  // OWNER_TENANT operations
+  getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<OWNER_TENANT[]>;
+  getTenant(id: string): Promise<OWNER_TENANT | undefined>;
+  createTenant(OWNER_TENANT: InsertTenant): Promise<OWNER_TENANT>;
+  updateTenant(id: string, updates: Partial<InsertTenant>): Promise<OWNER_TENANT>;
   deleteTenant(id: string): Promise<void>;
   getTenantsWithLotInfo(filters?: { status?: string; parkId?: string; q?: string }): Promise<any[]>;
   
@@ -982,8 +982,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(specialStatuses).where(eq(specialStatuses.id, id));
   }
 
-  // Tenant operations
-  async getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<Tenant[]> {
+  // OWNER_TENANT operations
+  async getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<OWNER_TENANT[]> {
     const conditions = [];
 
     if (filters?.lotId) {
@@ -1013,32 +1013,32 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(tenants).orderBy(desc(tenants.createdAt));
   }
 
-  async getTenant(id: string): Promise<Tenant | undefined> {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
-    return tenant;
+  async getTenant(id: string): Promise<OWNER_TENANT | undefined> {
+    const [OWNER_TENANT] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return OWNER_TENANT;
   }
 
-  async createTenant(tenant: InsertTenant): Promise<Tenant> {
-    console.log('Storage createTenant called with:', tenant);
+  async createTenant(OWNER_TENANT: InsertTenant): Promise<OWNER_TENANT> {
+    console.log('Storage createTenant called with:', OWNER_TENANT);
     
     // Extra cleanup to ensure no empty strings go to numeric fields
     const cleanTenant = {
-      ...tenant,
-      monthlyRent: tenant.monthlyRent === '' ? null : tenant.monthlyRent,
-      securityDeposit: tenant.securityDeposit === '' ? null : tenant.securityDeposit,
-      emergencyContactName: tenant.emergencyContactName === '' ? null : tenant.emergencyContactName,
-      emergencyContactPhone: tenant.emergencyContactPhone === '' ? null : tenant.emergencyContactPhone,
-      notes: tenant.notes === '' ? null : tenant.notes,
+      ...OWNER_TENANT,
+      monthlyRent: OWNER_TENANT.monthlyRent === '' ? null : OWNER_TENANT.monthlyRent,
+      securityDeposit: OWNER_TENANT.securityDeposit === '' ? null : OWNER_TENANT.securityDeposit,
+      emergencyContactName: OWNER_TENANT.emergencyContactName === '' ? null : OWNER_TENANT.emergencyContactName,
+      emergencyContactPhone: OWNER_TENANT.emergencyContactPhone === '' ? null : OWNER_TENANT.emergencyContactPhone,
+      notes: OWNER_TENANT.notes === '' ? null : OWNER_TENANT.notes,
       updatedAt: new Date(),
     };
     
-    console.log('Cleaned tenant for DB:', cleanTenant);
+    console.log('Cleaned OWNER_TENANT for DB:', cleanTenant);
     
     const [result] = await db.insert(tenants).values(cleanTenant).returning();
     return result;
   }
 
-  async updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant> {
+  async updateTenant(id: string, updates: Partial<InsertTenant>): Promise<OWNER_TENANT> {
     const [result] = await db.update(tenants)
       .set({
         ...updates,
@@ -1053,7 +1053,7 @@ export class DatabaseStorage implements IStorage {
     // First delete associated payments
     await db.delete(payments).where(eq(payments.tenantId, id));
     
-    // Then delete the tenant
+    // Then delete the OWNER_TENANT
     await db.delete(tenants).where(eq(tenants.id, id));
   }
 
@@ -1189,7 +1189,7 @@ export class DatabaseStorage implements IStorage {
       notes: payments.notes,
       createdAt: payments.createdAt,
       updatedAt: payments.updatedAt,
-      tenant: {
+      OWNER_TENANT: {
         id: tenants.id,
         firstName: tenants.firstName,
         lastName: tenants.lastName,
@@ -1238,6 +1238,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     return baseQuery.orderBy(desc(payments.dueDate));
+  }
+
+  async getTenantByUserId(userId: string): Promise<any | undefined> {
+    const [OWNER_TENANT] = await db.select().from(tenants)
+      .innerJoin(users, eq(users.email, tenants.email))
+      .where(eq(users.id, userId));
+    return OWNER_TENANT ? OWNER_TENANT.tenants : undefined;
   }
 }
 

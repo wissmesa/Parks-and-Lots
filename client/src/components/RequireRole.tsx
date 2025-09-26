@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 
 interface RequireRoleProps {
-  role: 'ADMIN' | 'MANAGER';
+  role: 'ADMIN' | 'MANAGER' | 'TENANT';
   children: React.ReactNode;
 }
 

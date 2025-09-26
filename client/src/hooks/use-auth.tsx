@@ -64,6 +64,7 @@ export function useAuth() {
     isAuthenticated: AuthManager.isAuthenticated(),
     isAdmin: AuthManager.isAdmin(),
     isManager: AuthManager.isManager(),
+    isTenant: AuthManager.isTenant(),
     login: loginMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
     acceptInvite: acceptInviteMutation.mutateAsync,
