@@ -18,12 +18,14 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import AdminCompanies from "@/pages/admin-companies";
 import AdminParks from "@/pages/admin-parks";
 import AdminLots from "@/pages/admin-lots";
+import AdminTenants from "@/pages/admin-tenants";
 import AdminManagers from "@/pages/admin-managers";
 import AdminBookings from "@/pages/admin-bookings";
 import AdminInvites from "@/pages/admin-invites";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import ManagerParks from "@/pages/manager-parks";
 import ManagerLots from "@/pages/manager-lots";
+import ManagerTenants from "@/pages/manager-tenants";
 import ManagerBookings from "@/pages/manager-bookings";
 import NotFound from "@/pages/not-found";
 
@@ -56,6 +58,9 @@ function Router() {
         <Route path="/admin/lots" component={() => (
           <RequireRole role="ADMIN"><AdminLots /></RequireRole>
         )} />
+        <Route path="/admin/tenants" component={() => (
+          <RequireRole role="ADMIN"><AdminTenants /></RequireRole>
+        )} />
         <Route path="/admin/managers" component={() => (
           <RequireRole role="ADMIN"><AdminManagers /></RequireRole>
         )} />
@@ -75,6 +80,9 @@ function Router() {
         )} />
         <Route path="/manager/lots" component={() => (
           <RequireRole role="MANAGER"><ManagerLots /></RequireRole>
+        )} />
+        <Route path="/manager/tenants" component={() => (
+          <RequireRole role="MANAGER"><ManagerTenants /></RequireRole>
         )} />
         <Route path="/manager/bookings" component={() => (
           <RequireRole role="MANAGER"><ManagerBookings /></RequireRole>

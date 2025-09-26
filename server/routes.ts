@@ -32,6 +32,7 @@ import {
   insertPhotoSchema,
   insertInviteSchema,
   insertSpecialStatusSchema,
+  insertTenantSchema,
   bookingSchema
 } from "@shared/schema";
 import { randomBytes, createHash } from "crypto";
@@ -82,6 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/healthz', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
 
   // Admin Stats Endpoint
   app.get('/api/admin/stats', authenticateToken, requireRole('ADMIN'), async (req, res) => {
@@ -2094,6 +2096,403 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(publicShowings);
     } catch (error) {
       console.error('Get showings error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Tenant routes
+  app.get('/api/tenants', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { status, lotId, q } = req.query;
+      console.log('Fetching tenants with filters:', { status, lotId, q });
+      
+      // Temporary: Return empty array until database is set up
+      // TODO: Implement actual database queries once tables are created
+      try {
+        // Try to get tenants from database
+        const tenants = await storage.getTenantsWithLotInfo({
+          status: status as string,
+          q: q as string
+        });
+        
+        // For managers, filter by their assigned parks
+        if (req.user!.role === 'MANAGER') {
+          const assignments = await storage.getManagerAssignments(req.user!.id);
+          const parkIds = assignments.map(a => a.parkId);
+          
+          if (parkIds.length === 0) {
+            return res.json({ tenants: [] });
+          }
+          
+          const filteredTenants = tenants.filter(tenant => 
+            tenant.lot && parkIds.includes(tenant.lot.parkId)
+          );
+          return res.json({ tenants: filteredTenants });
+        }
+        
+        res.json({ tenants });
+      } catch (dbError) {
+        console.log('Database not ready for tenants, returning empty array:', dbError);
+        // Return empty array if database tables don't exist yet
+        res.json({ tenants: [] });
+      }
+    } catch (error) {
+      console.error('Get tenants error:', error);
+      res.status(500).json({ message: 'Failed to fetch tenants' });
+    }
+  });
+
+  app.get('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const tenantId = req.params.id;
+      const tenant = await storage.getTenant(tenantId);
+      
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // For managers, check if they have access to this tenant's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this tenant' });
+        }
+      }
+
+      // Get tenant with lot and park info
+      const tenantWithInfo = await storage.getTenantsWithLotInfo();
+      const fullTenant = tenantWithInfo.find(t => t.id === tenantId);
+      
+      res.json({ tenant: fullTenant || tenant });
+    } catch (error) {
+      console.error('Get tenant error:', error);
+      res.status(500).json({ message: 'Failed to fetch tenant' });
+    }
+  });
+
+
+  app.post('/api/tenants', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      // Extract tenant data from request body (handle nested structure)
+      let rawTenantData = req.body;
+      if (req.body.tenant) {
+        rawTenantData = req.body.tenant;
+      }
+
+      // Clean up all fields - convert empty strings to null for optional fields
+      Object.keys(rawTenantData).forEach(key => {
+        if (rawTenantData[key] === '' && key !== 'firstName' && key !== 'lastName' && key !== 'email' && key !== 'phone' && key !== 'lotId') {
+          rawTenantData[key] = null;
+        }
+      });
+      
+      // Remove fields that shouldn't be in the creation request
+      delete rawTenantData.id;
+      delete rawTenantData.createdAt;
+      delete rawTenantData.updatedAt;
+      
+      console.log('Cleaned tenant data:', rawTenantData);
+
+      // Validate tenant data
+      const validation = insertTenantSchema.safeParse(rawTenantData);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid tenant data', 
+          errors: validation.error.errors 
+        });
+      }
+
+      const tenantData = validation.data;
+
+      // Additional validation for required fields
+      if (!tenantData.lotId || tenantData.lotId.trim() === '') {
+        return res.status(400).json({ 
+          message: 'Lot ID is required and cannot be empty'
+        });
+      }
+
+      if (!tenantData.firstName || tenantData.firstName.trim() === '') {
+        return res.status(400).json({ 
+          message: 'First name is required and cannot be empty' 
+        });
+      }
+
+      if (!tenantData.lastName || tenantData.lastName.trim() === '') {
+        return res.status(400).json({ 
+          message: 'Last name is required and cannot be empty' 
+        });
+      }
+
+      // For managers, verify they have access to the specified lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(tenantData.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this lot' });
+        }
+      }
+
+      const tenant = await storage.createTenant(tenantData);
+      res.status(201).json({ tenant });
+    } catch (error) {
+      console.error('Create tenant error:', error);
+      res.status(500).json({ message: 'Failed to create tenant' });
+    }
+  });
+
+  app.patch('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const tenantId = req.params.id;
+      const updates = req.body;
+
+      const existingTenant = await storage.getTenant(tenantId);
+      if (!existingTenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // For managers, check if they have access to this tenant's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(existingTenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this tenant' });
+        }
+      }
+
+      const tenant = await storage.updateTenant(tenantId, updates);
+      res.json({ tenant });
+    } catch (error) {
+      console.error('Update tenant error:', error);
+      res.status(500).json({ message: 'Failed to update tenant' });
+    }
+  });
+
+  app.delete('/api/tenants/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const tenantId = req.params.id;
+      
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      await storage.deleteTenant(tenantId);
+      res.json({ message: 'Tenant deleted successfully' });
+    } catch (error) {
+      console.error('Delete tenant error:', error);
+      res.status(500).json({ message: 'Failed to delete tenant' });
+    }
+  });
+
+  // Payment routes
+  app.get('/api/payments', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { status, tenantId, lotId, type } = req.query;
+      
+      // For managers, filter by their assigned parks
+      let payments;
+      if (req.user!.role === 'MANAGER') {
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const parkIds = assignments.map(a => a.parkId);
+        
+        if (parkIds.length === 0) {
+          return res.json({ payments: [] });
+        }
+        
+        // Get payments with tenant info and filter by manager's parks
+        const allPayments = await storage.getPaymentsWithTenantInfo({
+          status: status as string
+        });
+        
+        payments = allPayments.filter(payment => 
+          payment.park && parkIds.includes(payment.park.id)
+        );
+      } else {
+        // Admin can see all payments
+        payments = await storage.getPaymentsWithTenantInfo({
+          status: status as string
+        });
+      }
+      
+      res.json({ payments });
+    } catch (error) {
+      console.error('Get payments error:', error);
+      res.status(500).json({ message: 'Failed to fetch payments' });
+    }
+  });
+
+  app.get('/api/tenants/:tenantId/payments', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const tenantId = req.params.tenantId;
+      
+      // Verify tenant exists and user has access
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // For managers, check if they have access to this tenant's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this tenant' });
+        }
+      }
+
+      const payments = await storage.getPayments({ tenantId });
+      res.json({ payments });
+    } catch (error) {
+      console.error('Get tenant payments error:', error);
+      res.status(500).json({ message: 'Failed to fetch tenant payments' });
+    }
+  });
+
+  app.post('/api/payments', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const paymentData = req.body;
+
+      // Verify tenant exists and user has access
+      const tenant = await storage.getTenant(paymentData.tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // For managers, check if they have access to this tenant's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this tenant' });
+        }
+      }
+
+      // Ensure lotId matches tenant's lot
+      paymentData.lotId = tenant.lotId;
+
+      const payment = await storage.createPayment(paymentData);
+      res.status(201).json({ payment });
+    } catch (error) {
+      console.error('Create payment error:', error);
+      res.status(500).json({ message: 'Failed to create payment' });
+    }
+  });
+
+  app.patch('/api/payments/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const paymentId = req.params.id;
+      const updates = req.body;
+
+      const existingPayment = await storage.getPayment(paymentId);
+      if (!existingPayment) {
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+
+      // For managers, check if they have access to this payment's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(existingPayment.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this payment' });
+        }
+      }
+
+      const payment = await storage.updatePayment(paymentId, updates);
+      res.json({ payment });
+    } catch (error) {
+      console.error('Update payment error:', error);
+      res.status(500).json({ message: 'Failed to update payment' });
+    }
+  });
+
+  app.delete('/api/payments/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+    try {
+      const paymentId = req.params.id;
+      
+      const payment = await storage.getPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+
+      await storage.deletePayment(paymentId);
+      res.json({ message: 'Payment deleted successfully' });
+    } catch (error) {
+      console.error('Delete payment error:', error);
+      res.status(500).json({ message: 'Failed to delete payment' });
+    }
+  });
+
+  // Admin/Manager endpoint for full showing details (for lot history)
+  app.get('/api/lots/:id/showings/full', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const lotId = req.params.id;
+      
+      // Get the lot to verify it exists and check permissions
+      const lot = await storage.getLot(lotId);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+
+      // For managers, check if they have access to this lot's park
+      if (req.user!.role === 'MANAGER') {
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this lot' });
+        }
+      }
+
+      // Get full showing details with manager information
+      const showings = await storage.getShowings({ lotId });
+      
+      // Enrich with manager details
+      const enrichedShowings = await Promise.all(
+        showings.map(async (showing) => {
+          const manager = await storage.getUser(showing.managerId);
+          return {
+            ...showing,
+            manager: manager ? {
+              fullName: manager.fullName,
+              email: manager.email
+            } : null
+          };
+        })
+      );
+      
+      res.json({ showings: enrichedShowings });
+    } catch (error) {
+      console.error('Get full showings error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

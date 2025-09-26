@@ -295,6 +295,10 @@ export default function LotDetail() {
           new Date(rule.endDt) >= slotStart
         );
         
+        // Check if this time slot is in the past (for any day in the week)
+        const now = new Date();
+        const isPastHour = slotStart < now;
+        
         // REMOVED: Database showing checks - Google Calendar is now the single source of truth for bookings
         
         // Check if manager is busy using UTC-based slot key to match Google Calendar busy slots  
@@ -325,7 +329,10 @@ export default function LotDetail() {
           isManagerBusyUTCAsLocal,
           isManagerBusy: isManagerBusy,
           hasBlockage,
-          finalAvailable: !hasBlockage && !isManagerBusy,
+          isPastHour,
+          slotStart: slotStart.toString(),
+          now: now.toString(),
+          finalAvailable: !hasBlockage && !isManagerBusy && !isPastHour,
           managerConnected: managerAvailability?.managerConnected,
           busySlotSetSize: busySlotSet.size,
           sampleBusySlotKeys: Array.from(busySlotSet).slice(0, 5) // Show first 5 for debugging
@@ -340,7 +347,7 @@ export default function LotDetail() {
           minute,
           time: timeDisplay,
           date: new Date(date),
-          isAvailable: !hasBlockage && !isManagerBusy
+          isAvailable: !hasBlockage && !isManagerBusy && !isPastHour
         };
         
         daySchedule.slots.push(slot);

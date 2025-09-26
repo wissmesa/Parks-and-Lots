@@ -4,8 +4,30 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
+
+// Custom middleware to handle text/plain as JSON - MUST be before express.json()
+app.use((req, res, next) => {
+  if (req.headers['content-type'] === 'text/plain' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        req.body = JSON.parse(body);
+        next();
+      } catch (error) {
+        next();
+      }
+    });
+    return; // Don't call next() here, we'll call it in the 'end' event
+  }
+  next();
+});
+
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false }));
+
 
 app.use((req, res, next) => {
   const start = Date.now();

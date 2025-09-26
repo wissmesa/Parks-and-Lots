@@ -27,7 +27,8 @@ export function AdminSidebar() {
     { href: "/admin/companies", icon: Building, label: "Companies" },
     { href: "/admin/parks", icon: TreePine, label: "Parks" },
     { href: "/admin/lots", icon: Home, label: "Lots" },
-    { href: "/admin/managers", icon: Users, label: "Managers" },
+    { href: "/admin/tenants", icon: Users, label: "Tenants" },
+    { href: "/admin/managers", icon: Shield, label: "Managers" },
     { href: "/admin/bookings", icon: Calendar, label: "Bookings" },
     { href: "/admin/invites", icon: UserPlus, label: "Invites" },
   ];

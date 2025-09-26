@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
 import { LotCalculator } from "@/components/ui/lot-calculator";
+import { LotHistoryDialog } from "@/components/ui/lot-history-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +96,7 @@ export default function AdminLots() {
   const [showCalculatorSelection, setShowCalculatorSelection] = useState<string | null>(null);
   const [assigningSpecialStatus, setAssigningSpecialStatus] = useState<Lot | null>(null);
   const [selectedSpecialStatusId, setSelectedSpecialStatusId] = useState<string>("");
+  const [showLotHistory, setShowLotHistory] = useState<{ lotId: string; lotName: string } | null>(null);
 
   // Sorting state
   const [sortBy, setSortBy] = useState<string>("nameOrNumber");
@@ -1396,7 +1398,12 @@ export default function AdminLots() {
                   {lotsList.map((lot: Lot) => (
                     <TableRow key={lot.id}>
                       <TableCell>
-                        <div className="font-medium">{lot.nameOrNumber}</div>
+                        <button
+                          onClick={() => setShowLotHistory({ lotId: lot.id, lotName: lot.nameOrNumber })}
+                          className="font-medium text-left hover:text-primary hover:underline transition-colors"
+                        >
+                          {lot.nameOrNumber}
+                        </button>
                         <div className="text-sm text-muted-foreground">{lot.description}</div>
                         {lot.specialStatus && (
                           <div className="flex items-center gap-1 mt-1">
@@ -2185,6 +2192,16 @@ export default function AdminLots() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Lot History Dialog */}
+        {showLotHistory && (
+          <LotHistoryDialog
+            isOpen={!!showLotHistory}
+            onClose={() => setShowLotHistory(null)}
+            lotId={showLotHistory.lotId}
+            lotName={showLotHistory.lotName}
+          />
+        )}
       </div>
     </div>
   );
