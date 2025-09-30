@@ -1124,8 +1124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token, password, fullName } = req.body;
       
-      if (!token || !password || !fullName) {
-        return res.status(400).json({ message: 'Token, password and full name required' });
+      if (!token || !password) {
+        return res.status(400).json({ message: 'Token and password required' });
       }
 
       const invite = await storage.getInviteByToken(token);
@@ -1149,9 +1149,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If user exists but is inactive (tenant created but not activated), update their info
         if (!existingUser.isActive && existingUser.role === invite.role) {
           const passwordHash = await hashPassword(password);
+          
+          // For tenants, get the name from the tenant record if no fullName provided
+          let finalFullName = fullName;
+          if (invite.role === 'TENANT' && !fullName && existingUser.tenantId) {
+            const tenantInfo = await storage.getTenantByUserId(existingUser.id);
+            if (tenantInfo) {
+              finalFullName = `${tenantInfo.firstName} ${tenantInfo.lastName}`;
+            }
+          }
+          
           user = await storage.updateUser(existingUser.id, {
             passwordHash,
-            fullName,
+            fullName: finalFullName,
             isActive: true
           });
         } else {
@@ -1160,10 +1170,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Create new user
         const passwordHash = await hashPassword(password);
+        
+        // For tenants, get the name from the tenant record if no fullName provided
+        let finalFullName = fullName;
+        if (invite.role === 'TENANT' && !fullName) {
+          // Find tenant by email to get their name
+          const tenantInfo = await storage.getTenantByEmail(invite.email);
+          if (tenantInfo) {
+            finalFullName = `${tenantInfo.firstName} ${tenantInfo.lastName}`;
+          }
+        }
+        
         user = await storage.createUser({
           email: invite.email,
           passwordHash,
-          fullName,
+          fullName: finalFullName,
           role: invite.role,
           isActive: true
         });

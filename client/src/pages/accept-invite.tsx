@@ -66,9 +66,15 @@ export default function AcceptInvite() {
       await acceptInvite({ token, password, fullName });
       toast({
         title: "Account Created",
-        description: "Your manager account has been created successfully!",
+        description: `Your ${inviteData?.role === 'TENANT' ? 'tenant' : 'manager'} account has been created successfully!`,
       });
-      window.location.href = "/manager";
+      
+      // Redirect based on role
+      if (inviteData?.role === 'TENANT') {
+        window.location.href = "/tenant";
+      } else {
+        window.location.href = "/manager";
+      }
     } catch (error) {
       toast({
         title: "Setup Failed",
@@ -143,23 +149,25 @@ export default function AcceptInvite() {
               <span>Setup Your Account</span>
             </CardTitle>
             <p className="text-center text-sm text-muted-foreground">
-              You've been invited as a park manager for <span className="font-medium">{inviteData.email}</span>
+              You've been invited as a {inviteData.role === 'TENANT' ? 'tenant' : 'park manager'} for <span className="font-medium">{inviteData.email}</span>
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  placeholder="Enter your full name"
-                  data-testid="input-full-name"
-                />
-              </div>
+              {inviteData.role !== 'TENANT' && (
+                <div>
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    placeholder="Enter your full name"
+                    data-testid="input-full-name"
+                  />
+                </div>
+              )}
               
               <div>
                 <Label htmlFor="password">Password</Label>

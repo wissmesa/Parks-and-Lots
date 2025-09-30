@@ -141,6 +141,7 @@ export interface IStorage {
   // Tenant operations
   getTenants(filters?: { lotId?: string; status?: string; q?: string }): Promise<Tenant[]>;
   getTenant(id: string): Promise<Tenant | undefined>;
+  getTenantByEmail(email: string): Promise<Tenant | undefined>;
   createTenant(Tenant: InsertTenant): Promise<Tenant>;
   updateTenant(id: string, updates: Partial<InsertTenant>): Promise<Tenant>;
   deleteTenant(id: string): Promise<void>;
@@ -1062,6 +1063,11 @@ export class DatabaseStorage implements IStorage {
 
   async getTenant(id: string): Promise<Tenant | undefined> {
     const [Tenant] = await db.select().from(tenants).where(eq(tenants.id, id));
+    return Tenant;
+  }
+
+  async getTenantByEmail(email: string): Promise<Tenant | undefined> {
+    const [Tenant] = await db.select().from(tenants).where(eq(tenants.email, email));
     return Tenant;
   }
 
