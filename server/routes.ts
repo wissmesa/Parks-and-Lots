@@ -2717,13 +2717,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/tenants/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const tenantId = req.params.id;
       
       const Tenant = await storage.getTenant(tenantId);
       if (!Tenant) {
         return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // For managers, check if they have access to this Tenant's lot
+      if (req.user!.role === 'MANAGER') {
+        const lot = await storage.getLot(Tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        const assignments = await storage.getManagerAssignments(req.user!.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        }
       }
 
       await storage.deleteTenant(tenantId);
@@ -3291,6 +3305,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       console.error('Delete photo error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Update individual photo
+  app.patch('/api/photos/:id', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { caption } = req.body;
+      console.log('Update photo request:', { photoId: req.params.id, caption, body: req.body });
+      
+      // Get the photo to check permissions
+      const photo = await storage.getPhoto(req.params.id);
+      console.log('Found photo:', photo);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      // Check permissions based on entity type
+      if (photo.entityType === 'LOT') {
+        // For lots, allow both admins and managers with lot access
+        if (req.user?.role === 'ADMIN') {
+          // Admin can update any lot photo
+        } else if (req.user?.role === 'MANAGER') {
+          // Check if manager has access to this lot
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied' });
+          }
+        } else {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else if (photo.entityType === 'PARK') {
+        // For park photos, allow admins and managers with park access
+        if (req.user?.role === 'ADMIN') {
+          // Admin can update any park photo
+        } else if (req.user?.role === 'MANAGER') {
+          // Check if manager has access to this park
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === photo.entityId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied' });
+          }
+        } else {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else {
+        // For company photos, only admins can update
+        if (req.user?.role !== 'ADMIN') {
+          return res.status(403).json({ message: 'Admin access required' });
+        }
+      }
+
+      console.log('Updating photo with caption:', caption);
+      const updatedPhoto = await storage.updatePhoto(req.params.id, { caption });
+      console.log('Updated photo:', updatedPhoto);
+      res.json(updatedPhoto);
+    } catch (error) {
+      console.error('Update photo error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

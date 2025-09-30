@@ -112,6 +112,31 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     },
   });
 
+  // Update caption mutation
+  const updateCaptionMutation = useMutation({
+    mutationFn: async ({ photoId, caption }: { photoId: string; caption: string }) => {
+      console.log('Updating photo caption:', { photoId, caption });
+      return apiRequest("PATCH", `/api/photos/${photoId}`, { caption });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/${endpointBase}`, entityId, 'photos'] });
+      setEditingPhoto(null);
+      setEditCaption("");
+      toast({
+        title: "Success",
+        description: "Photo caption updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Photo caption update error:', error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update photo caption",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Reorder mutation
   const reorderMutation = useMutation({
     mutationFn: async (photoOrders: Array<{id: string, sortOrder: number}>) => {
@@ -386,12 +411,27 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                   <div className="absolute top-2 left-2 z-10 bg-white/80 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <GripVertical className="w-4 h-4 text-gray-600" />
                   </div>
-                  <img
-                    src={photo.urlOrPath}
-                    alt={photo.caption || 'Photo'}
-                    className="w-full h-32 object-cover rounded-lg"
-                    data-testid={`img-photo-${photo.id}`}
-                  />
+                  <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center relative">
+                    <img
+                      src={photo.urlOrPath}
+                      alt={photo.caption || 'Photo'}
+                      className="w-full h-full object-cover rounded-lg"
+                      data-testid={`img-photo-${photo.id}`}
+                      onError={(e) => {
+                        console.error('Failed to load image:', photo.urlOrPath);
+                        e.currentTarget.style.display = 'none';
+                        // Show fallback content
+                        const fallback = e.currentTarget.parentElement?.querySelector('.fallback-content');
+                        if (fallback) {
+                          (fallback as HTMLElement).style.display = 'flex';
+                        }
+                      }}
+                    />
+                    <div className="fallback-content absolute inset-0 bg-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-500" style={{ display: 'none' }}>
+                      <Camera className="w-8 h-8 mb-2" />
+                      <span className="text-sm">Photo</span>
+                    </div>
+                  </div>
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center space-x-2">
                     <Button
                       size="sm"
@@ -432,11 +472,25 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
             </DialogHeader>
             {editingPhoto && (
               <div className="space-y-4">
-                <img
-                  src={editingPhoto.urlOrPath}
-                  alt="Photo preview"
-                  className="w-full h-48 object-cover rounded-lg"
-                />
+                <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center relative">
+                  <img
+                    src={editingPhoto.urlOrPath}
+                    alt="Photo preview"
+                    className="w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      console.error('Failed to load image in edit dialog:', editingPhoto.urlOrPath);
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.fallback-content');
+                      if (fallback) {
+                        (fallback as HTMLElement).style.display = 'flex';
+                      }
+                    }}
+                  />
+                  <div className="fallback-content absolute inset-0 bg-gray-100 rounded-lg flex flex-col items-center justify-center text-gray-500" style={{ display: 'none' }}>
+                    <Camera className="w-12 h-12 mb-2" />
+                    <span className="text-sm">Photo Preview</span>
+                  </div>
+                </div>
                 <div>
                   <Label htmlFor="edit-caption">Caption</Label>
                   <Input
@@ -458,17 +512,17 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                   </Button>
                   <Button 
                     onClick={() => {
-                      // Note: Caption editing would require an update endpoint
-                      // For now, just close the dialog
-                      setEditingPhoto(null);
-                      toast({
-                        title: "Info",
-                        description: "Caption editing will be available soon",
-                      });
+                      if (editingPhoto) {
+                        updateCaptionMutation.mutate({
+                          photoId: editingPhoto.id,
+                          caption: editCaption
+                        });
+                      }
                     }}
+                    disabled={updateCaptionMutation.isPending}
                     data-testid="button-save-caption"
                   >
-                    Save Caption
+                    {updateCaptionMutation.isPending ? "Saving..." : "Save Caption"}
                   </Button>
                 </div>
               </div>

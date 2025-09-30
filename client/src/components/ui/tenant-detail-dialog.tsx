@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +35,8 @@ import {
   CheckCircle,
   Clock,
   Plus,
-  Edit3
+  Edit3,
+  Trash2
 } from "lucide-react";
 
 interface Tenant {
@@ -81,6 +92,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
   const queryClient = useQueryClient();
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [editingTenant, setEditingTenant] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch Tenant details
   const { data: Tenant, isLoading: tenantLoading } = useQuery({
@@ -213,6 +225,29 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     },
   });
 
+  // Delete Tenant mutation
+  const deleteTenantMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('DELETE', `/api/tenants/${tenantId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      setShowDeleteConfirm(false);
+      onClose(); // Close the dialog after deleting
+      toast({
+        title: "Tenant Deleted",
+        description: "Tenant has been successfully deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete Tenant",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault();
     createPaymentMutation.mutate(paymentForm);
@@ -272,13 +307,27 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
+            </DialogTitle>
+            {Tenant && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         {tenantLoading ? (
@@ -784,5 +833,27 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this tenant? This action cannot be undone and will remove all associated records including payments.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => deleteTenantMutation.mutate()}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleteTenantMutation.isPending ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

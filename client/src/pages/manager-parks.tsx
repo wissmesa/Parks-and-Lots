@@ -23,7 +23,7 @@ interface Park {
   address: string;
   city: string;
   state: string;
-  zipCode: string;
+  zip: string;
   companyId: string;
   createdAt: string;
   amenities?: string[];
@@ -60,7 +60,7 @@ export default function ManagerParks() {
     address: "",
     city: "",
     state: "",
-    zipCode: "",
+    zip: "",
     amenities: [] as string[]
   });
   const [newAmenity, setNewAmenity] = useState('');
@@ -101,6 +101,7 @@ export default function ManagerParks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/manager/assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
       setEditingPark(null);
       resetForm();
       toast({
@@ -124,7 +125,7 @@ export default function ManagerParks() {
       address: "",
       city: "",
       state: "",
-      zipCode: "",
+      zip: "",
       amenities: []
     });
     setNewAmenity('');
@@ -146,7 +147,7 @@ export default function ManagerParks() {
       address: park.address,
       city: park.city,
       state: park.state,
-      zipCode: park.zipCode,
+      zip: park.zip,
       amenities: park.amenities || []
     });
     setNewAmenity('');
@@ -357,7 +358,7 @@ export default function ManagerParks() {
                           <div className="flex items-center gap-1">
                             <MapPin className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm">
-                              {park?.city || 'N/A'}, {park?.state || 'N/A'} {park?.zipCode || ''}
+                              {park?.city || 'N/A'}, {park?.state || 'N/A'} {park?.zip || ''}
                             </span>
                           </div>
                         </TableCell>
@@ -470,11 +471,11 @@ export default function ManagerParks() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="zipCode">ZIP Code</Label>
+                    <Label htmlFor="zip">ZIP Code</Label>
                     <Input
-                      id="zipCode"
-                      value={formData.zipCode}
-                      onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                      id="zip"
+                      value={formData.zip}
+                      onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
                       required
                       data-testid="input-park-zip"
                     />

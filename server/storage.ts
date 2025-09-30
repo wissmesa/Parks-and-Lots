@@ -812,7 +812,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePhoto(id: string, updates: Partial<InsertPhoto>): Promise<Photo> {
+    console.log('Storage updatePhoto called with:', { id, updates });
     const [photo] = await db.update(photos).set(updates).where(eq(photos.id, id)).returning();
+    console.log('Storage updatePhoto result:', photo);
+    if (!photo) {
+      throw new Error(`Photo with id ${id} not found or update failed`);
+    }
     return photo;
   }
 

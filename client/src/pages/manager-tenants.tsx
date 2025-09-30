@@ -11,6 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +39,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  X
+  X,
+  Trash2
 } from "lucide-react";
 
 interface Tenant {
@@ -78,6 +89,7 @@ export default function ManagerTenants() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+  const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -141,6 +153,28 @@ export default function ManagerTenants() {
       toast({
         title: "Error",
         description: error.message || "Failed to create Tenant",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete Tenant mutation
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (tenantId: string) => {
+      await apiRequest('DELETE', `/api/tenants/${tenantId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      setTenantToDelete(null);
+      toast({
+        title: "Tenant Deleted",
+        description: "Tenant has been successfully deleted.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete Tenant",
         variant: "destructive",
       });
     },
@@ -399,14 +433,24 @@ export default function ManagerTenants() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedTenant(Tenant.id)}
-                            >
-                              <User className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedTenant(Tenant.id)}
+                              >
+                                <User className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTenantToDelete(Tenant)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -427,6 +471,28 @@ export default function ManagerTenants() {
           tenantId={selectedTenant}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!tenantToDelete} onOpenChange={() => setTenantToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete tenant {tenantToDelete?.firstName} {tenantToDelete?.lastName}? 
+              This action cannot be undone and will remove all associated records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => tenantToDelete && deleteTenantMutation.mutate(tenantToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteTenantMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
