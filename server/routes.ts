@@ -36,7 +36,7 @@ import {
   bookingSchema
 } from "@shared/schema";
 import { randomBytes, createHash } from "crypto";
-import { sendInviteEmail, sendPasswordResetEmail } from "./email";
+import { sendInviteEmail, sendPasswordResetEmail, sendTenantInviteEmail } from "./email";
 
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
 // Get environment-appropriate base URL
@@ -875,8 +875,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
       id: req.user!.id,
       email: req.user!.email,
       fullName: req.user!.fullName,
-      role: req.user!.role
+      role: req.user!.role,
+      tenantId: req.user!.tenantId
     });
+  });
+
+  // User-Tenant Association routes
+  app.get('/api/users/:id/tenant', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.params.id;
+      
+      // Only allow users to access their own data or admins to access any
+      if (req.user!.role !== 'ADMIN' && req.user!.id !== userId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const userWithTenant = await storage.getUserWithTenant(userId);
+      if (!userWithTenant) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      res.json(userWithTenant);
+    } catch (error) {
+      console.error('Get user with tenant error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/users/:userId/link-tenant/:tenantId', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const { userId, tenantId } = req.params;
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      // Verify user has TENANT role
+      if (user.role !== 'TENANT') {
+        return res.status(400).json({ 
+          message: 'Only users with TENANT role can be linked to tenant records' 
+        });
+      }
+      
+      // Check if user is already linked to another tenant
+      if (user.tenantId && user.tenantId !== tenantId) {
+        return res.status(400).json({ 
+          message: 'User is already linked to another tenant. Unlink first before linking to a new tenant.' 
+        });
+      }
+      
+      // Verify tenant exists
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+      
+      // Check if tenant is already linked to another user
+      const existingUserWithTenant = await storage.getUserByTenantId(tenantId);
+      if (existingUserWithTenant && existingUserWithTenant.id !== userId) {
+        return res.status(400).json({ 
+          message: 'This tenant is already linked to another user' 
+        });
+      }
+      
+      // Link user to tenant
+      const updatedUser = await storage.linkUserToTenant(userId, tenantId);
+      res.json({ 
+        message: 'User linked to tenant successfully',
+        user: updatedUser 
+      });
+    } catch (error) {
+      console.error('Link user to tenant error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/users/:userId/unlink-tenant', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      // Verify user has TENANT role
+      if (user.role !== 'TENANT') {
+        return res.status(400).json({ 
+          message: 'Only users with TENANT role can be unlinked from tenant records' 
+        });
+      }
+      
+      // Check if user is actually linked to a tenant
+      if (!user.tenantId) {
+        return res.status(400).json({ 
+          message: 'User is not currently linked to any tenant' 
+        });
+      }
+      
+      // Unlink user from tenant
+      const updatedUser = await storage.linkUserToTenant(userId, null as any);
+      res.json({ 
+        message: 'User unlinked from tenant successfully',
+        user: updatedUser 
+      });
+    } catch (error) {
+      console.error('Unlink user from tenant error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Get all tenant users with their association status
+  app.get('/api/admin/tenant-users', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+    try {
+      // Get all users with TENANT role
+      const tenantUsers = await storage.getUsers({ role: 'TENANT' as any });
+      
+      // Get tenant information for each user
+      const usersWithTenantInfo = await Promise.all(
+        tenantUsers.map(async (user) => {
+          if (user.tenantId) {
+            const tenant = await storage.getTenant(user.tenantId);
+            return {
+              ...user,
+              tenant: tenant ? {
+                id: tenant.id,
+                firstName: tenant.firstName,
+                lastName: tenant.lastName,
+                email: tenant.email,
+                status: tenant.status,
+                lotId: tenant.lotId
+              } : null,
+              isLinked: true
+            };
+          } else {
+            return {
+              ...user,
+              tenant: null,
+              isLinked: false
+            };
+          }
+        })
+      );
+      
+      res.json({ 
+        tenantUsers: usersWithTenantInfo,
+        total: usersWithTenantInfo.length,
+        linked: usersWithTenantInfo.filter(u => u.isLinked).length,
+        unlinked: usersWithTenantInfo.filter(u => !u.isLinked).length
+      });
+    } catch (error) {
+      console.error('Get tenant users error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
   });
 
   // Invite routes
@@ -980,19 +1134,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(invite.email);
+      let user;
+      
       if (existingUser) {
-        return res.status(409).json({ message: 'User already exists' });
+        // If user exists but is inactive (tenant created but not activated), update their info
+        if (!existingUser.isActive && existingUser.role === invite.role) {
+          const passwordHash = await hashPassword(password);
+          user = await storage.updateUser(existingUser.id, {
+            passwordHash,
+            fullName,
+            isActive: true
+          });
+        } else {
+          return res.status(409).json({ message: 'User already exists and is active' });
+        }
+      } else {
+        // Create new user
+        const passwordHash = await hashPassword(password);
+        user = await storage.createUser({
+          email: invite.email,
+          passwordHash,
+          fullName,
+          role: invite.role,
+          isActive: true
+        });
       }
-
-      // Create user
-      const passwordHash = await hashPassword(password);
-      const user = await storage.createUser({
-        email: invite.email,
-        passwordHash,
-        fullName,
-        role: invite.role,
-        isActive: true
-      });
 
       // Mark invite as accepted
       await storage.acceptInvite(token);
@@ -2061,7 +2227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results,
         summary: {
           total: rows.length,
-          successful,
+        successful,
           failed
         }
       });
@@ -2331,8 +2497,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const OWNER_TENANT = await storage.createTenant(tenantData);
-      res.status(201).json({ OWNER_TENANT });
+      // Check if a user with this email already exists
+      const existingUser = await storage.getUserByEmail(tenantData.email);
+      let user = existingUser;
+      let userCreated = false;
+      let inviteCreated = false;
+      let emailSent = false;
+
+      if (existingUser) {
+        // If user already exists, check if they have TENANT role
+        if (existingUser.role !== 'TENANT') {
+          return res.status(400).json({ 
+            message: 'A user with this email already exists with a different role' 
+          });
+        }
+        user = existingUser;
+      } else {
+        // Create user with TENANT role (without password - will be set via invite)
+        try {
+          // Generate a temporary password hash (will be replaced when they accept invite)
+          const tempPasswordHash = await hashPassword(randomBytes(32).toString('hex'));
+          
+          user = await storage.createUser({
+            email: tenantData.email,
+            passwordHash: tempPasswordHash,
+            fullName: `${tenantData.firstName} ${tenantData.lastName}`,
+            role: 'TENANT',
+            isActive: false // Will be activated when they accept the invite
+          });
+          userCreated = true;
+        } catch (userError) {
+          console.error('Failed to create user for tenant:', userError);
+          return res.status(500).json({ message: 'Failed to create user account' });
+        }
+      }
+
+      // Create the tenant record associated with the user
+      let OWNER_TENANT;
+      try {
+        OWNER_TENANT = await storage.createTenant(tenantData);
+        
+        // Link the user to the tenant
+        if (user) {
+          await storage.linkUserToTenant(user.id, OWNER_TENANT.id);
+        }
+      } catch (tenantError) {
+        console.error('Failed to create tenant:', tenantError);
+        // If we created a user but failed to create tenant, clean up the user
+        if (userCreated && user) {
+          try {
+            await storage.deleteUser(user.id);
+          } catch (cleanupError) {
+            console.error('Failed to cleanup user after tenant creation failure:', cleanupError);
+          }
+        }
+        return res.status(500).json({ message: 'Failed to create tenant record' });
+      }
+
+      // Create invite and send email only for new users
+      if (userCreated) {
+        try {
+          // Create an invite for the tenant to set up their account
+          const token = randomBytes(32).toString('hex');
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 7); // 7 days to accept
+
+          const invite = await storage.createInvite({
+            email: tenantData.email,
+            role: 'TENANT',
+            createdByUserId: req.user!.id,
+            token,
+            expiresAt
+          } as any);
+          inviteCreated = true;
+
+          // Get lot and park information for the email
+          const lot = await storage.getLot(tenantData.lotId);
+          let lotInfo = `Lot ${tenantData.lotId}`;
+          if (lot) {
+            const lotWithPark = await storage.getLotsWithParkInfo({ parkId: lot.parkId });
+            const lotDetails = lotWithPark.find(l => l.id === lot.id);
+            if (lotDetails && lotDetails.park) {
+              lotInfo = `Lot ${lot.nameOrNumber} at ${lotDetails.park.name}`;
+            } else {
+              lotInfo = `Lot ${lot.nameOrNumber}`;
+            }
+          }
+
+          // Send tenant invitation email
+          const inviteUrl = `${FRONTEND_BASE_URL}/accept-invite?token=${token}`;
+          emailSent = await sendTenantInviteEmail(
+            tenantData.email,
+            inviteUrl,
+            `${tenantData.firstName} ${tenantData.lastName}`,
+            lotInfo,
+            req.user!.fullName
+          );
+
+          if (!emailSent) {
+            console.error('Failed to send tenant invitation email to:', tenantData.email);
+          }
+        } catch (inviteError) {
+          console.error('Failed to create tenant invite:', inviteError);
+          // Don't fail the tenant creation if invite fails
+        }
+      }
+
+      res.status(201).json({ 
+        OWNER_TENANT,
+        user: {
+          id: user?.id,
+          email: user?.email,
+          fullName: user?.fullName,
+          role: user?.role
+        },
+        userCreated,
+        inviteCreated,
+        emailSent
+      });
     } catch (error) {
       console.error('Create OWNER_TENANT error:', error);
       res.status(500).json({ message: 'Failed to create OWNER_TENANT' });
@@ -2342,7 +2624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const tenantId = req.params.id;
-      const updates = req.body;
+      let updates = { ...req.body };
 
       const existingTenant = await storage.getTenant(tenantId);
       if (!existingTenant) {
@@ -2362,6 +2644,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied to this OWNER_TENANT' });
         }
       }
+
+      // Handle date string conversion for lease dates
+      if (updates.leaseStartDate) {
+        if (typeof updates.leaseStartDate === 'string') {
+          const date = new Date(updates.leaseStartDate);
+          updates.leaseStartDate = isNaN(date.getTime()) ? null : date;
+        }
+      }
+      
+      if (updates.leaseEndDate) {
+        if (typeof updates.leaseEndDate === 'string') {
+          const date = new Date(updates.leaseEndDate);
+          updates.leaseEndDate = isNaN(date.getTime()) ? null : date;
+        }
+      }
+
+      // Clean up empty strings to null for optional fields
+      Object.keys(updates).forEach(key => {
+        if (updates[key] === '' && !['firstName', 'lastName', 'email', 'phone', 'lotId'].includes(key)) {
+          updates[key] = null;
+        }
+      });
 
       const OWNER_TENANT = await storage.updateTenant(tenantId, updates);
       res.json({ OWNER_TENANT });
@@ -3026,11 +3330,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tenant routes
   app.get('/api/tenant/me', authenticateToken, requireRole('TENANT'), async (req: AuthRequest, res) => {
     try {
-      const tenant = await storage.getTenantByUserId(req.user!.id);
-      if (!tenant) {
+      const userWithTenant = await storage.getUserWithTenant(req.user!.id);
+      if (!userWithTenant || !userWithTenant.tenant) {
         return res.status(404).json({ message: 'Tenant information not found' });
       }
       
+      const tenant = userWithTenant.tenant;
       const lot = await storage.getLot(tenant.lotId);
       if (!lot) {
         return res.status(404).json({ message: 'Associated lot not found' });
@@ -3056,12 +3361,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/tenant/payments', authenticateToken, requireRole('TENANT'), async (req: AuthRequest, res) => {
     try {
-      const tenant = await storage.getTenantByUserId(req.user!.id);
-      if (!tenant) {
+      const userWithTenant = await storage.getUserWithTenant(req.user!.id);
+      if (!userWithTenant || !userWithTenant.tenant) {
         return res.status(404).json({ message: 'Tenant information not found' });
       }
       
-      const payments = await storage.getPayments({ tenantId: tenant.id });
+      const payments = await storage.getPayments({ tenantId: userWithTenant.tenant.id });
       res.json({ payments });
     } catch (error) {
       console.error('Get tenant payments error:', error);
@@ -3071,10 +3376,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/tenant/payments', authenticateToken, requireRole('TENANT'), upload.single('paymentProof'), async (req: AuthRequest, res) => {
     try {
-      const tenant = await storage.getTenantByUserId(req.user!.id);
-      if (!tenant) {
+      const userWithTenant = await storage.getUserWithTenant(req.user!.id);
+      if (!userWithTenant || !userWithTenant.tenant) {
         return res.status(404).json({ message: 'Tenant information not found' });
       }
+      const tenant = userWithTenant.tenant;
       
       const { type, amount, description, notes } = req.body;
       

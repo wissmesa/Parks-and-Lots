@@ -17,7 +17,7 @@ import { z } from "zod";
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'TENANT']);
-export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
+export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
 export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'BLOCKED']);
@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash").notNull(),
   fullName: varchar("full_name").notNull(),
   role: userRoleEnum("role").notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
   isActive: boolean("is_active").default(true).notNull(),
   resetToken: varchar("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
@@ -222,7 +223,11 @@ export const payments = pgTable("payments", {
 }));
 
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [users.tenantId],
+    references: [tenants.id],
+  }),
   managerAssignments: many(managerAssignments),
   showings: many(showings),
   oauthAccounts: many(oauthAccounts),
@@ -319,6 +324,10 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
     fields: [tenants.lotId],
     references: [lots.id],
   }),
+  user: one(users, {
+    fields: [tenants.id],
+    references: [users.tenantId],
+  }),
   payments: many(payments),
 }));
 
@@ -388,7 +397,26 @@ export const insertSpecialStatusSchema = createInsertSchema(specialStatuses).omi
   createdAt: true,
 });
 
-export const insertTenantSchema = createInsertSchema(tenants).omit({
+export const insertTenantSchema = createInsertSchema(tenants, {
+  leaseStartDate: z.union([
+    z.string().transform((val) => {
+      if (!val || val === '') return null;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    z.date(),
+    z.null()
+  ]).optional().nullable(),
+  leaseEndDate: z.union([
+    z.string().transform((val) => {
+      if (!val || val === '') return null;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    z.date(),
+    z.null()
+  ]).optional().nullable(),
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

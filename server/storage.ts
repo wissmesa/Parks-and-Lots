@@ -47,9 +47,12 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
-  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' }): Promise<User[]>;
+  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'TENANT' }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  getUserWithTenant(id: string): Promise<any | undefined>;
+  getUserByTenantId(tenantId: string): Promise<User | undefined>;
+  linkUserToTenant(userId: string, tenantId: string): Promise<User>;
   
   // Company operations
   getCompanies(includeInactive?: boolean): Promise<Company[]>;
@@ -181,7 +184,51 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' }): Promise<User[]> {
+  async getUserWithTenant(id: string): Promise<any | undefined> {
+    const [result] = await db.select({
+      id: users.id,
+      email: users.email,
+      fullName: users.fullName,
+      role: users.role,
+      tenantId: users.tenantId,
+      isActive: users.isActive,
+      createdAt: users.createdAt,
+      tenant: {
+        id: tenants.id,
+        firstName: tenants.firstName,
+        lastName: tenants.lastName,
+        email: tenants.email,
+        phone: tenants.phone,
+        status: tenants.status,
+        leaseStartDate: tenants.leaseStartDate,
+        leaseEndDate: tenants.leaseEndDate,
+        monthlyRent: tenants.monthlyRent,
+        securityDeposit: tenants.securityDeposit,
+        notes: tenants.notes,
+        lotId: tenants.lotId,
+      }
+    })
+    .from(users)
+    .leftJoin(tenants, eq(users.tenantId, tenants.id))
+    .where(eq(users.id, id));
+    
+    return result;
+  }
+
+  async getUserByTenantId(tenantId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.tenantId, tenantId));
+    return user;
+  }
+
+  async linkUserToTenant(userId: string, tenantId: string): Promise<User> {
+    const [result] = await db.update(users)
+      .set({ tenantId })
+      .where(eq(users.id, userId))
+      .returning();
+    return result;
+  }
+
+  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'TENANT' }): Promise<User[]> {
     let query = db.select().from(users);
     const conditions = [];
 
@@ -1050,10 +1097,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTenant(id: string): Promise<void> {
-    // First delete associated payments
+    // First, find and delete any TENANT users that reference this tenant
+    const usersToDelete = await db.select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.tenantId, id), eq(users.role, 'TENANT')));
+    
+    // Delete the TENANT users (this will automatically unlink them from the tenant)
+    for (const user of usersToDelete) {
+      await db.delete(users).where(eq(users.id, user.id));
+    }
+    
+    // Unlink any remaining users (non-TENANT users) that might reference this tenant
+    await db.update(users)
+      .set({ tenantId: null })
+      .where(eq(users.tenantId, id));
+    
+    // Then delete associated payments
     await db.delete(payments).where(eq(payments.tenantId, id));
     
-    // Then delete the OWNER_TENANT
+    // Finally delete the tenant
     await db.delete(tenants).where(eq(tenants.id, id));
   }
 
