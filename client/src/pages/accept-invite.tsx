@@ -28,7 +28,15 @@ export default function AcceptInvite() {
 
   // Validate invite token
   const { data: inviteData, isLoading: inviteLoading, error: inviteError } = useQuery({
-    queryKey: ["/api/auth/invites/validate", token],
+    queryKey: ["invite-validate", token],
+    queryFn: async () => {
+      const response = await fetch(`/api/auth/invites/validate/${token}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to validate invite');
+      }
+      return response.json();
+    },
     enabled: !!token,
     retry: false,
   });
