@@ -1058,7 +1058,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(invite.email);
       if (existingUser) {
-        return res.status(409).json({ message: 'User already exists' });
+        // If user exists but is inactive (tenant created but not activated), allow validation
+        if (!existingUser.isActive && existingUser.role === invite.role) {
+          // Allow validation to proceed - user can be updated during accept
+        } else {
+          return res.status(409).json({ message: 'User already exists and is active' });
+        }
       }
 
       res.json({ 
