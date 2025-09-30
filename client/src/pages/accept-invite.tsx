@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { MapPin, CheckCircle } from "lucide-react";
-
+//exports
 export default function AcceptInvite() {
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
