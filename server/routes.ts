@@ -56,8 +56,9 @@ const getFrontendBaseUrl = () => {
     return `https://${process.env.REPL_SLUG}.replit.app`;
   }
   
-  // Fallback for local development
-  return 'http://localhost:5000';
+  // Try to detect the actual domain from the request
+  // This will be set dynamically in the request handler
+  return process.env.FRONTEND_BASE_URL || 'http://localhost:5000';
 };
 
 const FRONTEND_BASE_URL = getFrontendBaseUrl();
@@ -581,8 +582,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resetTokenExpiresAt
       });
 
-      // Create reset URL using configured frontend base URL
-      const resetUrl = `${FRONTEND_BASE_URL}/reset-password?token=${resetToken}`;
+      // Create reset URL dynamically based on the request
+      const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5000';
+      const baseUrl = `${protocol}://${host}`;
+      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
       // Send password reset email
       const emailSent = await sendPasswordResetEmail(
@@ -2354,7 +2358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OWNER_TENANT routes
+  // Tenant routes
   app.get('/api/tenants', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const { status, lotId, q } = req.query;
@@ -2378,8 +2382,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({ tenants: [] });
           }
           
-          const filteredTenants = tenants.filter(OWNER_TENANT => 
-            OWNER_TENANT.lot && parkIds.includes(OWNER_TENANT.lot.parkId)
+          const filteredTenants = tenants.filter(Tenant => 
+            Tenant.lot && parkIds.includes(Tenant.lot.parkId)
           );
           return res.json({ tenants: filteredTenants });
         }
@@ -2399,15 +2403,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const tenantId = req.params.id;
-      const OWNER_TENANT = await storage.getTenant(tenantId);
+      const Tenant = await storage.getTenant(tenantId);
       
-      if (!OWNER_TENANT) {
-        return res.status(404).json({ message: 'OWNER_TENANT not found' });
+      if (!Tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this OWNER_TENANT's lot
+      // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(OWNER_TENANT.lotId);
+        const lot = await storage.getLot(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
@@ -2415,28 +2419,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
         if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this OWNER_TENANT' });
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
       }
 
-      // Get OWNER_TENANT with lot and park info
+      // Get Tenant with lot and park info
       const tenantWithInfo = await storage.getTenantsWithLotInfo();
       const fullTenant = tenantWithInfo.find(t => t.id === tenantId);
       
-      res.json({ OWNER_TENANT: fullTenant || OWNER_TENANT });
+      res.json({ Tenant: fullTenant || Tenant });
     } catch (error) {
-      console.error('Get OWNER_TENANT error:', error);
-      res.status(500).json({ message: 'Failed to fetch OWNER_TENANT' });
+      console.error('Get Tenant error:', error);
+      res.status(500).json({ message: 'Failed to fetch Tenant' });
     }
   });
 
 
   app.post('/api/tenants', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      // Extract OWNER_TENANT data from request body (handle nested structure)
+      // Extract Tenant data from request body (handle nested structure)
       let rawTenantData = req.body;
-      if (req.body.OWNER_TENANT) {
-        rawTenantData = req.body.OWNER_TENANT;
+      if (req.body.Tenant) {
+        rawTenantData = req.body.Tenant;
       }
 
       // Clean up all fields - convert empty strings to null for optional fields
@@ -2451,13 +2455,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       delete rawTenantData.createdAt;
       delete rawTenantData.updatedAt;
       
-      console.log('Cleaned OWNER_TENANT data:', rawTenantData);
+      console.log('Cleaned Tenant data:', rawTenantData);
 
-      // Validate OWNER_TENANT data
+      // Validate Tenant data
       const validation = insertTenantSchema.safeParse(rawTenantData);
       if (!validation.success) {
         return res.status(400).json({ 
-          message: 'Invalid OWNER_TENANT data', 
+          message: 'Invalid Tenant data', 
           errors: validation.error.errors 
         });
       }
@@ -2533,13 +2537,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create the tenant record associated with the user
-      let OWNER_TENANT;
+      let Tenant;
       try {
-        OWNER_TENANT = await storage.createTenant(tenantData);
+        Tenant = await storage.createTenant(tenantData);
         
         // Link the user to the tenant
         if (user) {
-          await storage.linkUserToTenant(user.id, OWNER_TENANT.id);
+          await storage.linkUserToTenant(user.id, Tenant.id);
         }
       } catch (tenantError) {
         console.error('Failed to create tenant:', tenantError);
@@ -2585,7 +2589,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Send tenant invitation email
-          const inviteUrl = `${FRONTEND_BASE_URL}/accept-invite?token=${token}`;
+          // Construct URL dynamically based on the request
+          const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+          const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:5000';
+          const baseUrl = `${protocol}://${host}`;
+          const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
+          
+          console.log('Constructed invite URL:', inviteUrl);
+          console.log('Request headers:', { 
+            'x-forwarded-proto': req.headers['x-forwarded-proto'],
+            'x-forwarded-host': req.headers['x-forwarded-host'],
+            host: req.headers.host,
+            secure: req.secure
+          });
           emailSent = await sendTenantInviteEmail(
             tenantData.email,
             inviteUrl,
@@ -2604,7 +2620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(201).json({ 
-        OWNER_TENANT,
+        Tenant,
         user: {
           id: user?.id,
           email: user?.email,
@@ -2616,8 +2632,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailSent
       });
     } catch (error) {
-      console.error('Create OWNER_TENANT error:', error);
-      res.status(500).json({ message: 'Failed to create OWNER_TENANT' });
+      console.error('Create Tenant error:', error);
+      res.status(500).json({ message: 'Failed to create Tenant' });
     }
   });
 
@@ -2628,10 +2644,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingTenant = await storage.getTenant(tenantId);
       if (!existingTenant) {
-        return res.status(404).json({ message: 'OWNER_TENANT not found' });
+        return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this OWNER_TENANT's lot
+      // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
         const lot = await storage.getLot(existingTenant.lotId);
         if (!lot) {
@@ -2641,7 +2657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
         if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this OWNER_TENANT' });
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
       }
 
@@ -2667,11 +2683,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      const OWNER_TENANT = await storage.updateTenant(tenantId, updates);
-      res.json({ OWNER_TENANT });
+      const Tenant = await storage.updateTenant(tenantId, updates);
+      res.json({ Tenant });
     } catch (error) {
-      console.error('Update OWNER_TENANT error:', error);
-      res.status(500).json({ message: 'Failed to update OWNER_TENANT' });
+      console.error('Update Tenant error:', error);
+      res.status(500).json({ message: 'Failed to update Tenant' });
     }
   });
 
@@ -2679,16 +2695,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tenantId = req.params.id;
       
-      const OWNER_TENANT = await storage.getTenant(tenantId);
-      if (!OWNER_TENANT) {
-        return res.status(404).json({ message: 'OWNER_TENANT not found' });
+      const Tenant = await storage.getTenant(tenantId);
+      if (!Tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
       }
 
       await storage.deleteTenant(tenantId);
-      res.json({ message: 'OWNER_TENANT deleted successfully' });
+      res.json({ message: 'Tenant deleted successfully' });
     } catch (error) {
-      console.error('Delete OWNER_TENANT error:', error);
-      res.status(500).json({ message: 'Failed to delete OWNER_TENANT' });
+      console.error('Delete Tenant error:', error);
+      res.status(500).json({ message: 'Failed to delete Tenant' });
     }
   });
 
@@ -2707,7 +2723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ payments: [] });
         }
         
-        // Get payments with OWNER_TENANT info and filter by manager's parks
+        // Get payments with Tenant info and filter by manager's parks
         const allPayments = await storage.getPaymentsWithTenantInfo({
           status: status as string
         });
@@ -2733,15 +2749,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const tenantId = req.params.tenantId;
       
-      // Verify OWNER_TENANT exists and user has access
-      const OWNER_TENANT = await storage.getTenant(tenantId);
-      if (!OWNER_TENANT) {
-        return res.status(404).json({ message: 'OWNER_TENANT not found' });
+      // Verify Tenant exists and user has access
+      const Tenant = await storage.getTenant(tenantId);
+      if (!Tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this OWNER_TENANT's lot
+      // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(OWNER_TENANT.lotId);
+        const lot = await storage.getLot(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
@@ -2749,15 +2765,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
         if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this OWNER_TENANT' });
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
       }
 
       const payments = await storage.getPayments({ tenantId });
       res.json({ payments });
     } catch (error) {
-      console.error('Get OWNER_TENANT payments error:', error);
-      res.status(500).json({ message: 'Failed to fetch OWNER_TENANT payments' });
+      console.error('Get Tenant payments error:', error);
+      res.status(500).json({ message: 'Failed to fetch Tenant payments' });
     }
   });
 
@@ -2765,15 +2781,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const paymentData = req.body;
 
-      // Verify OWNER_TENANT exists and user has access
-      const OWNER_TENANT = await storage.getTenant(paymentData.tenantId);
-      if (!OWNER_TENANT) {
-        return res.status(404).json({ message: 'OWNER_TENANT not found' });
+      // Verify Tenant exists and user has access
+      const Tenant = await storage.getTenant(paymentData.tenantId);
+      if (!Tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this OWNER_TENANT's lot
+      // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(OWNER_TENANT.lotId);
+        const lot = await storage.getLot(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
@@ -2781,12 +2797,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
         if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this OWNER_TENANT' });
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
       }
 
-      // Ensure lotId matches OWNER_TENANT's lot
-      paymentData.lotId = OWNER_TENANT.lotId;
+      // Ensure lotId matches Tenant's lot
+      paymentData.lotId = Tenant.lotId;
 
       const payment = await storage.createPayment(paymentData);
       res.status(201).json({ payment });

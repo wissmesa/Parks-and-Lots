@@ -28,7 +28,7 @@ import {
   Edit3
 } from "lucide-react";
 
-interface OWNER_TENANT {
+interface Tenant {
   id: string;
   firstName: string;
   lastName: string;
@@ -82,20 +82,20 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [editingTenant, setEditingTenant] = useState(false);
 
-  // Fetch OWNER_TENANT details
-  const { data: OWNER_TENANT, isLoading: tenantLoading } = useQuery({
-    queryKey: ['OWNER_TENANT', tenantId],
+  // Fetch Tenant details
+  const { data: Tenant, isLoading: tenantLoading } = useQuery({
+    queryKey: ['Tenant', tenantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/tenants/${tenantId}`);
       const data = await response.json();
-      return data.OWNER_TENANT as OWNER_TENANT;
+      return data.Tenant as Tenant;
     },
     enabled: isOpen && !!tenantId,
   });
 
-  // Fetch OWNER_TENANT payments
+  // Fetch Tenant payments
   const { data: payments, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['OWNER_TENANT-payments', tenantId],
+    queryKey: ['Tenant-payments', tenantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/tenants/${tenantId}/payments`);
       const data = await response.json();
@@ -113,7 +113,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     notes: '',
   });
 
-  // OWNER_TENANT edit form state
+  // Tenant edit form state
   const [tenantForm, setTenantForm] = useState({
     firstName: '',
     lastName: '',
@@ -121,7 +121,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     phone: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
-    status: 'ACTIVE' as OWNER_TENANT['status'],
+    status: 'ACTIVE' as Tenant['status'],
     leaseStartDate: '',
     leaseEndDate: '',
     monthlyRent: '',
@@ -129,22 +129,22 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     notes: '',
   });
 
-  // Set form data when OWNER_TENANT loads
+  // Set form data when Tenant loads
   useState(() => {
-    if (OWNER_TENANT) {
+    if (Tenant) {
       setTenantForm({
-        firstName: OWNER_TENANT.firstName || '',
-        lastName: OWNER_TENANT.lastName || '',
-        email: OWNER_TENANT.email || '',
-        phone: OWNER_TENANT.phone || '',
-        emergencyContactName: OWNER_TENANT.emergencyContactName || '',
-        emergencyContactPhone: OWNER_TENANT.emergencyContactPhone || '',
-        status: OWNER_TENANT.status,
-        leaseStartDate: OWNER_TENANT.leaseStartDate ? OWNER_TENANT.leaseStartDate.split('T')[0] : '',
-        leaseEndDate: OWNER_TENANT.leaseEndDate ? OWNER_TENANT.leaseEndDate.split('T')[0] : '',
-        monthlyRent: OWNER_TENANT.monthlyRent || '',
-        securityDeposit: OWNER_TENANT.securityDeposit || '',
-        notes: OWNER_TENANT.notes || '',
+        firstName: Tenant.firstName || '',
+        lastName: Tenant.lastName || '',
+        email: Tenant.email || '',
+        phone: Tenant.phone || '',
+        emergencyContactName: Tenant.emergencyContactName || '',
+        emergencyContactPhone: Tenant.emergencyContactPhone || '',
+        status: Tenant.status,
+        leaseStartDate: Tenant.leaseStartDate ? Tenant.leaseStartDate.split('T')[0] : '',
+        leaseEndDate: Tenant.leaseEndDate ? Tenant.leaseEndDate.split('T')[0] : '',
+        monthlyRent: Tenant.monthlyRent || '',
+        securityDeposit: Tenant.securityDeposit || '',
+        notes: Tenant.notes || '',
       });
     }
   });
@@ -161,7 +161,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
       return data.payment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['OWNER_TENANT-payments', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['Tenant-payments', tenantId] });
       setShowAddPayment(false);
       setPaymentForm({
         type: 'RENT',
@@ -184,7 +184,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     },
   });
 
-  // Update OWNER_TENANT mutation
+  // Update Tenant mutation
   const updateTenantMutation = useMutation({
     mutationFn: async (updates: any) => {
       const response = await apiRequest('PATCH', `/api/tenants/${tenantId}`, {
@@ -193,21 +193,21 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         leaseEndDate: updates.leaseEndDate ? new Date(updates.leaseEndDate).toISOString() : null,
       });
       const data = await response.json();
-      return data.OWNER_TENANT;
+      return data.Tenant;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['OWNER_TENANT', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['Tenant', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setEditingTenant(false);
       toast({
-        title: "OWNER_TENANT Updated",
-        description: "OWNER_TENANT information has been successfully updated.",
+        title: "Tenant Updated",
+        description: "Tenant information has been successfully updated.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update OWNER_TENANT",
+        description: error.message || "Failed to update Tenant",
         variant: "destructive",
       });
     },
@@ -267,7 +267,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     }
   };
 
-  if (!OWNER_TENANT && !tenantLoading) {
+  if (!Tenant && !tenantLoading) {
     return null;
   }
 
@@ -277,15 +277,15 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            {OWNER_TENANT ? `${OWNER_TENANT.firstName} ${OWNER_TENANT.lastName}` : 'Loading...'}
+            {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
           </DialogTitle>
         </DialogHeader>
 
         {tenantLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading OWNER_TENANT details...</div>
+            <div className="text-muted-foreground">Loading Tenant details...</div>
           </div>
-        ) : OWNER_TENANT ? (
+        ) : Tenant ? (
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -299,11 +299,11 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Status</CardTitle>
-                    {getStatusIcon(OWNER_TENANT.status)}
+                    {getStatusIcon(Tenant.status)}
                   </CardHeader>
                   <CardContent>
-                    <Badge variant={getStatusBadgeVariant(OWNER_TENANT.status)}>
-                      {OWNER_TENANT.status}
+                    <Badge variant={getStatusBadgeVariant(Tenant.status)}>
+                      {Tenant.status}
                     </Badge>
                   </CardContent>
                 </Card>
@@ -315,7 +315,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {OWNER_TENANT.monthlyRent ? formatCurrency(OWNER_TENANT.monthlyRent) : 'N/A'}
+                      {Tenant.monthlyRent ? formatCurrency(Tenant.monthlyRent) : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
@@ -327,7 +327,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {OWNER_TENANT.securityDeposit ? formatCurrency(OWNER_TENANT.securityDeposit) : 'N/A'}
+                      {Tenant.securityDeposit ? formatCurrency(Tenant.securityDeposit) : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
@@ -339,10 +339,10 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm">
-                      {OWNER_TENANT.leaseStartDate && OWNER_TENANT.leaseEndDate ? (
+                      {Tenant.leaseStartDate && Tenant.leaseEndDate ? (
                         <>
-                          <div>{formatDate(OWNER_TENANT.leaseStartDate)}</div>
-                          <div className="text-muted-foreground">to {formatDate(OWNER_TENANT.leaseEndDate)}</div>
+                          <div>{formatDate(Tenant.leaseStartDate)}</div>
+                          <div className="text-muted-foreground">to {formatDate(Tenant.leaseEndDate)}</div>
                         </>
                       ) : (
                         'N/A'
@@ -360,31 +360,31 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{OWNER_TENANT.email}</span>
+                      <span>{Tenant.email}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{OWNER_TENANT.phone}</span>
+                      <span>{Tenant.phone}</span>
                     </div>
-                    {OWNER_TENANT.emergencyContactName && (
+                    {Tenant.emergencyContactName && (
                       <>
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
-                          <span>Emergency: {OWNER_TENANT.emergencyContactName}</span>
+                          <span>Emergency: {Tenant.emergencyContactName}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>{OWNER_TENANT.emergencyContactPhone}</span>
+                          <span>{Tenant.emergencyContactPhone}</span>
                         </div>
                       </>
                     )}
                   </div>
-                  {OWNER_TENANT.notes && (
+                  {Tenant.notes && (
                     <>
                       <Separator />
                       <div>
                         <h4 className="font-medium mb-2">Notes</h4>
-                        <p className="text-sm text-muted-foreground">{OWNER_TENANT.notes}</p>
+                        <p className="text-sm text-muted-foreground">{Tenant.notes}</p>
                       </div>
                     </>
                   )}
@@ -394,7 +394,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
 
             <TabsContent value="details" className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">OWNER_TENANT Details</h3>
+                <h3 className="text-lg font-medium">Tenant Details</h3>
                 <Button
                   onClick={() => setEditingTenant(!editingTenant)}
                   variant="outline"
@@ -447,7 +447,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                     </div>
                     <div>
                       <Label htmlFor="status">Status</Label>
-                      <Select value={tenantForm.status} onValueChange={(value) => setTenantForm(prev => ({ ...prev, status: value as OWNER_TENANT['status'] }))}>
+                      <Select value={tenantForm.status} onValueChange={(value) => setTenantForm(prev => ({ ...prev, status: value as Tenant['status'] }))}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -547,7 +547,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                       type="submit"
                       disabled={updateTenantMutation.isPending}
                     >
-                      {updateTenantMutation.isPending ? 'Updating...' : 'Update OWNER_TENANT'}
+                      {updateTenantMutation.isPending ? 'Updating...' : 'Update Tenant'}
                     </Button>
                   </div>
                 </form>
@@ -556,29 +556,29 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Name</Label>
-                      <div className="p-2 bg-muted rounded">{OWNER_TENANT.firstName} {OWNER_TENANT.lastName}</div>
+                      <div className="p-2 bg-muted rounded">{Tenant.firstName} {Tenant.lastName}</div>
                     </div>
                     <div>
                       <Label>Status</Label>
                       <div className="p-2">
-                        <Badge variant={getStatusBadgeVariant(OWNER_TENANT.status)}>
-                          {OWNER_TENANT.status}
+                        <Badge variant={getStatusBadgeVariant(Tenant.status)}>
+                          {Tenant.status}
                         </Badge>
                       </div>
                     </div>
                     <div>
                       <Label>Email</Label>
-                      <div className="p-2 bg-muted rounded">{OWNER_TENANT.email}</div>
+                      <div className="p-2 bg-muted rounded">{Tenant.email}</div>
                     </div>
                     <div>
                       <Label>Phone</Label>
-                      <div className="p-2 bg-muted rounded">{OWNER_TENANT.phone}</div>
+                      <div className="p-2 bg-muted rounded">{Tenant.phone}</div>
                     </div>
                   </div>
-                  {OWNER_TENANT.notes && (
+                  {Tenant.notes && (
                     <div>
                       <Label>Notes</Label>
-                      <div className="p-2 bg-muted rounded">{OWNER_TENANT.notes}</div>
+                      <div className="p-2 bg-muted rounded">{Tenant.notes}</div>
                     </div>
                   )}
                 </div>
@@ -729,13 +729,13 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                 <div className="text-center py-8">
                   <DollarSign className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium">No Payments</h3>
-                  <p className="text-muted-foreground">No payment records found for this OWNER_TENANT.</p>
+                  <p className="text-muted-foreground">No payment records found for this Tenant.</p>
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="lot" className="space-y-4">
-              {OWNER_TENANT.lot && OWNER_TENANT.park ? (
+              {Tenant.lot && Tenant.park ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -747,21 +747,21 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Lot Name/Number</Label>
-                        <div className="p-2 bg-muted rounded font-medium">{OWNER_TENANT.lot.nameOrNumber}</div>
+                        <div className="p-2 bg-muted rounded font-medium">{Tenant.lot.nameOrNumber}</div>
                       </div>
                       <div>
                         <Label>Park</Label>
-                        <div className="p-2 bg-muted rounded">{OWNER_TENANT.park.name}</div>
+                        <div className="p-2 bg-muted rounded">{Tenant.park.name}</div>
                       </div>
                       <div>
                         <Label>Location</Label>
-                        <div className="p-2 bg-muted rounded">{OWNER_TENANT.park.city}, {OWNER_TENANT.park.state}</div>
+                        <div className="p-2 bg-muted rounded">{Tenant.park.city}, {Tenant.park.state}</div>
                       </div>
                     </div>
-                    {OWNER_TENANT.lot.description && (
+                    {Tenant.lot.description && (
                       <div>
                         <Label>Description</Label>
-                        <div className="p-2 bg-muted rounded">{OWNER_TENANT.lot.description}</div>
+                        <div className="p-2 bg-muted rounded">{Tenant.lot.description}</div>
                       </div>
                     )}
                   </CardContent>
@@ -770,7 +770,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                 <div className="text-center py-8">
                   <MapPin className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium">No Lot Information</h3>
-                  <p className="text-muted-foreground">Lot information is not available for this OWNER_TENANT.</p>
+                  <p className="text-muted-foreground">Lot information is not available for this Tenant.</p>
                 </div>
               )}
             </TabsContent>
@@ -778,8 +778,8 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         ) : (
           <div className="text-center py-8">
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">OWNER_TENANT Not Found</h3>
-            <p className="text-muted-foreground">The requested OWNER_TENANT could not be found.</p>
+            <h3 className="text-lg font-medium">Tenant Not Found</h3>
+            <p className="text-muted-foreground">The requested Tenant could not be found.</p>
           </div>
         )}
       </DialogContent>

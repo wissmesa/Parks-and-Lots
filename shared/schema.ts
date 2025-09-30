@@ -332,7 +332,7 @@ export const tenantsRelations = relations(tenants, ({ one, many }) => ({
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
-  OWNER_TENANT: one(tenants, {
+  Tenant: one(tenants, {
     fields: [payments.tenantId],
     references: [tenants.id],
   }),
@@ -457,7 +457,7 @@ export type GoogleCalendarToken = typeof googleCalendarTokens.$inferSelect;
 export type InsertGoogleCalendarToken = z.infer<typeof insertGoogleCalendarTokenSchema>;
 export type SpecialStatus = typeof specialStatuses.$inferSelect;
 export type InsertSpecialStatus = z.infer<typeof insertSpecialStatusSchema>;
-export type OWNER_TENANT = typeof tenants.$inferSelect;
+export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;

@@ -31,8 +31,8 @@ export default function Home() {
     return null;
   }
 
-  if (user?.role === 'OWNER_TENANT') {
-    window.location.href = '/OWNER_TENANT';
+  if (user?.role === 'Tenant') {
+    window.location.href = '/Tenant';
     return null;
   }
 

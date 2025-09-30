@@ -66,8 +66,8 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
-                {user?.role === 'OWNER_TENANT' && (
-                  <Link href="/OWNER_TENANT">
+                {user?.role === 'Tenant' && (
+                  <Link href="/Tenant">
                     <Button 
                       variant="outline" 
                       size="sm"

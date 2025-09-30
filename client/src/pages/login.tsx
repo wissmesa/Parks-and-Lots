@@ -30,8 +30,8 @@ export default function Login() {
         window.location.href = "/admin";
       } else if (userData.role === 'MANAGER') {
         window.location.href = "/manager";
-      } else if (userData.role === 'OWNER_TENANT') {
-        window.location.href = "/OWNER_TENANT";
+      } else if (userData.role === 'Tenant') {
+        window.location.href = "/Tenant";
       } else {
         window.location.href = "/";
       }
