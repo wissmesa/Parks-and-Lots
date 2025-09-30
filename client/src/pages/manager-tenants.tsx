@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { TenantDetailDialog } from "@/components/ui/tenant-detail-dialog";
+import { TenantStepForm } from "@/components/ui/tenant-step-form";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,15 +85,9 @@ export default function ManagerTenants() {
     lastName: "",
     email: "",
     phone: "",
-    emergencyContactName: "",
-    emergencyContactPhone: "",
-    status: "PENDING" as Tenant['status'],
+    parkId: "",
     lotId: "",
-    leaseStartDate: "",
-    leaseEndDate: "",
-    monthlyRent: "",
-    securityDeposit: "",
-    notes: "",
+    status: "PENDING" as Tenant['status'],
   });
 
   // Fetch tenants (filtered by manager's assigned parks)
@@ -157,15 +152,9 @@ export default function ManagerTenants() {
       lastName: "",
       email: "",
       phone: "",
-      emergencyContactName: "",
-      emergencyContactPhone: "",
-      status: "PENDING",
+      parkId: "",
       lotId: "",
-      leaseStartDate: "",
-      leaseEndDate: "",
-      monthlyRent: "",
-      securityDeposit: "",
-      notes: "",
+      status: "PENDING",
     });
   };
 
@@ -258,172 +247,13 @@ export default function ManagerTenants() {
                     Add Tenant
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Add New Tenant</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="firstName">First Name *</Label>
-                        <Input
-                          id="firstName"
-                          value={formData.firstName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="lastName">Last Name *</Label>
-                        <Input
-                          id="lastName"
-                          value={formData.lastName}
-                          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email">Email *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone">Phone *</Label>
-                        <Input
-                          id="phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="status">Status</Label>
-                        <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Tenant['status'] }))}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PENDING">Pending</SelectItem>
-                            <SelectItem value="ACTIVE">Active</SelectItem>
-                            <SelectItem value="INACTIVE">Inactive</SelectItem>
-                            <SelectItem value="TERMINATED">Terminated</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="lotId">Lot *</Label>
-                        <Select value={formData.lotId} onValueChange={(value) => setFormData(prev => ({ ...prev, lotId: value }))}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a lot" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {lots?.map((lot) => (
-                              <SelectItem key={lot.id} value={lot.id}>
-                                {lot.nameOrNumber} - {lot.park?.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Emergency Contact</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="emergencyContactName">Name</Label>
-                          <Input
-                            id="emergencyContactName"
-                            value={formData.emergencyContactName}
-                            onChange={(e) => setFormData(prev => ({ ...prev, emergencyContactName: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="emergencyContactPhone">Phone</Label>
-                          <Input
-                            id="emergencyContactPhone"
-                            value={formData.emergencyContactPhone}
-                            onChange={(e) => setFormData(prev => ({ ...prev, emergencyContactPhone: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Lease Information</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="leaseStartDate">Lease Start Date</Label>
-                          <Input
-                            id="leaseStartDate"
-                            type="date"
-                            value={formData.leaseStartDate}
-                            onChange={(e) => setFormData(prev => ({ ...prev, leaseStartDate: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="leaseEndDate">Lease End Date</Label>
-                          <Input
-                            id="leaseEndDate"
-                            type="date"
-                            value={formData.leaseEndDate}
-                            onChange={(e) => setFormData(prev => ({ ...prev, leaseEndDate: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="monthlyRent">Monthly Rent</Label>
-                          <Input
-                            id="monthlyRent"
-                            type="number"
-                            step="0.01"
-                            value={formData.monthlyRent}
-                            onChange={(e) => setFormData(prev => ({ ...prev, monthlyRent: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="securityDeposit">Security Deposit</Label>
-                          <Input
-                            id="securityDeposit"
-                            type="number"
-                            step="0.01"
-                            value={formData.securityDeposit}
-                            onChange={(e) => setFormData(prev => ({ ...prev, securityDeposit: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowCreateModal(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={createTenantMutation.isPending}
-                      >
-                        {createTenantMutation.isPending ? 'Creating...' : 'Create Tenant'}
-                      </Button>
-                    </div>
-                  </form>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <TenantStepForm
+                    onSubmit={(data) => createTenantMutation.mutate(data)}
+                    onCancel={() => setShowCreateModal(false)}
+                    isLoading={createTenantMutation.isPending}
+                    isManager={true}
+                  />
                 </DialogContent>
               </Dialog>
             </div>
