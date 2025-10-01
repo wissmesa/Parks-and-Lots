@@ -867,7 +867,7 @@ export default function ManagerLots() {
                     Add New Lot
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create New Lot</DialogTitle>
                 </DialogHeader>
@@ -950,7 +950,7 @@ export default function ManagerLots() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="bedrooms">Bedrooms</Label>
                       <Input
@@ -988,7 +988,7 @@ export default function ManagerLots() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="houseManufacturer">House Manufacturer</Label>
                       <Input
@@ -1011,7 +1011,7 @@ export default function ManagerLots() {
                   
                   <div>
                     <Label>Status (Select multiple)</Label>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                       {['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].map((status) => (
                         <div key={status} className="flex items-center space-x-2">
                           <Checkbox

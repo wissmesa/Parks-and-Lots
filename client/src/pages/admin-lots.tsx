@@ -84,9 +84,9 @@ export default function AdminLots() {
     priceRentToOwn: "",
     priceContractForDeed: "",
     description: "",
-    bedrooms: "",
-    bathrooms: "",
-    sqFt: "",
+    bedrooms: 1,
+    bathrooms: 1,
+    sqFt: 0,
     houseManufacturer: "",
     houseModel: "",
     parkId: ""
@@ -556,9 +556,9 @@ export default function AdminLots() {
       priceRentToOwn: "",
       priceContractForDeed: "",
       description: "",
-      bedrooms: "",
-      bathrooms: "",
-      sqFt: "",
+      bedrooms: 1,
+      bathrooms: 1,
+      sqFt: 0,
       houseManufacturer: "",
       houseModel: "",
       parkId: ""
@@ -576,9 +576,9 @@ export default function AdminLots() {
       priceRentToOwn: (lot as any).priceRentToOwn || "",
       priceContractForDeed: (lot as any).priceContractForDeed || "",
       description: lot.description || "",
-      bedrooms: lot.bedrooms?.toString() || "",
-      bathrooms: lot.bathrooms?.toString() || "",
-      sqFt: lot.sqFt?.toString() || "",
+      bedrooms: lot.bedrooms || 1,
+      bathrooms: lot.bathrooms || 1,
+      sqFt: lot.sqFt || 0,
       houseManufacturer: lot.houseManufacturer || "",
       houseModel: lot.houseModel || "",
       parkId: lot.parkId
@@ -850,20 +850,11 @@ export default function AdminLots() {
               </Button>
             </div>
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create New Lot</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Label htmlFor="nameOrNumber">Lot Name/Number</Label>
-                    <Input
-                      id="nameOrNumber"
-                      value={formData.nameOrNumber}
-                      onChange={(e) => setFormData(prev => ({ ...prev, nameOrNumber: e.target.value }))}
-                      required
-                    />
-                  </div>
                   <div>
                     <Label htmlFor="parkId">Park</Label>
                     <Select value={formData.parkId} onValueChange={(value) => setFormData(prev => ({ ...prev, parkId: value }))}>
@@ -879,102 +870,78 @@ export default function AdminLots() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label htmlFor="status">Status</Label>
-                      <div className="space-y-2">
-                        {[
-                          { value: 'FOR_RENT', label: 'For Rent' },
-                          { value: 'FOR_SALE', label: 'For Sale' },
-                          { value: 'RENT_TO_OWN', label: 'Rent to Own' },
-                          { value: 'CONTRACT_FOR_DEED', label: 'Contract for Deed' }
-                        ].map((statusOption) => (
-                          <div key={statusOption.value} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`status-${statusOption.value}`}
-                              checked={formData.status.includes(statusOption.value as any)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData(prev => ({ 
-                                    ...prev, 
-                                    status: [...prev.status, statusOption.value as any] 
-                                  }));
-                                } else {
-                                  setFormData(prev => ({ 
-                                    ...prev, 
-                                    status: prev.status.filter(s => s !== statusOption.value) 
-                                  }));
-                                }
-                              }}
-                              className="rounded"
-                            />
-                            <label htmlFor={`status-${statusOption.value}`} className="text-sm">
-                              {statusOption.label}
-                            </label>
-                          </div>
-                        ))}
+                  
+                  <div>
+                    <Label htmlFor="nameOrNumber">Lot Name/Number</Label>
+                    <Input
+                      id="nameOrNumber"
+                      value={formData.nameOrNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, nameOrNumber: e.target.value }))}
+                      placeholder="e.g., Lot 12A"
+                      required
+                    />
+                  </div>
+                  {/* Price fields for each status */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Prices by Status</Label>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <Label htmlFor="priceForRent">For Rent ($)</Label>
+                        <Input
+                          id="priceForRent"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceForRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                          placeholder="Monthly rent amount"
+                        />
                       </div>
-                    </div>
-                    {/* Price fields for each status */}
-                    <div className="space-y-3">
-                      <Label className="text-base font-medium">Prices by Status</Label>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div>
-                          <Label htmlFor="priceForRent">For Rent ($)</Label>
-                          <Input
-                            id="priceForRent"
-                            type="number"
-                            step="0.01"
-                            value={formData.priceForRent}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                            placeholder="Monthly rent amount"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="priceForSale">For Sale ($)</Label>
-                          <Input
-                            id="priceForSale"
-                            type="number"
-                            step="0.01"
-                            value={formData.priceForSale}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                            placeholder="Sale price"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
-                          <Input
-                            id="priceRentToOwn"
-                            type="number"
-                            step="0.01"
-                            value={formData.priceRentToOwn}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                            placeholder="Monthly rent-to-own amount"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
-                          <Input
-                            id="priceContractForDeed"
-                            type="number"
-                            step="0.01"
-                            value={formData.priceContractForDeed}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                            placeholder="Monthly contract payment"
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="priceForSale">For Sale ($)</Label>
+                        <Input
+                          id="priceForSale"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceForSale}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                          placeholder="Sale price"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
+                        <Input
+                          id="priceRentToOwn"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceRentToOwn}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                          placeholder="Monthly rent-to-own amount"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
+                        <Input
+                          id="priceContractForDeed"
+                          type="number"
+                          step="0.01"
+                          value={formData.priceContractForDeed}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                          placeholder="Monthly contract payment"
+                        />
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="bedrooms">Bedrooms</Label>
                       <Input
                         id="bedrooms"
                         type="number"
+                        min="1"
                         value={formData.bedrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: e.target.value }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) || 1 }))}
+                        required
                       />
                     </div>
                     <div>
@@ -982,21 +949,28 @@ export default function AdminLots() {
                       <Input
                         id="bathrooms"
                         type="number"
+                        min="1"
                         value={formData.bathrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="sqFt">Sq Ft</Label>
-                      <Input
-                        id="sqFt"
-                        type="number"
-                        value={formData.sqFt}
-                        onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseInt(e.target.value) || 1 }))}
+                        required
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  
+                  <div>
+                    <Label htmlFor="sqFt">Square Feet</Label>
+                    <Input
+                      id="sqFt"
+                      type="number"
+                      min="1"
+                      value={formData.sqFt}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) || 0 }))}
+                      placeholder="e.g., 1200"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="houseManufacturer">House Manufacturer</Label>
                       <Input
@@ -1016,21 +990,47 @@ export default function AdminLots() {
                       />
                     </div>
                   </div>
+                  
+                  <div>
+                    <Label>Status (Select multiple)</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                      {['FOR_RENT', 'FOR_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED'].map((status) => (
+                        <div key={status} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`create-status-${status}`}
+                            checked={formData.status.includes(status as any)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData(prev => ({ ...prev, status: [...prev.status, status as any] }));
+                              } else {
+                                setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== status) }));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`create-status-${status}`} className="text-sm cursor-pointer">
+                            {status === "FOR_RENT" ? "For Rent" : status === "FOR_SALE" ? "For Sale" : status === "RENT_TO_OWN" ? "Rent to Own" : "Contract for Deed"}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <div>
                     <Label htmlFor="description">Description</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe the lot features..."
                       rows={3}
                     />
                   </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                  
+                  <div className="flex space-x-3">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)} className="flex-1">
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "Creating..." : "Create"}
+                    <Button type="submit" className="flex-1" disabled={createMutation.isPending}>
+                      {createMutation.isPending ? "Creating..." : "Create Lot"}
                     </Button>
                   </div>
                 </form>
