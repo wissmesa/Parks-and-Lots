@@ -1215,6 +1215,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mark invite as accepted
       await storage.acceptInvite(token);
 
+      // If this is a tenant user, update their tenant status to ACTIVE
+      if (invite.role === 'TENANT') {
+        try {
+          const tenant = await storage.getTenantByEmail(invite.email);
+          if (tenant) {
+            await storage.updateTenant(tenant.id, { status: 'ACTIVE' });
+          }
+        } catch (tenantError) {
+          console.error('Failed to update tenant status:', tenantError);
+          // Don't fail the entire request if tenant status update fails
+        }
+      }
+
       const tokens = generateTokens(user);
       res.json({
         user: { 
