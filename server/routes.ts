@@ -352,6 +352,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manager Parks Endpoint
+  app.get('/api/manager/parks', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const assignments = await storage.getManagerAssignments(req.user!.id);
+      const parkIds = assignments.map((a: any) => a.parkId);
+      
+      let assignedParks = [];
+      for (const parkId of parkIds) {
+        // Use getParkAny to avoid filtering by isActive
+        const park = await storage.getParkAny(parkId);
+        if (park) {
+          assignedParks.push(park);
+        }
+      }
+      
+      res.json({ parks: assignedParks });
+    } catch (error) {
+      console.error('Manager parks error:', error);
+      res.status(500).json({ message: 'Failed to fetch parks' });
+    }
+  });
+
   // Manager Lots CRUD Endpoints
   app.get('/api/manager/lots', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
     try {
@@ -2527,6 +2549,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if a tenant with this email already exists
+      console.log('Checking for existing tenant with email:', tenantData.email);
+      const existingTenant = await storage.getTenantByEmail(tenantData.email);
+      console.log('Existing tenant found:', existingTenant);
+      if (existingTenant) {
+        console.log('Duplicate email detected, rejecting request');
+        return res.status(400).json({ 
+          message: 'A tenant with this email already exists' 
+        });
+      }
+
       // Check if a user with this email already exists
       const existingUser = await storage.getUserByEmail(tenantData.email);
       let user = existingUser;
@@ -2708,6 +2741,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updates[key] = null;
         }
       });
+
+      // If email is being updated, check for uniqueness
+      if (updates.email && updates.email !== existingTenant.email) {
+        const existingTenantWithEmail = await storage.getTenantByEmail(updates.email);
+        if (existingTenantWithEmail && existingTenantWithEmail.id !== tenantId) {
+          return res.status(400).json({ 
+            message: 'A tenant with this email already exists' 
+          });
+        }
+      }
+
+      // Validate the updates using the schema
+      const validation = insertTenantSchema.partial().safeParse(updates);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid tenant data', 
+          errors: validation.error.errors 
+        });
+      }
 
       const Tenant = await storage.updateTenant(tenantId, updates);
       res.json({ Tenant });

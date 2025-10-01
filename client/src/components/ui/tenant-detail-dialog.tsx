@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { validateEmail, validatePhone, validateRequired } from "@/lib/validation";
 import { 
   User, 
   Phone, 
@@ -140,6 +141,39 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     securityDeposit: '',
     notes: '',
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Validation functions
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'firstName':
+        error = validateRequired(value, 'First name');
+        break;
+      case 'lastName':
+        error = validateRequired(value, 'Last name');
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'phone':
+        error = validatePhone(value);
+        break;
+      case 'emergencyContactPhone':
+        if (value && !validatePhone(value)) {
+          error = validatePhone(value);
+        }
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+    
+    return !error;
+  };
 
   // Set form data when Tenant loads
   useState(() => {
@@ -232,6 +266,10 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      // Invalidate lot queries to update assignment status
+      queryClient.invalidateQueries({ queryKey: ['lots-for-tenant-form'] });
+      queryClient.invalidateQueries({ queryKey: ['manager-lots-for-tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['all-lots-for-tenant-form'] });
       setShowDeleteConfirm(false);
       onClose(); // Close the dialog after deleting
       toast({
@@ -311,23 +349,10 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
-            </DialogTitle>
-            {Tenant && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            )}
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
+          </DialogTitle>
         </DialogHeader>
 
         {tenantLoading ? (
@@ -481,18 +506,40 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                         id="email"
                         type="email"
                         value={tenantForm.email}
-                        onChange={(e) => setTenantForm(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => {
+                          setTenantForm(prev => ({ ...prev, email: e.target.value }));
+                          validateField('email', e.target.value);
+                        }}
+                        onBlur={(e) => validateField('email', e.target.value)}
                         required
+                        className={validationErrors.email ? 'border-red-500' : ''}
                       />
+                      {validationErrors.email && (
+                        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {validationErrors.email}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="phone">Phone</Label>
                       <Input
                         id="phone"
                         value={tenantForm.phone}
-                        onChange={(e) => setTenantForm(prev => ({ ...prev, phone: e.target.value }))}
+                        onChange={(e) => {
+                          setTenantForm(prev => ({ ...prev, phone: e.target.value }));
+                          validateField('phone', e.target.value);
+                        }}
+                        onBlur={(e) => validateField('phone', e.target.value)}
                         required
+                        className={validationErrors.phone ? 'border-red-500' : ''}
                       />
+                      {validationErrors.phone && (
+                        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {validationErrors.phone}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="status">Status</Label>
@@ -526,8 +573,19 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                       <Input
                         id="emergencyContactPhone"
                         value={tenantForm.emergencyContactPhone}
-                        onChange={(e) => setTenantForm(prev => ({ ...prev, emergencyContactPhone: e.target.value }))}
+                        onChange={(e) => {
+                          setTenantForm(prev => ({ ...prev, emergencyContactPhone: e.target.value }));
+                          validateField('emergencyContactPhone', e.target.value);
+                        }}
+                        onBlur={(e) => validateField('emergencyContactPhone', e.target.value)}
+                        className={validationErrors.emergencyContactPhone ? 'border-red-500' : ''}
                       />
+                      {validationErrors.emergencyContactPhone && (
+                        <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          {validationErrors.emergencyContactPhone}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -829,6 +887,21 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">Tenant Not Found</h3>
             <p className="text-muted-foreground">The requested Tenant could not be found.</p>
+          </div>
+        )}
+
+        {/* Delete Button at Bottom */}
+        {Tenant && (
+          <div className="flex justify-end pt-4 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Tenant
+            </Button>
           </div>
         )}
       </DialogContent>

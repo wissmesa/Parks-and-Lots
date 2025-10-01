@@ -13,7 +13,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle } from "lucide-react";
+import { validateEmail, validatePhone } from "@/lib/validation";
 
 interface Company {
   id: string;
@@ -48,9 +49,35 @@ export default function AdminCompanies() {
     phone: "",
     email: ""
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [assigningParks, setAssigningParks] = useState<Company | null>(null);
   const [selectedParkIds, setSelectedParkIds] = useState<string[]>([]);
+
+  // Validation functions
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'email':
+        if (value && !validateEmail(value)) {
+          error = validateEmail(value);
+        }
+        break;
+      case 'phone':
+        if (value && !validatePhone(value)) {
+          error = validatePhone(value);
+        }
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+    
+    return !error;
+  };
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -307,8 +334,19 @@ export default function AdminCompanies() {
                     <Input
                       id="phone"
                       value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, phone: e.target.value }));
+                        validateField('phone', e.target.value);
+                      }}
+                      onBlur={(e) => validateField('phone', e.target.value)}
+                      className={validationErrors.phone ? 'border-red-500' : ''}
                     />
+                    {validationErrors.phone && (
+                      <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        {validationErrors.phone}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="email">Email</Label>
@@ -316,8 +354,19 @@ export default function AdminCompanies() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, email: e.target.value }));
+                        validateField('email', e.target.value);
+                      }}
+                      onBlur={(e) => validateField('email', e.target.value)}
+                      className={validationErrors.email ? 'border-red-500' : ''}
                     />
+                    {validationErrors.email && (
+                      <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        {validationErrors.email}
+                      </p>
+                    )}
                   </div>
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
@@ -503,8 +552,19 @@ export default function AdminCompanies() {
                 <Input
                   id="edit-phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, phone: e.target.value }));
+                    validateField('phone', e.target.value);
+                  }}
+                  onBlur={(e) => validateField('phone', e.target.value)}
+                  className={validationErrors.phone ? 'border-red-500' : ''}
                 />
+                {validationErrors.phone && (
+                  <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {validationErrors.phone}
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="edit-email">Email</Label>
@@ -512,8 +572,19 @@ export default function AdminCompanies() {
                   id="edit-email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, email: e.target.value }));
+                    validateField('email', e.target.value);
+                  }}
+                  onBlur={(e) => validateField('email', e.target.value)}
+                  className={validationErrors.email ? 'border-red-500' : ''}
                 />
+                {validationErrors.email && (
+                  <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {validationErrors.email}
+                  </p>
+                )}
               </div>
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setEditingCompany(null)}>

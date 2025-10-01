@@ -187,7 +187,7 @@ export const tenants = pgTable("tenants", {
   lotId: varchar("lot_id").references(() => lots.id).notNull(),
   firstName: varchar("first_name").notNull(),
   lastName: varchar("last_name").notNull(),
-  email: varchar("email").notNull(),
+  email: varchar("email").notNull().unique(),
   phone: varchar("phone").notNull(),
   emergencyContactName: varchar("emergency_contact_name"),
   emergencyContactPhone: varchar("emergency_contact_phone"),
@@ -343,12 +343,20 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 }));
 
 // Zod schemas
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Please enter a valid email address"),
+}).omit({
   id: true,
   createdAt: true,
 });
 
-export const insertCompanySchema = createInsertSchema(companies).omit({
+export const insertCompanySchema = createInsertSchema(companies, {
+  email: z.string().email("Please enter a valid email address").optional().nullable(),
+  phone: z.string().regex(
+    /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
+    "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
+  ).optional().nullable(),
+}).omit({
   id: true,
   createdAt: true,
 });
@@ -378,7 +386,9 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({
   id: true,
 });
 
-export const insertInviteSchema = createInsertSchema(invites).omit({
+export const insertInviteSchema = createInsertSchema(invites, {
+  email: z.string().email("Please enter a valid email address"),
+}).omit({
   id: true,
   token: true,
   expiresAt: true,
@@ -398,6 +408,11 @@ export const insertSpecialStatusSchema = createInsertSchema(specialStatuses).omi
 });
 
 export const insertTenantSchema = createInsertSchema(tenants, {
+  email: z.string().email("Please enter a valid email address"),
+  phone: z.string().regex(
+    /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
+    "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
+  ),
   leaseStartDate: z.union([
     z.string().transform((val) => {
       if (!val || val === '') return null;
@@ -429,9 +444,12 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 });
 
 export const bookingSchema = z.object({
-  clientName: z.string().min(1),
-  clientEmail: z.string().email(),
-  clientPhone: z.string().min(1),
+  clientName: z.string().min(1, "Client name is required"),
+  clientEmail: z.string().email("Please enter a valid email address"),
+  clientPhone: z.string().regex(
+    /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
+    "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
+  ),
   startDt: z.string().datetime(),
   endDt: z.string().datetime(),
 });

@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { UserPlus, Plus, Copy, Trash2, Mail } from "lucide-react";
+import { UserPlus, Plus, Copy, Trash2, Mail, AlertCircle } from "lucide-react";
+import { validateEmail } from "@/lib/validation";
 
 interface Invite {
   id: string;
@@ -32,6 +33,25 @@ export default function AdminInvites() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Validation functions
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'email':
+        error = validateEmail(value);
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+    
+    return !error;
+  };
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -101,6 +121,19 @@ export default function AdminInvites() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email
+    const emailValid = validateField('email', inviteEmail);
+    
+    if (!emailValid) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the email address before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (inviteEmail.trim()) {
       createInviteMutation.mutate(inviteEmail.trim());
     }
@@ -151,10 +184,21 @@ export default function AdminInvites() {
                       id="email"
                       type="email"
                       value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onChange={(e) => {
+                        setInviteEmail(e.target.value);
+                        validateField('email', e.target.value);
+                      }}
+                      onBlur={(e) => validateField('email', e.target.value)}
                       placeholder="manager@example.com"
                       required
+                      className={validationErrors.email ? 'border-red-500' : ''}
                     />
+                    {validationErrors.email && (
+                      <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-4 w-4" />
+                        {validationErrors.email}
+                      </p>
+                    )}
                   </div>
                   <div className="bg-muted p-3 rounded-lg">
                     <p className="text-sm text-muted-foreground">

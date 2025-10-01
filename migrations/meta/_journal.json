@@ -43,6 +43,20 @@
       "when": 1759240894182,
       "tag": "0005_glossy_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1759331704703,
+      "tag": "0006_boring_roxanne_simpson",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1759332000000,
+      "tag": "0007_add_test_users",
+      "breakpoints": true
     }
   ]
 }

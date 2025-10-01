@@ -121,8 +121,7 @@ export default function ManagerTenants() {
     queryKey: ['manager-lots-for-tenants'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/manager/lots');
-      const data = await response.json();
-      return data as Lot[];
+      return response.json();
     },
     enabled: showCreateModal,
   });
@@ -142,6 +141,10 @@ export default function ManagerTenants() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      // Invalidate lot queries to update assignment status
+      queryClient.invalidateQueries({ queryKey: ['lots-for-tenant-form'] });
+      queryClient.invalidateQueries({ queryKey: ['manager-lots-for-tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['all-lots-for-tenant-form'] });
       setShowCreateModal(false);
       resetForm();
       toast({
@@ -165,6 +168,10 @@ export default function ManagerTenants() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      // Invalidate lot queries to update assignment status
+      queryClient.invalidateQueries({ queryKey: ['lots-for-tenant-form'] });
+      queryClient.invalidateQueries({ queryKey: ['manager-lots-for-tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['all-lots-for-tenant-form'] });
       setTenantToDelete(null);
       toast({
         title: "Tenant Deleted",
@@ -175,6 +182,29 @@ export default function ManagerTenants() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete Tenant",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update Tenant status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ tenantId, status }: { tenantId: string; status: Tenant['status'] }) => {
+      const response = await apiRequest('PATCH', `/api/tenants/${tenantId}`, { status });
+      const data = await response.json();
+      return data.Tenant;
+    },
+    onSuccess: (updatedTenant) => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      toast({
+        title: "Status Updated",
+        description: `Tenant status has been updated to ${updatedTenant.status}.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update tenant status",
         variant: "destructive",
       });
     },
@@ -254,6 +284,10 @@ export default function ManagerTenants() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const handleStatusChange = (tenantId: string, newStatus: Tenant['status']) => {
+    updateStatusMutation.mutate({ tenantId, status: newStatus });
   };
 
   const filteredTenants = tenants || [];
@@ -414,10 +448,26 @@ export default function ManagerTenants() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={getStatusBadgeVariant(Tenant.status)} className="flex items-center gap-1 w-fit">
-                              {getStatusIcon(Tenant.status)}
-                              {Tenant.status}
-                            </Badge>
+                            <Select 
+                              value={Tenant.status} 
+                              onValueChange={(newStatus) => handleStatusChange(Tenant.id, newStatus as Tenant['status'])}
+                            >
+                              <SelectTrigger className="w-fit p-0 border-0 bg-transparent hover:bg-transparent">
+                                <Badge 
+                                  variant={getStatusBadgeVariant(Tenant.status)} 
+                                  className="flex items-center gap-1 w-fit cursor-pointer hover:opacity-80 transition-opacity"
+                                >
+                                  {getStatusIcon(Tenant.status)}
+                                  {Tenant.status}
+                                </Badge>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ACTIVE">Active</SelectItem>
+                                <SelectItem value="PENDING">Pending</SelectItem>
+                                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                <SelectItem value="TERMINATED">Terminated</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             {Tenant.monthlyRent ? formatCurrency(Tenant.monthlyRent) : 'N/A'}

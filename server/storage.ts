@@ -479,7 +479,12 @@ export class DatabaseStorage implements IStorage {
         name: specialStatuses.name,
         color: specialStatuses.color,
         isActive: specialStatuses.isActive
-      }
+      },
+      // Add tenant assignment info
+      tenantId: tenants.id,
+      tenantName: sql<string>`CONCAT(${tenants.firstName}, ' ', ${tenants.lastName})`,
+      tenantStatus: tenants.status,
+      isAssigned: sql<boolean>`CASE WHEN ${tenants.id} IS NOT NULL THEN true ELSE false END`
     };
     
     const conditions = [];
@@ -533,6 +538,7 @@ export class DatabaseStorage implements IStorage {
           .leftJoin(parks, eq(lots.parkId, parks.id))
           .leftJoin(companies, eq(parks.companyId, companies.id))
           .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .leftJoin(tenants, eq(lots.id, tenants.lotId))
           .where(and(...conditions))
           .orderBy(asc(lots.nameOrNumber));
       } else {
@@ -540,6 +546,7 @@ export class DatabaseStorage implements IStorage {
           .leftJoin(parks, eq(lots.parkId, parks.id))
           .leftJoin(companies, eq(parks.companyId, companies.id))
           .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .leftJoin(tenants, eq(lots.id, tenants.lotId))
           .orderBy(asc(lots.nameOrNumber));
       }
       console.log(`getLotsWithParkInfo (includeInactive=true): Found ${result.length} lots`);
@@ -549,6 +556,7 @@ export class DatabaseStorage implements IStorage {
           .innerJoin(parks, eq(lots.parkId, parks.id))
           .innerJoin(companies, eq(parks.companyId, companies.id))
           .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .leftJoin(tenants, eq(lots.id, tenants.lotId))
           .where(and(...conditions))
           .orderBy(asc(lots.nameOrNumber));
       } else {
@@ -556,6 +564,7 @@ export class DatabaseStorage implements IStorage {
           .innerJoin(parks, eq(lots.parkId, parks.id))
           .innerJoin(companies, eq(parks.companyId, companies.id))
           .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+          .leftJoin(tenants, eq(lots.id, tenants.lotId))
           .orderBy(asc(lots.nameOrNumber));
       }
       console.log(`getLotsWithParkInfo (includeInactive=false): Found ${result.length} lots`);

@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Check, ChevronsUpDown, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { validateEmail, validatePhone, validateRequired } from "@/lib/validation";
 
 interface Park {
   id: string;
@@ -26,6 +27,9 @@ interface Lot {
   };
   status: string[];
   isAssigned?: boolean;
+  tenantId?: string;
+  tenantName?: string;
+  tenantStatus?: string;
 }
 
 interface TenantFormData {
@@ -56,17 +60,18 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
     lotId: "",
     status: "PENDING"
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const [parkOpen, setParkOpen] = useState(false);
   const [lotOpen, setLotOpen] = useState(false);
   const [parkSearch, setParkSearch] = useState("");
   const [lotSearch, setLotSearch] = useState("");
 
-  // Fetch all parks
+  // Fetch parks (filtered for managers)
   const { data: parksData, isLoading: parksLoading } = useQuery({
-    queryKey: ['parks-for-tenant-form'],
+    queryKey: ['parks-for-tenant-form', isManager],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/parks');
+      const response = await apiRequest('GET', isManager ? '/api/manager/parks' : '/api/parks');
       return response.json();
     },
   });
@@ -82,18 +87,8 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
     enabled: !!formData.parkId,
   });
 
-  // Fetch all lots for manager view
-  const { data: allLotsData, isLoading: allLotsLoading } = useQuery({
-    queryKey: ['all-lots-for-tenant-form'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', isManager ? '/api/manager/lots' : '/api/lots');
-      return response.json();
-    },
-    enabled: isManager,
-  });
-
   const parks = parksData?.parks || [];
-  const lots = isManager ? (allLotsData || []) : (lotsData?.lots || []);
+  const lots = lotsData?.lots || [];
 
   // Filter parks based on search
   const filteredParks = parks.filter((park: Park) =>
@@ -102,14 +97,46 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
     park.state.toLowerCase().includes(parkSearch.toLowerCase())
   );
 
-  // Filter lots based on search
-  const filteredLots = lots.filter((lot: Lot) =>
-    lot.nameOrNumber.toLowerCase().includes(lotSearch.toLowerCase()) ||
-    (lot.park?.name && lot.park.name.toLowerCase().includes(lotSearch.toLowerCase()))
-  );
+  // Filter lots based on search and selected park
+  const filteredLots = lots.filter((lot: Lot) => {
+    const matchesSearch = lot.nameOrNumber.toLowerCase().includes(lotSearch.toLowerCase()) ||
+      (lot.park?.name && lot.park.name.toLowerCase().includes(lotSearch.toLowerCase()));
+    
+    // For managers, ensure lot belongs to selected park
+    const matchesPark = isManager ? lot.parkId === formData.parkId : true;
+    
+    return matchesSearch && matchesPark;
+  });
 
   const selectedPark = parks.find((park: Park) => park.id === formData.parkId);
   const selectedLot = lots.find((lot: Lot) => lot.id === formData.lotId);
+
+  // Validation functions
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'firstName':
+        error = validateRequired(value, 'First name');
+        break;
+      case 'lastName':
+        error = validateRequired(value, 'Last name');
+        break;
+      case 'email':
+        error = validateEmail(value);
+        break;
+      case 'phone':
+        error = validatePhone(value);
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+    
+    return !error;
+  };
 
   const handleNext = () => {
     if (currentStep < 3) {
@@ -128,7 +155,8 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
     onSubmit(formData);
   };
 
-  const isStep1Valid = formData.firstName && formData.lastName && formData.email && formData.phone;
+  const isStep1Valid = formData.firstName && formData.lastName && formData.email && formData.phone &&
+    !validationErrors.firstName && !validationErrors.lastName && !validationErrors.email && !validationErrors.phone;
   const isStep2Valid = formData.parkId;
   const isStep3Valid = formData.lotId;
 
@@ -140,20 +168,42 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
           <Input
             id="firstName"
             value={formData.firstName}
-            onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, firstName: e.target.value }));
+              validateField('firstName', e.target.value);
+            }}
+            onBlur={(e) => validateField('firstName', e.target.value)}
             required
             placeholder="Enter first name"
+            className={validationErrors.firstName ? 'border-red-500' : ''}
           />
+          {validationErrors.firstName && (
+            <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              {validationErrors.firstName}
+            </p>
+          )}
         </div>
         <div>
           <Label htmlFor="lastName">Last Name *</Label>
           <Input
             id="lastName"
             value={formData.lastName}
-            onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, lastName: e.target.value }));
+              validateField('lastName', e.target.value);
+            }}
+            onBlur={(e) => validateField('lastName', e.target.value)}
             required
             placeholder="Enter last name"
+            className={validationErrors.lastName ? 'border-red-500' : ''}
           />
+          {validationErrors.lastName && (
+            <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              {validationErrors.lastName}
+            </p>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -163,20 +213,42 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
             id="email"
             type="email"
             value={formData.email}
-            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, email: e.target.value }));
+              validateField('email', e.target.value);
+            }}
+            onBlur={(e) => validateField('email', e.target.value)}
             required
             placeholder="Enter email address"
+            className={validationErrors.email ? 'border-red-500' : ''}
           />
+          {validationErrors.email && (
+            <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              {validationErrors.email}
+            </p>
+          )}
         </div>
         <div>
           <Label htmlFor="phone">Phone *</Label>
           <Input
             id="phone"
             value={formData.phone}
-            onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, phone: e.target.value }));
+              validateField('phone', e.target.value);
+            }}
+            onBlur={(e) => validateField('phone', e.target.value)}
             required
             placeholder="Enter phone number"
+            className={validationErrors.phone ? 'border-red-500' : ''}
           />
+          {validationErrors.phone && (
+            <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              {validationErrors.phone}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -265,39 +337,49 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
               <CommandList>
                 <CommandEmpty>No lots found.</CommandEmpty>
                 <CommandGroup>
-                  {filteredLots.map((lot: Lot) => (
-                    <CommandItem
-                      key={lot.id}
-                      value={lot.id}
-                      onSelect={() => {
-                        setFormData(prev => ({ ...prev, lotId: lot.id }));
-                        setLotOpen(false);
-                        setLotSearch("");
-                      }}
-                      disabled={lot.isAssigned}
-                    >
-                      <Check
+                  {filteredLots.map((lot: Lot) => {
+                    const isAssigned = lot.isAssigned || lot.tenantId;
+                    const assignedTenant = lot.tenantName;
+                    
+                    return (
+                      <CommandItem
+                        key={lot.id}
+                        value={lot.id}
+                        onSelect={() => {
+                          if (!isAssigned) {
+                            setFormData(prev => ({ ...prev, lotId: lot.id }));
+                            setLotOpen(false);
+                            setLotSearch("");
+                          }
+                        }}
+                        disabled={isAssigned}
                         className={cn(
-                          "mr-2 h-4 w-4",
-                          formData.lotId === lot.id ? "opacity-100" : "opacity-0"
+                          isAssigned && "opacity-60 cursor-not-allowed"
                         )}
-                      />
-                      <div className="flex flex-col flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{lot.nameOrNumber}</span>
-                          {lot.isAssigned && (
-                            <div className="flex items-center gap-1 text-xs text-orange-600">
-                              <AlertCircle className="h-3 w-3" />
-                              <span>Assigned</span>
-                            </div>
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.lotId === lot.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{lot.nameOrNumber}</span>
+                            {isAssigned && (
+                              <div className="flex items-center gap-1 text-xs text-orange-600">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Assigned to {assignedTenant}</span>
+                              </div>
+                            )}
+                          </div>
+                          {lot.park && (
+                            <span className="text-sm text-muted-foreground">{lot.park.name}</span>
                           )}
                         </div>
-                        {lot.park && (
-                          <span className="text-sm text-muted-foreground">{lot.park.name}</span>
-                        )}
-                      </div>
-                    </CommandItem>
-                  ))}
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
             </Command>

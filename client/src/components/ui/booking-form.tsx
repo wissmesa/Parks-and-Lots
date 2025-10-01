@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, AlertCircle } from "lucide-react";
+import { validateEmail, validatePhone, validateRequired } from "@/lib/validation";
 
 interface BookingFormProps {
   lotId: string;
@@ -22,11 +23,36 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const [clientPhone, setClientPhone] = useState("");
   const [selectedDate, setSelectedDate] = useState(selectedSlot?.date || "");
   const [selectedTime, setSelectedTime] = useState(selectedSlot?.time || "");
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // Dynamic showing duration (30 minutes)
   const SHOWING_DURATION_MINUTES = 30;
+
+  // Validation functions
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'clientName':
+        error = validateRequired(value, 'Full name');
+        break;
+      case 'clientEmail':
+        error = validateEmail(value);
+        break;
+      case 'clientPhone':
+        error = validatePhone(value);
+        break;
+    }
+    
+    setValidationErrors(prev => ({
+      ...prev,
+      [field]: error || ''
+    }));
+    
+    return !error;
+  };
 
   // Update form fields when a time slot is selected
   useEffect(() => {
@@ -96,29 +122,15 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate all required fields
-    if (!clientName.trim()) {
+    // Validate all fields
+    const nameValid = validateField('clientName', clientName);
+    const emailValid = validateField('clientEmail', clientEmail);
+    const phoneValid = validateField('clientPhone', clientPhone);
+    
+    if (!nameValid || !emailValid || !phoneValid) {
       toast({
-        title: "Missing Information",
-        description: "Please enter your full name.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!clientEmail.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your email address.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!clientPhone.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter your phone number.",
+        title: "Validation Error",
+        description: "Please fix the errors in the form before submitting.",
         variant: "destructive",
       });
       return;
@@ -170,11 +182,22 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
               id="clientName"
               type="text"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onChange={(e) => {
+                setClientName(e.target.value);
+                validateField('clientName', e.target.value);
+              }}
+              onBlur={(e) => validateField('clientName', e.target.value)}
               required
               placeholder="Enter your full name"
               data-testid="input-client-name"
+              className={validationErrors.clientName ? 'border-red-500' : ''}
             />
+            {validationErrors.clientName && (
+              <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.clientName}
+              </p>
+            )}
           </div>
           
           <div>
@@ -183,11 +206,22 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
               id="clientEmail"
               type="email"
               value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
+              onChange={(e) => {
+                setClientEmail(e.target.value);
+                validateField('clientEmail', e.target.value);
+              }}
+              onBlur={(e) => validateField('clientEmail', e.target.value)}
               required
               placeholder="your@email.com"
               data-testid="input-client-email"
+              className={validationErrors.clientEmail ? 'border-red-500' : ''}
             />
+            {validationErrors.clientEmail && (
+              <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.clientEmail}
+              </p>
+            )}
           </div>
           
           <div>
@@ -196,11 +230,22 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
               id="clientPhone"
               type="tel"
               value={clientPhone}
-              onChange={(e) => setClientPhone(e.target.value)}
+              onChange={(e) => {
+                setClientPhone(e.target.value);
+                validateField('clientPhone', e.target.value);
+              }}
+              onBlur={(e) => validateField('clientPhone', e.target.value)}
               required
               placeholder="(555) 123-4567"
               data-testid="input-client-phone"
+              className={validationErrors.clientPhone ? 'border-red-500' : ''}
             />
+            {validationErrors.clientPhone && (
+              <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.clientPhone}
+              </p>
+            )}
           </div>
           
           <div className="grid grid-cols-2 gap-3">
