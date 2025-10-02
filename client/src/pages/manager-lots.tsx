@@ -2046,41 +2046,35 @@ export default function ManagerLots() {
               <div className="grid grid-cols-1 gap-3 py-4">
                 <Button
                   variant="outline"
-                  className="h-auto p-4 justify-start"
-                  onClick={() => {
-                    // Do nothing - placeholder
-                    setShowCalculatorSelection(null);
-                  }}
+                  className="h-auto p-4 justify-start opacity-50 cursor-not-allowed"
+                  disabled
                 >
                   <div className="text-left">
-                    <div className="font-medium">For Rent</div>
+                    <div className="font-medium text-muted-foreground">For Rent</div>
                     <div className="text-sm text-muted-foreground">Calculate monthly rental payments</div>
+                    <div className="text-xs text-muted-foreground mt-1 font-medium">Coming Soon</div>
                   </div>
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-auto p-4 justify-start"
-                  onClick={() => {
-                    // Do nothing - placeholder
-                    setShowCalculatorSelection(null);
-                  }}
+                  className="h-auto p-4 justify-start opacity-50 cursor-not-allowed"
+                  disabled
                 >
                   <div className="text-left">
-                    <div className="font-medium">For Sale</div>
+                    <div className="font-medium text-muted-foreground">For Sale</div>
                     <div className="text-sm text-muted-foreground">Calculate purchase financing options</div>
+                    <div className="text-xs text-muted-foreground mt-1 font-medium">Coming Soon</div>
                   </div>
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-auto p-4 justify-start"
-                  onClick={() => {
-                    // Do nothing - placeholder
-                    setShowCalculatorSelection(null);
-                  }}
+                  className="h-auto p-4 justify-start opacity-50 cursor-not-allowed"
+                  disabled
                 >
                   <div className="text-left">
-                    <div className="font-medium">Rent to Own</div>
+                    <div className="font-medium text-muted-foreground">Rent to Own</div>
                     <div className="text-sm text-muted-foreground">Calculate rent-to-own terms</div>
+                    <div className="text-xs text-muted-foreground mt-1 font-medium">Coming Soon</div>
                   </div>
                 </Button>
                 <Button

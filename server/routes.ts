@@ -221,6 +221,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/manager/showings/this-week', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay()); // Start of this week (Sunday)
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7); // End of this week
+      endOfWeek.setHours(0, 0, 0, 0);
+
+      const showings = await storage.getShowings({ managerId: req.user!.id });
+      const thisWeekShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfWeek && showingDate < endOfWeek;
+      });
+
+      res.json(thisWeekShowings);
+    } catch (error) {
+      console.error('This week showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch this week showings' });
+    }
+  });
+
+  app.get('/api/manager/showings/this-month', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      const today = new Date();
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      endOfMonth.setHours(0, 0, 0, 0);
+
+      const showings = await storage.getShowings({ managerId: req.user!.id });
+      const thisMonthShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfMonth && showingDate < endOfMonth;
+      });
+
+      res.json(thisMonthShowings);
+    } catch (error) {
+      console.error('This month showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch this month showings' });
+    }
+  });
+
   app.get('/api/manager/stats', authenticateToken, requireRole('MANAGER'), async (req: AuthRequest, res) => {
     try {
       const assignments = await storage.getManagerAssignments(req.user!.id);

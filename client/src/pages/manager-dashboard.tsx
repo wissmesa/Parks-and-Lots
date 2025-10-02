@@ -177,7 +177,9 @@ export default function ManagerDashboard() {
                       {/* Client Info */}
                       <div className="col-span-4">
                         <div className="font-medium text-base">{showing.clientName}</div>
-                        <div className="text-sm text-muted-foreground mt-1">{showing.lotName || `Lot ${showing.lotId}`}</div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {showing.lot?.nameOrNumber || showing.lotName || `Lot ${showing.lotId}`}
+                        </div>
                       </div>
                       
                       {/* Contact Info */}
