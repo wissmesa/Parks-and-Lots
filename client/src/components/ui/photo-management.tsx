@@ -94,7 +94,10 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (photoId: string) => {
-      return apiRequest("DELETE", `/api/photos/${photoId}`);
+      console.log('Deleting photo:', photoId);
+      const response = await apiRequest("DELETE", `/api/photos/${photoId}`);
+      console.log('Delete response:', response.status);
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/${endpointBase}`, entityId, 'photos'] });
@@ -103,10 +106,12 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         description: "Photo deleted successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Photo deletion error:', error);
+      const errorMessage = error?.message || error?.response?.data?.message || "Failed to delete photo";
       toast({
         title: "Error",
-        description: "Failed to delete photo",
+        description: errorMessage,
         variant: "destructive",
       });
     },

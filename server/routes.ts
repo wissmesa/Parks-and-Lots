@@ -3424,11 +3424,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete photo (works for all entity types)
   app.delete('/api/photos/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      console.log('Delete photo request for ID:', req.params.id);
+      console.log('User role:', req.user?.role);
+      
       // Get photo information to check permissions
       const photo = await storage.getPhoto(req.params.id);
+      console.log('Photo found:', !!photo);
       if (!photo) {
+        console.log('Photo not found in database');
         return res.status(404).json({ message: 'Photo not found' });
       }
+      
+      console.log('Photo details:', {
+        entityType: photo.entityType,
+        entityId: photo.entityId,
+        urlOrPath: photo.urlOrPath
+      });
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
@@ -3450,27 +3461,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           return res.status(403).json({ message: 'Access denied' });
         }
+      } else if (photo.entityType === 'PARK') {
+        // For park photos, allow both admins and managers with park access
+        if (req.user?.role === 'ADMIN') {
+          // Admin can delete any park photo
+        } else if (req.user?.role === 'MANAGER') {
+          // Check if manager has access to this park
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === photo.entityId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+        } else {
+          return res.status(403).json({ message: 'Access denied' });
+        }
       } else {
-        // For company and park photos, only admins can delete
+        // For company photos, only admins can delete
         if (req.user?.role !== 'ADMIN') {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
 
+      console.log('Permission checks passed, proceeding with deletion');
+
       // Delete the file from filesystem
       try {
+        console.log('Photo urlOrPath:', photo.urlOrPath);
         const filePath = path.join(process.cwd(), photo.urlOrPath.replace(/^\//, ''));
+        console.log('Attempting to delete file at:', filePath);
         await fs.unlink(filePath);
+        console.log('File deleted successfully');
       } catch (fileError) {
         console.error('Failed to delete file:', fileError);
+        console.error('File path was:', path.join(process.cwd(), photo.urlOrPath.replace(/^\//, '')));
         // Continue with DB deletion even if file deletion fails
       }
 
+      console.log('Deleting photo from database');
       await storage.deletePhoto(req.params.id);
+      console.log('Photo deleted successfully from database');
       res.status(204).send();
     } catch (error) {
       console.error('Delete photo error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        photoId: req.params.id
+      });
+      res.status(500).json({ 
+        message: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
