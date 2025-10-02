@@ -75,6 +75,10 @@ interface Lot {
     color: string;
     isActive: boolean;
   } | null;
+  tenantId?: string | null;
+  tenantName?: string | null;
+  tenantStatus?: string | null;
+  isAssigned?: boolean;
 }
 
 interface SpecialStatus {
@@ -1452,7 +1456,7 @@ export default function ManagerLots() {
                     
                     {/* Special status */}
                     {lot.specialStatus && (
-                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                      <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md mb-2">
                         <div
                           className="w-3 h-3 rounded-full border"
                           style={{ backgroundColor: lot.specialStatus.color }}
@@ -1462,6 +1466,32 @@ export default function ManagerLots() {
                         </span>
                       </div>
                     )}
+                    
+                    {/* Tenant information */}
+                    <div className="mb-2">
+                      {lot.tenantId && lot.tenantName ? (
+                        <button
+                          onClick={() => window.location.href = `/manager/tenants?tenant=${lot.tenantId}`}
+                          className="text-left hover:text-primary hover:underline transition-colors w-full"
+                        >
+                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{lot.tenantName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Tenant • {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
+                                         lot.tenantStatus === 'PENDING' ? 'Pending' : 
+                                         lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
+                                         lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded-md">
+                          No tenant assigned
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   
                   <CardContent className="pt-0">
@@ -1588,6 +1618,7 @@ export default function ManagerLots() {
                     <TableHead>Lot</TableHead>
                     <TableHead>Park</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
@@ -1635,6 +1666,24 @@ export default function ManagerLots() {
                             );
                           })()}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {lot.tenantId && lot.tenantName ? (
+                          <button
+                            onClick={() => window.location.href = `/manager/tenants?tenant=${lot.tenantId}`}
+                            className="text-left hover:text-primary hover:underline transition-colors"
+                          >
+                            <div className="font-medium">{lot.tenantName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
+                               lot.tenantStatus === 'PENDING' ? 'Pending' : 
+                               lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
+                               lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
+                            </div>
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No tenant</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={lot.isActive ? 'default' : 'destructive'}>

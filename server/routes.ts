@@ -1282,9 +1282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/companies/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
-      console.log('PATCH /api/companies/:id received:', { id: req.params.id, body: req.body });
       const updates = insertCompanySchema.partial().parse(req.body);
-      console.log('Parsed updates:', updates);
       const company = await storage.updateCompany(req.params.id, updates);
       res.json(company);
     } catch (error) {
@@ -2619,6 +2617,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (user) {
           await storage.linkUserToTenant(user.id, Tenant.id);
         }
+
+        // Automatically set the lot to "Hidden" status when a tenant is assigned
+        try {
+          const lot = await storage.getLot(tenantData.lotId);
+          if (lot) {
+            // Find or create "Hidden" special status for this park
+            const hiddenStatus = await storage.findOrCreateSpecialStatus(lot.parkId, 'Hidden');
+            
+            // Update the lot with the Hidden status
+            await storage.updateLot(tenantData.lotId, {
+              specialStatusId: hiddenStatus.id
+            });
+            
+            console.log(`Lot ${lot.nameOrNumber} automatically set to Hidden status due to tenant assignment`);
+          }
+        } catch (statusError) {
+          console.error('Failed to set lot to Hidden status:', statusError);
+          // Don't fail the entire request if status update fails
+        }
       } catch (tenantError) {
         console.error('Failed to create tenant:', tenantError);
         // If we created a user but failed to create tenant, clean up the user
@@ -2807,7 +2824,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Store lot info before deleting tenant
+      const lot = await storage.getLot(Tenant.lotId);
+      
       await storage.deleteTenant(tenantId);
+      
+      // Remove "Hidden" status from the lot when tenant is deleted
+      if (lot && lot.specialStatusId) {
+        try {
+          const specialStatus = await storage.getSpecialStatus(lot.specialStatusId);
+          if (specialStatus && specialStatus.name === 'Hidden') {
+            // Remove the Hidden status
+            await storage.updateLot(lot.id, {
+              specialStatusId: null
+            });
+            console.log(`Removed Hidden status from lot ${lot.nameOrNumber} after tenant deletion`);
+          }
+        } catch (statusError) {
+          console.error('Failed to remove Hidden status from lot:', statusError);
+          // Don't fail the entire request if status update fails
+        }
+      }
+      
       res.json({ message: 'Tenant deleted successfully' });
     } catch (error) {
       console.error('Delete Tenant error:', error);

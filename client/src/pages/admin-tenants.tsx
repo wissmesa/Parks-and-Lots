@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { TenantDetailDialog } from "@/components/ui/tenant-detail-dialog";
@@ -94,6 +94,19 @@ export default function AdminTenants() {
     lotId: "",
     status: "PENDING" as Tenant['status'],
   });
+
+  // Handle URL parameters to auto-open tenant details
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenantId = urlParams.get('tenant');
+    if (tenantId) {
+      setSelectedTenant(tenantId);
+      // Clear the URL parameter after opening the dialog
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('tenant');
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  }, []);
 
   // Fetch tenants
   const { data: tenants, isLoading: tenantsLoading } = useQuery({

@@ -48,6 +48,10 @@ interface Lot {
     color: string;
     isActive: boolean;
   } | null;
+  tenantId?: string | null;
+  tenantName?: string | null;
+  tenantStatus?: string | null;
+  isAssigned?: boolean;
 }
 
 interface Park {
@@ -1434,6 +1438,7 @@ export default function AdminLots() {
                     <TableHead>Park</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
@@ -1491,6 +1496,24 @@ export default function AdminLots() {
                             );
                           })()}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {lot.tenantId && lot.tenantName ? (
+                          <button
+                            onClick={() => window.location.href = `/admin/tenants?tenant=${lot.tenantId}`}
+                            className="text-left hover:text-primary hover:underline transition-colors"
+                          >
+                            <div className="font-medium">{lot.tenantName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
+                               lot.tenantStatus === 'PENDING' ? 'Pending' : 
+                               lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
+                               lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
+                            </div>
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No tenant</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={lot.isActive ? 'default' : 'secondary'}>
@@ -1635,6 +1658,32 @@ export default function AdminLots() {
                             return company?.name || 'Unknown Company';
                           })()}
                         </Badge>
+                      </div>
+                      
+                      {/* Tenant information */}
+                      <div className="mb-3">
+                        {lot.tenantId && lot.tenantName ? (
+                          <button
+                            onClick={() => window.location.href = `/admin/tenants?tenant=${lot.tenantId}`}
+                            className="text-left hover:text-primary hover:underline transition-colors w-full"
+                          >
+                            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm">{lot.tenantName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Tenant • {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
+                                           lot.tenantStatus === 'PENDING' ? 'Pending' : 
+                                           lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
+                                           lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded-md">
+                            No tenant assigned
+                          </div>
+                        )}
                       </div>
                       
                       {/* Price and details */}
