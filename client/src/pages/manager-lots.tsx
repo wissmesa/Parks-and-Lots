@@ -42,7 +42,9 @@ import {
   Filter,
   X,
   MoreHorizontal,
-  Calculator
+  Calculator,
+  List,
+  Grid3X3
 } from "lucide-react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -113,6 +115,9 @@ export default function ManagerLots() {
   // Sorting state
   const [sortBy, setSortBy] = useState<string>("nameOrNumber");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('cards');
 
   // Filtering state
   const [filters, setFilters] = useState({
@@ -1097,6 +1102,26 @@ export default function ManagerLots() {
                     )}
                     {sortOrder === "asc" ? "Asc" : "Desc"}
                   </Button>
+
+                  {/* View Toggle */}
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      className="rounded-r-none border-r"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('cards')}
+                      className="rounded-l-none"
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
               
@@ -1391,7 +1416,7 @@ export default function ManagerLots() {
                 </Button>
               </CardContent>
             </Card>
-          ) : (
+          ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
               {sortedLots.map((lot) => (
                 <Card key={lot.id} className={`transition-all hover:shadow-md ${!lot.isActive ? "opacity-60" : ""}`}>
@@ -1554,6 +1579,134 @@ export default function ManagerLots() {
                 </Card>
               ))}
             </div>
+          ) : (
+            // List View
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lot</TableHead>
+                    <TableHead>Park</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Visibility</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedLots.map((lot) => (
+                    <TableRow key={lot.id}>
+                      <TableCell>
+                        <button
+                          onClick={() => setShowLotHistory({ lotId: lot.id, lotName: lot.nameOrNumber })}
+                          className="font-medium text-left hover:text-primary hover:underline transition-colors"
+                        >
+                          {lot.nameOrNumber}
+                        </button>
+                        <div className="text-sm text-muted-foreground">{lot.description}</div>
+                        {lot.specialStatus && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <div
+                              className="w-2 h-2 rounded-full border"
+                              style={{ backgroundColor: lot.specialStatus.color }}
+                            />
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {lot.specialStatus.name}
+                            </span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {lot.park.name}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                            return statusArray.length > 0 ? statusArray.map((status, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {status === 'FOR_RENT' ? 'For Rent' : status === 'FOR_SALE' ? 'For Sale' : status === 'RENT_TO_OWN' ? 'Rent to Own' : status === 'CONTRACT_FOR_DEED' ? 'Contract for Deed' : status}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline" className="text-xs">No Status</Badge>
+                            );
+                          })()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={lot.isActive ? 'default' : 'destructive'}>
+                          {lot.isActive ? 'Visible' : 'Hidden'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" />
+                          <span>{parseInt(lot.price).toLocaleString()}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {lot.bedrooms && <span>{lot.bedrooms}br </span>}
+                          {lot.bathrooms && <span>{lot.bathrooms}ba </span>}
+                          {lot.sqFt && <span>{lot.sqFt}sqft</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline">
+                              Actions
+                              <MoreHorizontal className="w-4 h-4 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(lot)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setShowPhotos(lot.id)}>
+                              <Camera className="w-4 h-4 mr-2" />
+                              Manage Photos
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setShowCalculatorSelection(lot.id)}>
+                              <Calculator className="w-4 h-4 mr-2" />
+                              Calculator
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAssignSpecialStatus(lot)}>
+                              <Tag className="w-4 h-4 mr-2" />
+                              Special Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toggleVisibility(lot.id, !lot.isActive)}>
+                              {lot.isActive ? (
+                                <>
+                                  <EyeOff className="w-4 h-4 mr-2" />
+                                  Hide Lot
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Show Lot
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => deleteLot(lot.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
           )}
 
           {/* Edit Modal */}

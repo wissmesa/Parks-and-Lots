@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3 } from "lucide-react";
 
 interface Park {
   id: string;
@@ -72,6 +72,9 @@ export default function ManagerParks() {
     color: "#3B82F6",
     isActive: true
   });
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
   // Redirect if not manager
   if (user?.role !== 'MANAGER') {
@@ -328,12 +331,35 @@ export default function ManagerParks() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TreePine className="w-5 h-5" />
-                  Parks ({parks.length})
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <TreePine className="w-5 h-5" />
+                    Parks ({parks.length})
+                  </CardTitle>
+                  
+                  {/* View Toggle */}
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      className="rounded-r-none border-r"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('cards')}
+                      className="rounded-l-none"
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
+                {viewMode === 'list' ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -409,6 +435,73 @@ export default function ManagerParks() {
                     ))}
                   </TableBody>
                 </Table>
+                ) : (
+                  // Card View
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {parks.map((park) => (
+                      <Card key={park?.id || Math.random()} className="transition-all hover:shadow-md">
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h3 className="text-xl font-bold mb-1">{park?.name || 'Unknown Park'}</h3>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {park?.description || 'No description available'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Company badge */}
+                          <div className="mb-3">
+                            <Badge variant="outline">
+                              {park?.company?.name || 'No Company'}
+                            </Badge>
+                          </div>
+                          
+                          {/* Location */}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              <span className="font-medium">
+                                {park?.city || 'N/A'}, {park?.state || 'N/A'}
+                              </span>
+                            </div>
+                            {park?.address && (
+                              <p className="text-sm text-muted-foreground">{park.address}</p>
+                            )}
+                            {park?.zip && (
+                              <p className="text-sm text-muted-foreground">ZIP: {park.zip}</p>
+                            )}
+                          </div>
+                        </CardHeader>
+                        
+                        <CardContent className="pt-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" className="w-full" disabled={!park}>
+                                Actions
+                                <MoreHorizontal className="w-4 h-4 ml-2" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => park && handleEdit(park)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Park
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => park?.id && setShowPhotos(park.id)}>
+                                <Camera className="w-4 h-4 mr-2" />
+                                Manage Photos
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => park && setManageSpecialStatuses(park)}>
+                                <Tag className="w-4 h-4 mr-2" />
+                                Special Statuses
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

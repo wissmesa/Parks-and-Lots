@@ -29,7 +29,9 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  X
+  X,
+  List,
+  Grid3X3
 } from "lucide-react";
 
 interface Tenant {
@@ -78,6 +80,9 @@ export default function AdminTenants() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
   
   // Form state
   const [formData, setFormData] = useState({
@@ -363,9 +368,31 @@ export default function AdminTenants() {
             {/* Tenants Table */}
             <Card>
               <CardHeader>
-                <CardTitle>
-                  Tenants ({filteredTenants.length})
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>
+                    Tenants ({filteredTenants.length})
+                  </CardTitle>
+                  
+                  {/* View Toggle */}
+                  <div className="flex items-center border rounded-md">
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
+                      className="rounded-r-none border-r"
+                    >
+                      <List className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('cards')}
+                      className="rounded-l-none"
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {tenantsLoading ? (
@@ -387,7 +414,7 @@ export default function AdminTenants() {
                       Add Tenant
                     </Button>
                   </div>
-                ) : (
+                ) : viewMode === 'list' ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -494,6 +521,119 @@ export default function AdminTenants() {
                       ))}
                     </TableBody>
                   </Table>
+                ) : (
+                  // Card View
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                      {filteredTenants.map((tenant) => (
+                        <Card key={tenant.id} className="transition-all hover:shadow-md">
+                          <CardHeader className="pb-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <button
+                                  onClick={() => setSelectedTenant(tenant.id)}
+                                  className="text-xl font-bold mb-1 text-left hover:text-primary hover:underline transition-colors"
+                                >
+                                  {tenant.firstName} {tenant.lastName}
+                                </button>
+                              </div>
+                              <Select 
+                                value={tenant.status} 
+                                onValueChange={(newStatus) => handleStatusChange(tenant.id, newStatus as Tenant['status'])}
+                              >
+                                <SelectTrigger className="w-fit p-0 border-0 bg-transparent hover:bg-transparent">
+                                  <Badge 
+                                    variant={getStatusBadgeVariant(tenant.status)} 
+                                    className="flex items-center gap-1 w-fit cursor-pointer hover:opacity-80 transition-opacity"
+                                  >
+                                    {getStatusIcon(tenant.status)}
+                                    {tenant.status}
+                                  </Badge>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="ACTIVE">Active</SelectItem>
+                                  <SelectItem value="PENDING">Pending</SelectItem>
+                                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                  <SelectItem value="TERMINATED">Terminated</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            {/* Contact info */}
+                            <div className="space-y-2 mb-3">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Mail className="h-3 w-3" />
+                                <span>{tenant.email}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm">
+                                <Phone className="h-3 w-3" />
+                                <span>{tenant.phone}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Lot and location */}
+                            {tenant.lot && (
+                              <div className="space-y-2 mb-3">
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-4 w-4" />
+                                  <span className="font-medium">Lot {tenant.lot.nameOrNumber}</span>
+                                </div>
+                                {tenant.park && (
+                                  <p className="text-sm text-muted-foreground">{tenant.park.name}</p>
+                                )}
+                                {tenant.park && (
+                                  <p className="text-sm text-muted-foreground">{tenant.park.city}, {tenant.park.state}</p>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Lease info */}
+                            <div className="space-y-2">
+                              {tenant.monthlyRent && (
+                                <div className="flex items-center gap-1">
+                                  <DollarSign className="h-4 w-4" />
+                                  <span className="font-medium">${parseFloat(tenant.monthlyRent).toLocaleString()}/month</span>
+                                </div>
+                              )}
+                              
+                              {(tenant.leaseStartDate || tenant.leaseEndDate) && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>
+                                    {tenant.leaseStartDate && new Date(tenant.leaseStartDate).toLocaleDateString()}
+                                    {tenant.leaseStartDate && tenant.leaseEndDate && ' - '}
+                                    {tenant.leaseEndDate && new Date(tenant.leaseEndDate).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </CardHeader>
+                          
+                          <CardContent className="pt-0">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedTenant(tenant.id)}
+                                className="flex-1"
+                              >
+                                <User className="h-4 w-4 mr-1" />
+                                View Details
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteTenant(tenant.id, `${tenant.firstName} ${tenant.lastName}`)}
+                                disabled={deleteTenantMutation.isPending}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>

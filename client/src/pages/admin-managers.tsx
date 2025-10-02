@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, Plus, Trash2, UserPlus, Settings, Edit, MoreHorizontal } from "lucide-react";
+import { Users, Plus, Trash2, UserPlus, Settings, Edit, MoreHorizontal, List, Grid3X3 } from "lucide-react";
 
 interface Manager {
   id: string;
@@ -42,6 +42,9 @@ export default function AdminManagers() {
   const [editingManager, setEditingManager] = useState<Manager | null>(null);
   const [editedName, setEditedName] = useState("");
   const [selectedParkIds, setSelectedParkIds] = useState<string[]>([]);
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
   // RequireRole component now handles authentication/authorization
 
@@ -211,7 +214,29 @@ export default function AdminManagers() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Managers</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>All Managers</CardTitle>
+              
+              {/* View Toggle */}
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-r-none border-r"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="rounded-l-none"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {managersLoading ? (
@@ -225,7 +250,7 @@ export default function AdminManagers() {
                 <p className="text-muted-foreground">No managers found</p>
                 <p className="text-sm text-muted-foreground">Send invites to add managers</p>
               </div>
-            ) : (
+            ) : viewMode === 'list' ? (
               <div className="overflow-x-auto">
                 <Table>
                 <TableHeader>
@@ -313,6 +338,98 @@ export default function AdminManagers() {
                   })}
                 </TableBody>
               </Table>
+              </div>
+            ) : (
+              // Card View
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {managersList.map((manager: Manager) => {
+                  const assignedParks = managerParkMap[manager.id] || [];
+                  
+                  return (
+                    <Card key={manager.id} className="transition-all hover:shadow-md">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-bold mb-1">{manager.fullName}</h3>
+                            <Badge variant="secondary">{manager.role}</Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Email */}
+                        <div className="mb-3">
+                          <p className="text-sm text-muted-foreground">📧 {manager.email}</p>
+                        </div>
+                        
+                        {/* Assigned Parks */}
+                        <div className="mb-3">
+                          <p className="text-sm font-medium mb-2">Assigned Parks:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {assignedParks.length === 0 ? (
+                              <Badge variant="outline">No assignments</Badge>
+                            ) : (
+                              assignedParks.map((park) => (
+                                <Badge key={park.id} variant="secondary" className="text-xs">
+                                  {park.name}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Joined date */}
+                        <div>
+                          <Badge variant="outline" className="text-xs">
+                            Joined {new Date(manager.createdAt).toLocaleDateString()}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="pt-0">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full">
+                              Actions
+                              <MoreHorizontal className="w-4 h-4 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedManager(manager);
+                                setSelectedParkIds(assignedParks.map(p => p.id));
+                                setIsAssignModalOpen(true);
+                              }}
+                            >
+                              <Settings className="w-4 h-4 mr-2" />
+                              Assign Parks
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingManager(manager);
+                                setEditedName(manager.fullName);
+                                setIsEditModalOpen(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Name
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to remove ${manager.fullName}?`)) {
+                                  deleteManagerMutation.mutate(manager.id);
+                                }
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Manager
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </CardContent>

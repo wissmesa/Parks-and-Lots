@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag, MoreHorizontal } from "lucide-react";
+import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag, MoreHorizontal, List, Grid3X3 } from "lucide-react";
 
 interface Park {
   id: string;
@@ -83,6 +83,9 @@ export default function AdminParks() {
     color: "#3B82F6",
     isActive: true
   });
+
+  // View toggle state
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -505,7 +508,29 @@ export default function AdminParks() {
 
         <Card>
           <CardHeader>
-            <CardTitle>All Parks</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>All Parks</CardTitle>
+              
+              {/* View Toggle */}
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-r-none border-r"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('cards')}
+                  className="rounded-l-none"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -518,7 +543,7 @@ export default function AdminParks() {
                 <TreePine className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">No parks found</p>
               </div>
-            ) : (
+            ) : viewMode === 'list' ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -613,6 +638,84 @@ export default function AdminParks() {
                   ))}
                 </TableBody>
               </Table>
+            ) : (
+              // Card View
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {parksList.map((park: Park) => (
+                  <Card key={park.id} className="transition-all hover:shadow-md">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-bold mb-1">{park.name}</h3>
+                          <p className="text-sm text-muted-foreground">{park.description}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Company badge */}
+                      <div className="mb-3">
+                        <Badge variant="secondary">
+                          {companyById.get(park.companyId)?.name ?? park.company?.name ?? 'Unknown'}
+                        </Badge>
+                      </div>
+                      
+                      {/* Location */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          <span className="font-medium">{park.city}, {park.state}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{park.address}</p>
+                        {park.zip && (
+                          <p className="text-sm text-muted-foreground">ZIP: {park.zip}</p>
+                        )}
+                      </div>
+                      
+                      {/* Created date */}
+                      <div className="mt-3">
+                        <Badge variant="outline" className="text-xs">
+                          Created {new Date(park.createdAt).toLocaleDateString()}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="pt-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full">
+                            Actions
+                            <MoreHorizontal className="w-4 h-4 ml-2" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(park)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setShowPhotos(park.id)}>
+                            <Camera className="w-4 h-4 mr-2" />
+                            Manage Photos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setAssigningLots(park)}>
+                            <Home className="w-4 h-4 mr-2" />
+                            Assign Lots
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setManageSpecialStatuses(park)}>
+                            <Tag className="w-4 h-4 mr-2" />
+                            Special Statuses
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => deletePark(park.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Park
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
