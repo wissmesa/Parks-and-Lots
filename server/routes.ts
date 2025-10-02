@@ -2026,7 +2026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('Public lots endpoint hit:', req.url, req.query);
     
     try {
-      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20' } = req.query;
+      const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '50' } = req.query;
       
       // Handle price range parameter (e.g. "100000-200000", "300000+", "0-100000")
       let parsedMinPrice, parsedMaxPrice;
@@ -2064,18 +2064,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Found ${lots.length} lots`);
       
       const pageNum = parseInt(page as string);
-      const limitNum = Math.min(parseInt(limit as string), 100);
-      const offset = (pageNum - 1) * limitNum;
+      const limitNum = Math.min(parseInt(limit as string), 1000);
+      const totalPages = Math.ceil(lots.length / limitNum);
+      
+      // Validate page number
+      const validPageNum = Math.max(1, Math.min(pageNum, totalPages || 1));
+      const offset = (validPageNum - 1) * limitNum;
       
       const paginatedLots = lots.slice(offset, offset + limitNum);
+      
+      // Calculate navigation information
+      const hasNextPage = validPageNum < totalPages;
+      const hasPrevPage = validPageNum > 1;
+      const startItem = totalPages > 0 ? offset + 1 : 0;
+      const endItem = Math.min(offset + limitNum, lots.length);
+      
+      // Generate page numbers for navigation (show up to 5 pages around current)
+      const generatePageNumbers = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, validPageNum - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        // Adjust if we're near the end
+        if (endPage - startPage + 1 < maxVisiblePages) {
+          startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+          pages.push(i);
+        }
+        return pages;
+      };
       
       const response = {
         lots: paginatedLots,
         pagination: {
-          page: pageNum,
+          // Current page info
+          currentPage: validPageNum,
+          totalPages: totalPages,
           limit: limitNum,
           total: lots.length,
-          pages: Math.ceil(lots.length / limitNum)
+          
+          // Item range info
+          startItem: startItem,
+          endItem: endItem,
+          
+          // Navigation controls
+          hasNextPage: hasNextPage,
+          hasPrevPage: hasPrevPage,
+          nextPage: hasNextPage ? validPageNum + 1 : null,
+          prevPage: hasPrevPage ? validPageNum - 1 : null,
+          firstPage: totalPages > 0 ? 1 : null,
+          lastPage: totalPages > 0 ? totalPages : null,
+          
+          // Page numbers for navigation
+          pageNumbers: generatePageNumbers(),
+          
+          // Additional metadata
+          isEmpty: lots.length === 0,
+          isFirstPage: validPageNum === 1,
+          isLastPage: validPageNum === totalPages
         }
       };
       

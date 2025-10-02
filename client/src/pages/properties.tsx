@@ -12,11 +12,15 @@ import {
   Ruler, 
   DollarSign, 
   Search, 
- 
+  
   MapPin, 
   Home,
   ArrowRight,
-  TreePine 
+  TreePine,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
 import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
 import { ParkCard } from "@/components/ui/park-card";
@@ -95,21 +99,28 @@ export default function Properties() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [priceRange, setPriceRange] = useState("");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50); // Fixed at 50 per page
 
-  // Parse URL parameters and set search immediately
+  // Parse URL parameters and set search immediately (only on initial load)
   useEffect(() => {
     const params = new URLSearchParams(location.split('?')[1] || '');
     const urlSearchQuery = params.get('q') || '';
     const urlState = params.get('state') || '';
     const urlStatus = params.get('status') || '';
     const urlPrice = params.get('price') || '';
+    const urlPage = params.get('page') || '1';
+    const urlLimit = params.get('limit') || '50';
     
     setSearchInput(urlSearchQuery);
     setSearchQuery(urlSearchQuery); // Set immediately for URL params
     setSelectedState(urlState);
     setSelectedStatus(urlStatus);
     setPriceRange(urlPrice);
-  }, [location]);
+    setCurrentPage(parseInt(urlPage));
+  }, []); // Only run once on mount, not on every location change
 
   // Debounced search function - only for manual input changes
   const debouncedSearch = useCallback(() => {
@@ -152,24 +163,40 @@ export default function Properties() {
 
   // Lots data
   const { data: lotsData, isLoading: lotsLoading } = useQuery({
-    queryKey: ["/api/lots", searchQuery, selectedState, selectedStatus, priceRange],
+    queryKey: ["/api/public/lots", searchQuery, selectedState, selectedStatus, priceRange, currentPage, itemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
       if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
       if (priceRange && priceRange !== 'all') params.set('price', priceRange);
+      params.set('page', currentPage.toString());
+      params.set('limit', itemsPerPage.toString());
       
-      const url = `/api/public/lots${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/api/public/lots?${params.toString()}`;
+      console.log('Making request to:', url);
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
-      return response.json();
+      const data = await response.json();
+      console.log('Received data:', {
+        lotsCount: data.lots?.length,
+        pagination: data.pagination,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage
+      });
+      return data;
     },
     staleTime: 5 * 60 * 1000,
   });
 
   const parks = parksData?.parks || [];
   const lots = (lotsData?.lots || []) as Lot[];
+  const pagination = lotsData?.pagination;
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedState, selectedStatus, priceRange]);
 
   const handleSearch = () => {
     // Update search query immediately to trigger API calls
@@ -182,8 +209,17 @@ export default function Properties() {
     if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
     if (priceRange && priceRange !== 'all') params.set('price', priceRange);
     
+    params.set('page', '1'); // Reset to first page on search
+    params.set('limit', itemsPerPage.toString());
+    
     const queryString = params.toString();
-    window.history.pushState(null, '', `/properties${queryString ? `?${queryString}` : ''}`);
+    window.history.pushState(null, '', `/properties?${queryString}`);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    console.log('Page change requested:', { from: currentPage, to: newPage });
+    setCurrentPage(newPage);
+    // Don't update URL to avoid page refresh - React Query will handle the data fetching
   };
 
   const clearFilters = () => {
@@ -192,6 +228,7 @@ export default function Properties() {
     setSelectedState("");
     setSelectedStatus("");
     setPriceRange("");
+    setCurrentPage(1);
     window.history.pushState(null, '', `/properties`);
   };
 
@@ -425,6 +462,109 @@ export default function Properties() {
                 </Card>
               ))}
             </div>
+            
+            {/* Pagination Controls */}
+            {pagination && (
+              <div className="mt-8 p-6 bg-muted/50 rounded-lg">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Page info */}
+                  <div className="text-sm text-muted-foreground">
+                    Page {pagination?.currentPage || currentPage} of {pagination?.totalPages || Math.ceil((pagination?.total || lots.length) / 50)} • Showing {pagination?.startItem || ((currentPage - 1) * 50 + 1)}-{pagination?.endItem || Math.min(currentPage * 50, pagination?.total || lots.length)} of {pagination?.total || lots.length} lots
+                  </div>
+                  
+                  {/* Pagination buttons */}
+                  <div className="flex items-center gap-2">
+                    {/* First page */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(1);
+                      }}
+                      disabled={currentPage <= 1}
+                      className="hidden sm:flex"
+                      type="button"
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </Button>
+                    
+                    {/* Previous page */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage - 1);
+                      }}
+                      disabled={currentPage <= 1}
+                      type="button"
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Previous
+                    </Button>
+                    
+                    {/* Page numbers */}
+                    <div className="flex items-center gap-1">
+                      {pagination?.pageNumbers && pagination.pageNumbers.length > 0 ? pagination.pageNumbers.map((pageNum) => (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === (pagination?.currentPage || currentPage) ? "default" : "outline"}
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handlePageChange(pageNum);
+                          }}
+                          className="w-10 h-10"
+                          type="button"
+                        >
+                          {pageNum}
+                        </Button>
+                      )) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-10 h-10"
+                          type="button"
+                        >
+                          {pagination?.currentPage || currentPage}
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {/* Next page */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage + 1);
+                      }}
+                      disabled={currentPage >= Math.ceil((pagination?.total || lots.length) / 50)}
+                      type="button"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                    
+                    {/* Last page */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(Math.ceil((pagination?.total || lots.length) / 50));
+                      }}
+                      disabled={currentPage >= Math.ceil((pagination?.total || lots.length) / 50)}
+                      className="hidden sm:flex"
+                      type="button"
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
