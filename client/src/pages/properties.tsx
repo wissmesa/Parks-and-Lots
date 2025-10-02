@@ -70,6 +70,10 @@ interface Lot {
   nameOrNumber: string;
   status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
+  priceForRent?: string | null;
+  priceForSale?: string | null;
+  priceRentToOwn?: string | null;
+  priceContractForDeed?: string | null;
   description: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
@@ -340,14 +344,44 @@ export default function Properties() {
                     
                     {/* Price - prominent display */}
                     <div className="mb-4">
-                      <div className="flex items-center text-2xl font-bold text-primary">
-                        <DollarSign className="w-6 h-6 mr-1" />
-                        <span>{parseInt(lot.price).toLocaleString()}</span>
-                        {(() => {
-                          const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                          return statusArray.includes('FOR_RENT') ? <span className="text-lg ml-1">/mo</span> : null;
-                        })()}
-                      </div>
+                      {(() => {
+                        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                        const prices = [];
+                        
+                        // Show pricing based on status and availability
+                        if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
+                          prices.push({ label: 'Rent', value: lot.priceForRent, suffix: '/mo' });
+                        }
+                        if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
+                          prices.push({ label: 'Sale', value: lot.priceForSale, suffix: '' });
+                        }
+                        if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
+                          prices.push({ label: 'Rent to Own', value: lot.priceRentToOwn, suffix: '/mo' });
+                        }
+                        if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
+                          prices.push({ label: 'Contract', value: lot.priceContractForDeed, suffix: '/mo' });
+                        }
+                        
+                        // Fallback to legacy price if no specific pricing is available
+                        if (prices.length === 0 && lot.price) {
+                          prices.push({ label: 'Price', value: lot.price, suffix: statusArray.includes('FOR_RENT') ? '/mo' : '' });
+                        }
+                        
+                        return (
+                          <div className="space-y-2">
+                            {prices.map((price, index) => (
+                              <div key={index} className="flex items-center text-xl font-bold text-primary">
+                                <DollarSign className="w-5 h-5 mr-1" />
+                                <span>{parseInt(price.value).toLocaleString()}</span>
+                                <span className="text-lg ml-1">{price.suffix}</span>
+                                {prices.length > 1 && (
+                                  <span className="text-sm ml-2 text-muted-foreground">({price.label})</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     {/* Property Details */}

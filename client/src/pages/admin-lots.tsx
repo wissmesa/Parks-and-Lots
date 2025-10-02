@@ -29,6 +29,10 @@ interface Lot {
   nameOrNumber: string;
   status: ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[] | ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED') | null;
   price: string;
+  priceForRent?: string | null;
+  priceForSale?: string | null;
+  priceRentToOwn?: string | null;
+  priceContractForDeed?: string | null;
   description: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
@@ -578,10 +582,10 @@ export default function AdminLots() {
       nameOrNumber: lot.nameOrNumber,
       status: Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []),
       price: lot.price,
-      priceForRent: (lot as any).priceForRent || "",
-      priceForSale: (lot as any).priceForSale || "",
-      priceRentToOwn: (lot as any).priceRentToOwn || "",
-      priceContractForDeed: (lot as any).priceContractForDeed || "",
+      priceForRent: lot.priceForRent || "",
+      priceForSale: lot.priceForSale || "",
+      priceRentToOwn: lot.priceRentToOwn || "",
+      priceContractForDeed: lot.priceContractForDeed || "",
       description: lot.description || "",
       bedrooms: lot.bedrooms || 1,
       bathrooms: lot.bathrooms || 1,
@@ -1690,7 +1694,33 @@ export default function AdminLots() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-1">
                           <DollarSign className="w-4 h-4" />
-                          <span className="font-semibold">{parseInt(lot.price).toLocaleString()}</span>
+                          <span className="font-semibold">
+                            {(() => {
+                              const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                              
+                              // Show pricing based on status and availability
+                              if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
+                                return `$${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
+                              }
+                              if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
+                                return `$${parseFloat(lot.priceForSale).toLocaleString()}`;
+                              }
+                              if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
+                                return `$${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
+                              }
+                              if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
+                                return `$${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
+                              }
+                              
+                              // Fallback to legacy price if no specific pricing is available
+                              if (lot.price) {
+                                const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
+                                return `$${parseFloat(lot.price).toLocaleString()}${suffix}`;
+                              }
+                              
+                              return 'Price TBD';
+                            })()}
+                          </span>
                         </div>
                         
                         <div className="text-sm text-muted-foreground">
@@ -2359,7 +2389,33 @@ export default function AdminLots() {
                             </Badge>
                           </TableCell>
                           <TableCell>{lot.parkId || 'N/A'}</TableCell>
-                          <TableCell>{lot.price ? `$${lot.price}` : 'N/A'}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                              
+                              // Show pricing based on status and availability
+                              if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
+                                return `$${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
+                              }
+                              if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
+                                return `$${parseFloat(lot.priceForSale).toLocaleString()}`;
+                              }
+                              if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
+                                return `$${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
+                              }
+                              if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
+                                return `$${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
+                              }
+                              
+                              // Fallback to legacy price if no specific pricing is available
+                              if (lot.price) {
+                                const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
+                                return `$${parseFloat(lot.price).toLocaleString()}${suffix}`;
+                              }
+                              
+                              return 'N/A';
+                            })()}
+                          </TableCell>
                           <TableCell className="max-w-xs truncate">{lot.description || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
