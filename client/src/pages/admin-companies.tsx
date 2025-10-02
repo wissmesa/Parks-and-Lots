@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,12 +20,14 @@ import { validateEmail, validatePhone } from "@/lib/validation";
 interface Company {
   id: string;
   name: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  phone: string;
-  email: string;
+  description?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  email?: string;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -42,6 +45,7 @@ export default function AdminCompanies() {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: "",
+    description: "",
     address: "",
     city: "",
     state: "",
@@ -63,13 +67,19 @@ export default function AdminCompanies() {
     
     switch (field) {
       case 'email':
-        if (value && !validateEmail(value)) {
-          error = validateEmail(value);
+        if (value.trim()) {
+          // Only validate if not empty
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            error = "Please enter a valid email address";
+          }
         }
         break;
       case 'phone':
-        if (value && !validatePhone(value)) {
-          error = validatePhone(value);
+        if (value.trim()) {
+          // Only validate if not empty - US phone numbers only
+          if (!/^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/.test(value)) {
+            error = "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)";
+          }
         }
         break;
     }
@@ -100,44 +110,70 @@ export default function AdminCompanies() {
 
 
   const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      return apiRequest("POST", "/api/companies", data);
+    mutationFn: async (data: any): Promise<Company> => {
+      const response = await apiRequest("POST", "/api/companies", data);
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newCompany: Company) => {
+      // Immediately add the new company to the cache for real-time updates
+      queryClient.setQueryData(["/api/companies"], (oldData: Company[]) => {
+        if (!oldData) return [newCompany];
+        return [...oldData, newCompany];
+      });
+      
+      // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      
       setIsCreateModalOpen(false);
       resetForm();
+      setValidationErrors({});
       toast({
         title: "Success",
         description: "Company created successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Create company error:', error);
+      const errorMessage = error?.response?.data?.message || "Failed to create company";
       toast({
         title: "Error",
-        description: "Failed to create company",
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      return apiRequest("PATCH", `/api/companies/${editingCompany?.id}`, data);
+    mutationFn: async (data: any): Promise<Company> => {
+      const response = await apiRequest("PATCH", `/api/companies/${editingCompany?.id}`, data);
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedCompany: Company) => {
+      // Immediately update the cache with the new data for real-time updates
+      queryClient.setQueryData(["/api/companies"], (oldData: Company[]) => {
+        if (!oldData) return oldData;
+        return oldData.map((company: Company) => 
+          company.id === updatedCompany.id ? updatedCompany : company
+        );
+      });
+      
+      // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      
       setEditingCompany(null);
       resetForm();
+      setValidationErrors({});
       toast({
         title: "Success",
         description: "Company updated successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Update company error:', error);
+      const errorMessage = error?.response?.data?.message || "Failed to update company";
       toast({
         title: "Error",
-        description: "Failed to update company",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -193,6 +229,7 @@ export default function AdminCompanies() {
   const resetForm = () => {
     setFormData({
       name: "",
+      description: "",
       address: "",
       city: "",
       state: "",
@@ -206,21 +243,59 @@ export default function AdminCompanies() {
     setEditingCompany(company);
     setFormData({
       name: company.name,
-      address: company.address,
-      city: company.city,
-      state: company.state,
-      zipCode: company.zipCode,
-      phone: company.phone,
-      email: company.email
+      description: company.description || "",
+      address: company.address || "",
+      city: company.city || "",
+      state: company.state || "",
+      zipCode: company.zipCode || "",
+      phone: company.phone || "",
+      email: company.email || ""
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all fields before submission
+    const emailValid = validateField('email', formData.email);
+    const phoneValid = validateField('phone', formData.phone);
+    
+    // Check required fields
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Company name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Check if validation passed
+    if (!emailValid || !phoneValid) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the validation errors before submitting",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Clean up empty strings to null for optional fields
+    const cleanedData = {
+      ...formData,
+      email: formData.email.trim() || null,
+      phone: formData.phone.trim() || null,
+      address: formData.address.trim() || null,
+      city: formData.city.trim() || null,
+      state: formData.state.trim() || null,
+      zipCode: formData.zipCode.trim() || null,
+      description: formData.description.trim() || null,
+    };
+    
     if (editingCompany) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(cleanedData);
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(cleanedData);
     }
   };
 
@@ -297,12 +372,21 @@ export default function AdminCompanies() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                  <div>
                     <Label htmlFor="address">Address</Label>
                     <Input
                       id="address"
                       value={formData.address}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      required
+                      placeholder="Enter company address"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -312,7 +396,7 @@ export default function AdminCompanies() {
                         id="city"
                         value={formData.city}
                         onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                        required
+                        placeholder="City"
                       />
                     </div>
                     <div>
@@ -321,7 +405,7 @@ export default function AdminCompanies() {
                         id="state"
                         value={formData.state}
                         onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                        required
+                        placeholder="State"
                       />
                     </div>
                   </div>
@@ -331,6 +415,7 @@ export default function AdminCompanies() {
                       id="zipCode"
                       value={formData.zipCode}
                       onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                      placeholder="Zip Code"
                     />
                   </div>
                   <div>
@@ -344,6 +429,7 @@ export default function AdminCompanies() {
                       }}
                       onBlur={(e) => validateField('phone', e.target.value)}
                       className={validationErrors.phone ? 'border-red-500' : ''}
+                      placeholder="(555) 123-4567"
                     />
                     {validationErrors.phone && (
                       <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
@@ -364,6 +450,7 @@ export default function AdminCompanies() {
                       }}
                       onBlur={(e) => validateField('email', e.target.value)}
                       className={validationErrors.email ? 'border-red-500' : ''}
+                      placeholder="company@example.com"
                     />
                     {validationErrors.email && (
                       <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
@@ -525,13 +612,20 @@ export default function AdminCompanies() {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <h3 className="text-xl font-bold mb-1">{company.name}</h3>
-                          <p className="text-sm text-muted-foreground">{company.address}</p>
+                          {company.description && (
+                            <p className="text-sm text-muted-foreground">{company.description}</p>
+                          )}
                         </div>
                       </div>
                       
                       {/* Location */}
                       <div className="space-y-2 mb-3">
-                        <div className="font-medium">{company.city}, {company.state}</div>
+                        {company.address && (
+                          <div className="text-sm">{company.address}</div>
+                        )}
+                        {(company.city || company.state) && (
+                          <div className="font-medium">{company.city}, {company.state}</div>
+                        )}
                         {company.zipCode && (
                           <div className="text-sm text-muted-foreground">ZIP: {company.zipCode}</div>
                         )}
@@ -621,12 +715,21 @@ export default function AdminCompanies() {
                 />
               </div>
               <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+              <div>
                 <Label htmlFor="edit-address">Address</Label>
                 <Input
                   id="edit-address"
                   value={formData.address}
                   onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  required
+                  placeholder="Enter company address"
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -636,7 +739,7 @@ export default function AdminCompanies() {
                     id="edit-city"
                     value={formData.city}
                     onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                    required
+                    placeholder="City"
                   />
                 </div>
                 <div>
@@ -645,7 +748,7 @@ export default function AdminCompanies() {
                     id="edit-state"
                     value={formData.state}
                     onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                    required
+                    placeholder="State"
                   />
                 </div>
               </div>
@@ -655,6 +758,7 @@ export default function AdminCompanies() {
                   id="edit-zipCode"
                   value={formData.zipCode}
                   onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                  placeholder="Zip Code"
                 />
               </div>
               <div>
@@ -668,6 +772,7 @@ export default function AdminCompanies() {
                   }}
                   onBlur={(e) => validateField('phone', e.target.value)}
                   className={validationErrors.phone ? 'border-red-500' : ''}
+                  placeholder="(555) 123-4567"
                 />
                 {validationErrors.phone && (
                   <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
@@ -688,6 +793,7 @@ export default function AdminCompanies() {
                   }}
                   onBlur={(e) => validateField('email', e.target.value)}
                   className={validationErrors.email ? 'border-red-500' : ''}
+                  placeholder="company@example.com"
                 />
                 {validationErrors.email && (
                   <p className="text-sm text-red-500 mt-1 flex items-center gap-1">

@@ -273,7 +273,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCompany(id: string, updates: Partial<InsertCompany>): Promise<Company> {
+    console.log('updateCompany called with:', { id, updates });
     const [company] = await db.update(companies).set(updates).where(eq(companies.id, id)).returning();
+    console.log('updateCompany result:', company);
     return company;
   }
 

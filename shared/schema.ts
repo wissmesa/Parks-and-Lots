@@ -56,6 +56,12 @@ export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  address: varchar("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zipCode: varchar("zip_code"),
+  phone: varchar("phone"),
+  email: varchar("email"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -351,11 +357,16 @@ export const insertUserSchema = createInsertSchema(users, {
 });
 
 export const insertCompanySchema = createInsertSchema(companies, {
-  email: z.string().email("Please enter a valid email address").optional().nullable(),
+  email: z.string().email("Please enter a valid email address").nullable().optional(),
   phone: z.string().regex(
     /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
     "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
-  ).optional().nullable(),
+  ).nullable().optional(),
+  address: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zipCode: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
 }).omit({
   id: true,
   createdAt: true,

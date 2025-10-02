@@ -1282,7 +1282,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/companies/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
+      console.log('PATCH /api/companies/:id received:', { id: req.params.id, body: req.body });
       const updates = insertCompanySchema.partial().parse(req.body);
+      console.log('Parsed updates:', updates);
       const company = await storage.updateCompany(req.params.id, updates);
       res.json(company);
     } catch (error) {
