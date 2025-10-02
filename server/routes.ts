@@ -2618,22 +2618,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.linkUserToTenant(user.id, Tenant.id);
         }
 
-        // Automatically set the lot to "Hidden" status when a tenant is assigned
+        // Automatically hide the lot when a tenant is assigned
         try {
           const lot = await storage.getLot(tenantData.lotId);
           if (lot) {
-            // Find or create "Hidden" special status for this park
-            const hiddenStatus = await storage.findOrCreateSpecialStatus(lot.parkId, 'Hidden');
-            
-            // Update the lot with the Hidden status
+            // Set the lot to hidden (isActive: false)
             await storage.updateLot(tenantData.lotId, {
-              specialStatusId: hiddenStatus.id
+              isActive: false
             });
             
-            console.log(`Lot ${lot.nameOrNumber} automatically set to Hidden status due to tenant assignment`);
+            console.log(`Lot ${lot.nameOrNumber} automatically hidden due to tenant assignment`);
           }
         } catch (statusError) {
-          console.error('Failed to set lot to Hidden status:', statusError);
+          console.error('Failed to hide lot:', statusError);
           // Don't fail the entire request if status update fails
         }
       } catch (tenantError) {
@@ -2829,19 +2826,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.deleteTenant(tenantId);
       
-      // Remove "Hidden" status from the lot when tenant is deleted
-      if (lot && lot.specialStatusId) {
+      // Make the lot visible again when tenant is deleted
+      if (lot) {
         try {
-          const specialStatus = await storage.getSpecialStatus(lot.specialStatusId);
-          if (specialStatus && specialStatus.name === 'Hidden') {
-            // Remove the Hidden status
-            await storage.updateLot(lot.id, {
-              specialStatusId: null
-            });
-            console.log(`Removed Hidden status from lot ${lot.nameOrNumber} after tenant deletion`);
-          }
+          // Set the lot back to visible (isActive: true)
+          await storage.updateLot(lot.id, {
+            isActive: true
+          });
+          console.log(`Lot ${lot.nameOrNumber} made visible again after tenant deletion`);
         } catch (statusError) {
-          console.error('Failed to remove Hidden status from lot:', statusError);
+          console.error('Failed to make lot visible:', statusError);
           // Don't fail the entire request if status update fails
         }
       }
