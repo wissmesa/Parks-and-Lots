@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
@@ -95,26 +95,28 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
   const [editingTenant, setEditingTenant] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Fetch Tenant details
-  const { data: Tenant, isLoading: tenantLoading } = useQuery({
-    queryKey: ['Tenant', tenantId],
+  // Fetch tenant details
+  const { data: tenant, isLoading: tenantLoading, error: tenantError } = useQuery({
+    queryKey: ['tenant', tenantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/tenants/${tenantId}`);
       const data = await response.json();
-      return data.Tenant as Tenant;
+      return data.tenant as Tenant;
     },
     enabled: isOpen && !!tenantId,
+    retry: 1,
   });
 
-  // Fetch Tenant payments
-  const { data: payments, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['Tenant-payments', tenantId],
+  // Fetch tenant payments
+  const { data: payments, isLoading: paymentsLoading, error: paymentsError } = useQuery({
+    queryKey: ['tenant-payments', tenantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/tenants/${tenantId}/payments`);
       const data = await response.json();
       return data.payments as Payment[];
     },
     enabled: isOpen && !!tenantId,
+    retry: 1,
   });
 
   // Payment form state
@@ -175,25 +177,25 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     return !error;
   };
 
-  // Set form data when Tenant loads
-  useState(() => {
-    if (Tenant) {
+  // Set form data when tenant loads
+  useEffect(() => {
+    if (tenant) {
       setTenantForm({
-        firstName: Tenant.firstName || '',
-        lastName: Tenant.lastName || '',
-        email: Tenant.email || '',
-        phone: Tenant.phone || '',
-        emergencyContactName: Tenant.emergencyContactName || '',
-        emergencyContactPhone: Tenant.emergencyContactPhone || '',
-        status: Tenant.status,
-        leaseStartDate: Tenant.leaseStartDate ? Tenant.leaseStartDate.split('T')[0] : '',
-        leaseEndDate: Tenant.leaseEndDate ? Tenant.leaseEndDate.split('T')[0] : '',
-        monthlyRent: Tenant.monthlyRent || '',
-        securityDeposit: Tenant.securityDeposit || '',
-        notes: Tenant.notes || '',
+        firstName: tenant.firstName || '',
+        lastName: tenant.lastName || '',
+        email: tenant.email || '',
+        phone: tenant.phone || '',
+        emergencyContactName: tenant.emergencyContactName || '',
+        emergencyContactPhone: tenant.emergencyContactPhone || '',
+        status: tenant.status,
+        leaseStartDate: tenant.leaseStartDate ? tenant.leaseStartDate.split('T')[0] : '',
+        leaseEndDate: tenant.leaseEndDate ? tenant.leaseEndDate.split('T')[0] : '',
+        monthlyRent: tenant.monthlyRent || '',
+        securityDeposit: tenant.securityDeposit || '',
+        notes: tenant.notes || '',
       });
     }
-  });
+  }, [tenant]);
 
   // Create payment mutation
   const createPaymentMutation = useMutation({
@@ -207,7 +209,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
       return data.payment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['Tenant-payments', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant-payments', tenantId] });
       setShowAddPayment(false);
       setPaymentForm({
         type: 'RENT',
@@ -239,10 +241,10 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         leaseEndDate: updates.leaseEndDate ? new Date(updates.leaseEndDate).toISOString() : null,
       });
       const data = await response.json();
-      return data.Tenant;
+      return data.tenant;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['Tenant', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['tenant', tenantId] });
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       setEditingTenant(false);
       toast({
@@ -340,7 +342,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
     }
   };
 
-  if (!Tenant && !tenantLoading) {
+  if (!tenant && !tenantLoading) {
     return null;
   }
 
@@ -351,15 +353,25 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            {Tenant ? `${Tenant.firstName} ${Tenant.lastName}` : 'Loading...'}
+            {tenant ? `${tenant.firstName} ${tenant.lastName}` : 'Loading...'}
           </DialogTitle>
         </DialogHeader>
 
         {tenantLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading Tenant details...</div>
+            <div className="text-muted-foreground">Loading tenant details...</div>
           </div>
-        ) : Tenant ? (
+        ) : tenantError ? (
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="text-destructive">Failed to load tenant details</div>
+            <Button 
+              onClick={() => window.location.reload()} 
+              variant="outline"
+            >
+              Retry
+            </Button>
+          </div>
+        ) : tenant ? (
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -373,11 +385,11 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Status</CardTitle>
-                    {getStatusIcon(Tenant.status)}
+                    {getStatusIcon(tenant.status)}
                   </CardHeader>
                   <CardContent>
-                    <Badge variant={getStatusBadgeVariant(Tenant.status)}>
-                      {Tenant.status}
+                    <Badge variant={getStatusBadgeVariant(tenant.status)}>
+                      {tenant.status}
                     </Badge>
                   </CardContent>
                 </Card>
@@ -389,7 +401,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {Tenant.monthlyRent ? formatCurrency(Tenant.monthlyRent) : 'N/A'}
+                      {tenant.monthlyRent ? formatCurrency(tenant.monthlyRent) : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
@@ -401,7 +413,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {Tenant.securityDeposit ? formatCurrency(Tenant.securityDeposit) : 'N/A'}
+                      {tenant.securityDeposit ? formatCurrency(tenant.securityDeposit) : 'N/A'}
                     </div>
                   </CardContent>
                 </Card>
@@ -413,10 +425,10 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm">
-                      {Tenant.leaseStartDate && Tenant.leaseEndDate ? (
+                      {tenant.leaseStartDate && tenant.leaseEndDate ? (
                         <>
-                          <div>{formatDate(Tenant.leaseStartDate)}</div>
-                          <div className="text-muted-foreground">to {formatDate(Tenant.leaseEndDate)}</div>
+                          <div>{formatDate(tenant.leaseStartDate)}</div>
+                          <div className="text-muted-foreground">to {formatDate(tenant.leaseEndDate)}</div>
                         </>
                       ) : (
                         'N/A'
@@ -434,31 +446,31 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{Tenant.email}</span>
+                      <span>{tenant.email}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{Tenant.phone}</span>
+                      <span>{tenant.phone}</span>
                     </div>
-                    {Tenant.emergencyContactName && (
+                    {tenant.emergencyContactName && (
                       <>
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
-                          <span>Emergency: {Tenant.emergencyContactName}</span>
+                          <span>Emergency: {tenant.emergencyContactName}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>{Tenant.emergencyContactPhone}</span>
+                          <span>{tenant.emergencyContactPhone}</span>
                         </div>
                       </>
                     )}
                   </div>
-                  {Tenant.notes && (
+                  {tenant.notes && (
                     <>
                       <Separator />
                       <div>
                         <h4 className="font-medium mb-2">Notes</h4>
-                        <p className="text-sm text-muted-foreground">{Tenant.notes}</p>
+                        <p className="text-sm text-muted-foreground">{tenant.notes}</p>
                       </div>
                     </>
                   )}
@@ -663,29 +675,29 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Name</Label>
-                      <div className="p-2 bg-muted rounded">{Tenant.firstName} {Tenant.lastName}</div>
+                      <div className="p-2 bg-muted rounded">{tenant.firstName} {tenant.lastName}</div>
                     </div>
                     <div>
                       <Label>Status</Label>
                       <div className="p-2">
-                        <Badge variant={getStatusBadgeVariant(Tenant.status)}>
-                          {Tenant.status}
+                        <Badge variant={getStatusBadgeVariant(tenant.status)}>
+                          {tenant.status}
                         </Badge>
                       </div>
                     </div>
                     <div>
                       <Label>Email</Label>
-                      <div className="p-2 bg-muted rounded">{Tenant.email}</div>
+                      <div className="p-2 bg-muted rounded">{tenant.email}</div>
                     </div>
                     <div>
                       <Label>Phone</Label>
-                      <div className="p-2 bg-muted rounded">{Tenant.phone}</div>
+                      <div className="p-2 bg-muted rounded">{tenant.phone}</div>
                     </div>
                   </div>
-                  {Tenant.notes && (
+                  {tenant.notes && (
                     <div>
                       <Label>Notes</Label>
-                      <div className="p-2 bg-muted rounded">{Tenant.notes}</div>
+                      <div className="p-2 bg-muted rounded">{tenant.notes}</div>
                     </div>
                   )}
                 </div>
@@ -842,7 +854,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
             </TabsContent>
 
             <TabsContent value="lot" className="space-y-4">
-              {Tenant.lot && Tenant.park ? (
+              {tenant.lot && tenant.park ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -854,21 +866,21 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Lot Name/Number</Label>
-                        <div className="p-2 bg-muted rounded font-medium">{Tenant.lot.nameOrNumber}</div>
+                        <div className="p-2 bg-muted rounded font-medium">{tenant.lot.nameOrNumber}</div>
                       </div>
                       <div>
                         <Label>Park</Label>
-                        <div className="p-2 bg-muted rounded">{Tenant.park.name}</div>
+                        <div className="p-2 bg-muted rounded">{tenant.park.name}</div>
                       </div>
                       <div>
                         <Label>Location</Label>
-                        <div className="p-2 bg-muted rounded">{Tenant.park.city}, {Tenant.park.state}</div>
+                        <div className="p-2 bg-muted rounded">{tenant.park.city}, {tenant.park.state}</div>
                       </div>
                     </div>
-                    {Tenant.lot.description && (
+                    {tenant.lot.description && (
                       <div>
                         <Label>Description</Label>
-                        <div className="p-2 bg-muted rounded">{Tenant.lot.description}</div>
+                        <div className="p-2 bg-muted rounded">{tenant.lot.description}</div>
                       </div>
                     )}
                   </CardContent>
@@ -891,7 +903,7 @@ export function TenantDetailDialog({ isOpen, onClose, tenantId }: TenantDetailDi
         )}
 
         {/* Delete Button at Bottom */}
-        {Tenant && (
+        {tenant && (
           <div className="flex justify-end pt-4 border-t">
             <Button
               variant="outline"

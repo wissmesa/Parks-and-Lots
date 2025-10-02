@@ -198,7 +198,7 @@ export default function AdminTenants() {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       toast({
         title: "Status Updated",
-        description: `Tenant status has been updated to ${updatedTenant.status}.`,
+        description: `Tenant status has been updated to ${updatedtenant.status}.`,
       });
     },
     onError: (error: any) => {
@@ -229,7 +229,7 @@ export default function AdminTenants() {
     if (!formData.lotId) {
       toast({
         title: "Validation Error",
-        description: "Please select a lot for the Tenant.",
+        description: "Please select a lot for the tenant.",
         variant: "destructive",
       });
       return;
@@ -419,7 +419,7 @@ export default function AdminTenants() {
                     <p className="text-muted-foreground mb-4">
                       {searchTerm || statusFilter !== 'all' 
                         ? 'No tenants match your current filters.'
-                        : 'Get started by adding your first Tenant.'
+                        : 'Get started by adding your first tenant.'
                       }
                     </p>
                     <Button onClick={() => setShowCreateModal(true)}>
@@ -442,51 +442,51 @@ export default function AdminTenants() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTenants.map((Tenant) => (
-                        <TableRow key={Tenant.id}>
+                      {filteredTenants.map((tenant) => (
+                        <TableRow key={tenant.id}>
                           <TableCell>
                             <button
-                              onClick={() => setSelectedTenant(Tenant.id)}
+                              onClick={() => setSelectedTenant(tenant.id)}
                               className="font-medium text-left hover:text-primary hover:underline transition-colors"
                             >
-                              {Tenant.firstName} {Tenant.lastName}
+                              {tenant.firstName} {tenant.lastName}
                             </button>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-1">
                               <div className="flex items-center gap-1 text-sm">
                                 <Mail className="h-3 w-3" />
-                                {Tenant.email}
+                                {tenant.email}
                               </div>
                               <div className="flex items-center gap-1 text-sm">
                                 <Phone className="h-3 w-3" />
-                                {Tenant.phone}
+                                {tenant.phone}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="font-medium">
-                              {Tenant.lot?.nameOrNumber || 'N/A'}
+                              {tenant.lot?.nameOrNumber || 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm">
                               <MapPin className="h-3 w-3" />
-                              {Tenant.park ? `${Tenant.park.name}, ${Tenant.park.city}` : 'N/A'}
+                              {tenant.park ? `${tenant.park.name}, ${tenant.park.city}` : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <Select 
-                              value={Tenant.status} 
-                              onValueChange={(newStatus) => handleStatusChange(Tenant.id, newStatus as Tenant['status'])}
+                              value={tenant.status} 
+                              onValueChange={(newStatus) => handleStatusChange(tenant.id, newStatus as Tenant['status'])}
                             >
                               <SelectTrigger className="w-fit p-0 border-0 bg-transparent hover:bg-transparent">
                                 <Badge 
-                                  variant={getStatusBadgeVariant(Tenant.status)} 
+                                  variant={getStatusBadgeVariant(tenant.status)} 
                                   className="flex items-center gap-1 w-fit cursor-pointer hover:opacity-80 transition-opacity"
                                 >
-                                  {getStatusIcon(Tenant.status)}
-                                  {Tenant.status}
+                                  {getStatusIcon(tenant.status)}
+                                  {tenant.status}
                                 </Badge>
                               </SelectTrigger>
                               <SelectContent>
@@ -498,13 +498,13 @@ export default function AdminTenants() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            {Tenant.monthlyRent ? formatCurrency(Tenant.monthlyRent) : 'N/A'}
+                            {tenant.monthlyRent ? formatCurrency(tenant.monthlyRent) : 'N/A'}
                           </TableCell>
                           <TableCell>
-                            {Tenant.leaseStartDate && Tenant.leaseEndDate ? (
+                            {tenant.leaseStartDate && tenant.leaseEndDate ? (
                               <div className="text-sm">
-                                <div>{formatDate(Tenant.leaseStartDate)}</div>
-                                <div className="text-muted-foreground">to {formatDate(Tenant.leaseEndDate)}</div>
+                                <div>{formatDate(tenant.leaseStartDate)}</div>
+                                <div className="text-muted-foreground">to {formatDate(tenant.leaseEndDate)}</div>
                               </div>
                             ) : (
                               'N/A'
@@ -515,7 +515,7 @@ export default function AdminTenants() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setSelectedTenant(Tenant.id)}
+                                onClick={() => setSelectedTenant(tenant.id)}
                               >
                                 <User className="h-4 w-4 mr-1" />
                                 View
@@ -523,7 +523,7 @@ export default function AdminTenants() {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => handleDeleteTenant(Tenant.id, `${Tenant.firstName} ${Tenant.lastName}`)}
+                                onClick={() => handleDeleteTenant(tenant.id, `${tenant.firstName} ${tenant.lastName}`)}
                                 disabled={deleteTenantMutation.isPending}
                               >
                                 Delete

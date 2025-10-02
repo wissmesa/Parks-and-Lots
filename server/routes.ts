@@ -2419,6 +2419,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint to check tenant-lot relationships
+  app.get('/api/debug/tenant-lots', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      if (req.user!.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      
+      const tenants = await storage.getTenants();
+      const issues = [];
+      
+      for (const tenant of tenants) {
+        if (tenant.lotId) {
+          const lot = await storage.getLotAny(tenant.lotId);
+          if (!lot) {
+            issues.push({
+              tenantId: tenant.id,
+              tenantName: `${tenant.firstName} ${tenant.lastName}`,
+              missingLotId: tenant.lotId
+            });
+          }
+        }
+      }
+      
+      res.json({ 
+        totalTenants: tenants.length,
+        tenantsWithLots: tenants.filter(t => t.lotId).length,
+        issues: issues,
+        message: issues.length > 0 ? 'Found data integrity issues' : 'No issues found'
+      });
+    } catch (error) {
+      console.error('Debug tenant-lots error:', error);
+      res.status(500).json({ message: 'Failed to check tenant-lot relationships' });
+    }
+  });
+
   // Tenant routes
   app.get('/api/tenants', authenticateToken, async (req: AuthRequest, res) => {
     try {
@@ -2464,34 +2499,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/tenants/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const tenantId = req.params.id;
-      const Tenant = await storage.getTenant(tenantId);
+      const tenant = await storage.getTenant(tenantId);
       
-      if (!Tenant) {
+      console.log(`getTenant(${tenantId}) returned:`, !!tenant);
+      
+      if (!tenant) {
         return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this Tenant's lot
+      // For managers, check if they have access to this tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(Tenant.lotId);
-        if (!lot) {
-          return res.status(404).json({ message: 'Associated lot not found' });
-        }
-
-        const assignments = await storage.getManagerAssignments(req.user!.id);
-        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        console.log(`Manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
+        
+        // If tenant has no lot assigned, allow access (tenant might not be assigned to a lot yet)
+        if (!tenant.lotId) {
+          console.log(`✅ Tenant has no lot assigned, allowing access`);
+        } else {
+          const lot = await storage.getLotAny(tenant.lotId);
+          console.log(`Lot found:`, !!lot);
+          
+          if (!lot) {
+            console.log(`⚠️ Lot ${tenant.lotId} not found, but allowing access to tenant`);
+            // Don't block access if lot is missing - this is a data integrity issue
+            // The tenant still exists and should be viewable
+          } else {
+            const assignments = await storage.getManagerAssignments(req.user!.id);
+            console.log(`Manager assignments:`, assignments.map(a => a.parkId));
+            console.log(`Lot park ID:`, lot.parkId);
+            const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+            console.log(`Manager has access:`, hasAccess);
+            if (!hasAccess) {
+              console.log(`❌ Access denied to tenant ${tenantId}`);
+              return res.status(403).json({ message: 'Access denied to this tenant' });
+            }
+          }
         }
       }
 
-      // Get Tenant with lot and park info
+      // Get tenant with lot and park info
       const tenantWithInfo = await storage.getTenantsWithLotInfo();
       const fullTenant = tenantWithInfo.find(t => t.id === tenantId);
       
-      res.json({ Tenant: fullTenant || Tenant });
+      console.log(`Looking for tenant ${tenantId}, found in getTenantsWithLotInfo: ${!!fullTenant}`);
+      
+      // If fullTenant is not found (due to missing lot/park relationships), 
+      // return the basic tenant info with null lot/park data
+      if (!fullTenant) {
+        console.log(`⚠️ Tenant not found in getTenantsWithLotInfo, returning basic tenant data`);
+        const tenantWithNullLot = {
+          ...tenant,
+          lot: null,
+          park: null
+        };
+        res.json({ tenant: tenantWithNullLot });
+      } else {
+        res.json({ tenant: fullTenant });
+      }
     } catch (error) {
-      console.error('Get Tenant error:', error);
-      res.status(500).json({ message: 'Failed to fetch Tenant' });
+      console.error('Get tenant error:', error);
+      res.status(500).json({ message: 'Failed to fetch tenant' });
     }
   });
 
