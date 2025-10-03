@@ -535,7 +535,7 @@ export default function ManagerTenants() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setTenantToDelete(Tenant)}
+                                onClick={() => setTenantToDelete(tenant)}
                                 className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="h-4 w-4" />
