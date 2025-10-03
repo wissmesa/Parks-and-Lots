@@ -92,6 +92,34 @@ const amenityIcons: Record<string, any> = {
   'Security': Shield,
 };
 
+function AvailableLotsCard({ totalLots, isLoading }: { totalLots: number; isLoading: boolean }) {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Available Lots</h3>
+          <Home className="w-5 h-5 text-primary" />
+        </div>
+        
+        <div className="text-center">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-4xl font-bold text-primary mb-2">{totalLots}</div>
+              <p className="text-sm text-muted-foreground">
+                {totalLots === 1 ? 'lot available' : 'lots available'}
+              </p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AmenitiesCard({ park }: { park: Park | undefined }) {
   // Early return if park is not loaded
   if (!park || !park.id) {
@@ -185,6 +213,7 @@ export default function ParkDetail() {
   });
 
   const lots = (lotsData?.lots || []) as Lot[];
+  const totalLots = lotsData?.pagination?.total || 0;
   const parkPhotos = (photos || []) as any[];
 
 
@@ -442,6 +471,9 @@ export default function ParkDetail() {
 
           {/* Park Information Sidebar */}
           <div className="space-y-6">
+            {/* Available Lots */}
+            <AvailableLotsCard totalLots={totalLots} isLoading={lotsLoading} />
+
             {/* Amenities */}
             <AmenitiesCard park={park} />
 
