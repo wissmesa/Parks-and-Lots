@@ -4105,12 +4105,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const tenant = userWithTenant.tenant;
-      const lot = await storage.getLot(tenant.lotId);
+      // Use getLotAny to get the lot even if it's hidden (isActive = false)
+      // Tenants should always be able to see their assigned lot
+      const lot = await storage.getLotAny(tenant.lotId);
       if (!lot) {
         return res.status(404).json({ message: 'Associated lot not found' });
       }
       
-      const park = await storage.getPark(lot.parkId);
+      // Use getParkAny to get the park even if it's hidden (isActive = false)
+      // Tenants should always be able to see the park their lot belongs to
+      const park = await storage.getParkAny(lot.parkId);
       if (!park) {
         return res.status(404).json({ message: 'Associated park not found' });
       }
