@@ -676,6 +676,7 @@ export class DatabaseStorage implements IStorage {
       clientEmail: showings.clientEmail,
       clientPhone: showings.clientPhone,
       createdAt: showings.createdAt,
+      calendarEventId: showings.calendarEventId,
       lotId: lots.id,
       lotNameOrNumber: lots.nameOrNumber,
       parkId: parks.id,
@@ -707,6 +708,7 @@ export class DatabaseStorage implements IStorage {
         clientEmail: row.clientEmail,
         clientPhone: row.clientPhone,
         createdAt: row.createdAt,
+        calendarEventId: row.calendarEventId,
         lot: {
           id: row.lotId,
           nameOrNumber: row.lotNameOrNumber,
@@ -728,6 +730,7 @@ export class DatabaseStorage implements IStorage {
       clientEmail: row.clientEmail,
       clientPhone: row.clientPhone,
       createdAt: row.createdAt,
+      calendarEventId: row.calendarEventId,
       lot: {
         id: row.lotId,
         nameOrNumber: row.lotNameOrNumber,

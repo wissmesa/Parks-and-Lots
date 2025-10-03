@@ -229,12 +229,26 @@ export class GoogleCalendarService {
   }
 
   async deleteCalendarEvent(userId: string, eventId: string) {
-    const calendar = await this.createCalendarClient(userId);
-    
-    await calendar.events.delete({
-      calendarId: 'primary',
-      eventId: eventId
-    });
+    try {
+      const calendar = await this.createCalendarClient(userId);
+      
+      await calendar.events.delete({
+        calendarId: 'primary',
+        eventId: eventId,
+        sendUpdates: 'all'
+      });
+      
+      console.log(`Successfully deleted calendar event ${eventId} for user ${userId}`);
+    } catch (error: any) {
+      // If event doesn't exist (404), consider it already deleted - don't throw error
+      if (error?.status === 404 || error?.code === 404) {
+        console.log(`Calendar event ${eventId} not found - likely already deleted`);
+        return;
+      }
+      
+      console.error(`Error deleting calendar event ${eventId}:`, error);
+      throw new Error(`Failed to delete calendar event: ${error?.message || 'Unknown error'}`);
+    }
   }
 
   async isCalendarConnected(userId: string): Promise<boolean> {

@@ -208,15 +208,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      // Always get database showings first as the primary source
+      // Get database showings for ID mapping
       const dbShowings = await storage.getShowings({ managerId: req.user!.id });
       const todayDbShowings = dbShowings.filter(showing => {
         const showingDate = new Date(showing.startDt);
         return showingDate >= startOfDay && showingDate < endOfDay;
       });
 
-      // Try to enhance with Google Calendar data if available
-      let todayShowings = todayDbShowings;
+      // Initialize with empty array - will be populated from calendar if connected
+      let todayShowings: any[] = [];
 
       try {
         const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
@@ -234,11 +234,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             event.id && event.summary && event.summary.includes('Property Showing')
           );
 
-          // If we have calendar events, use them as the source of truth
-          // This ensures consistency with the stats endpoint
-          if (propertyShowingEvents.length > 0) {
-            todayShowings = propertyShowingEvents.map(event => {
+          // Always use calendar as the source of truth when connected
+          // Map calendar events to showing objects
+          todayShowings = propertyShowingEvents.map(event => {
               const eventStart = new Date(event.start?.dateTime || event.start?.date!);
+              
+              // Find the corresponding database showing by calendar event ID
+              const dbShowing = todayDbShowings.find(s => s.calendarEventId === event.id);
               
               // Extract contact information from event description
               let clientEmail = '';
@@ -273,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
               
               return {
-                id: event.id,
+                id: dbShowing?.id || event.id, // Use database showing ID if available, fallback to event ID
                 startDt: eventStart.toISOString(),
                 endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
                 status: 'SCHEDULED',
@@ -281,7 +283,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 clientEmail: clientEmail,
                 clientPhone: clientPhone,
                 calendarHtmlLink: event.htmlLink,
-                lot: {
+                calendarEventId: event.id, // Include the calendar event ID for reference
+                lot: dbShowing?.lot || {
                   nameOrNumber: event.summary?.split(' - ')[1] || 'Unknown Lot',
                   park: {
                     name: 'Unknown Park'
@@ -289,11 +292,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               };
             });
-          }
+        } else {
+          // Calendar not connected, use database showings
+          todayShowings = todayDbShowings;
         }
       } catch (calendarError) {
-        console.log('Calendar verification failed, using database data:', calendarError);
-        // Keep using database data if calendar fails
+        console.log('Calendar fetch failed, using database data:', calendarError);
+        // Fallback to database data if calendar fails
+        todayShowings = todayDbShowings;
       }
 
       res.json(todayShowings);
@@ -314,11 +320,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       endOfWeek.setDate(startOfWeek.getDate() + 7); // End of this week
       endOfWeek.setHours(0, 0, 0, 0);
 
-      const showings = await storage.getShowings({ managerId: req.user!.id });
-      const thisWeekShowings = showings.filter(showing => {
+      // Get database showings for ID mapping
+      const dbShowings = await storage.getShowings({ managerId: req.user!.id });
+      const thisWeekDbShowings = dbShowings.filter(showing => {
         const showingDate = new Date(showing.startDt);
         return showingDate >= startOfWeek && showingDate < endOfWeek;
       });
+
+      // Initialize with empty array - will be populated from calendar if connected
+      let thisWeekShowings: any[] = [];
+
+      try {
+        const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
+        
+        if (isConnected) {
+          // Get calendar events for the same time range
+          const calendarEvents = await googleCalendarService.getUserCalendarEvents(
+            req.user!.id, 
+            startOfWeek, 
+            endOfWeek
+          );
+
+          // Filter property showing events
+          const propertyShowingEvents = calendarEvents.filter(event => 
+            event.id && event.summary && event.summary.includes('Property Showing')
+          );
+
+          // Always use calendar as the source of truth when connected
+          thisWeekShowings = propertyShowingEvents.map(event => {
+            const eventStart = new Date(event.start?.dateTime || event.start?.date!);
+            const dbShowing = thisWeekDbShowings.find(s => s.calendarEventId === event.id);
+            
+            let clientEmail = '';
+            let clientPhone = '';
+            
+            if (event.description) {
+              const emailMatch = event.description.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+              if (emailMatch) clientEmail = emailMatch[1];
+              
+              const phoneMatch = event.description.match(/(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/);
+              if (phoneMatch) {
+                clientPhone = `(${phoneMatch[2]}) ${phoneMatch[3]}-${phoneMatch[4]}`;
+              }
+            }
+            
+            if (!clientEmail && event.attendees && event.attendees.length > 0) {
+              const clientAttendee = event.attendees.find(attendee => 
+                attendee.email && !attendee.organizer && attendee.responseStatus !== 'declined'
+              );
+              if (clientAttendee?.email) clientEmail = clientAttendee.email;
+            }
+            
+            return {
+              id: dbShowing?.id || event.id,
+              startDt: eventStart.toISOString(),
+              endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
+              status: 'SCHEDULED',
+              clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+              clientEmail: clientEmail,
+              clientPhone: clientPhone,
+              calendarHtmlLink: event.htmlLink,
+              calendarEventId: event.id,
+              lot: dbShowing?.lot || {
+                nameOrNumber: event.summary?.split(' - ')[1] || 'Unknown Lot',
+                park: { name: 'Unknown Park' }
+              }
+            };
+          });
+        } else {
+          // Calendar not connected, use database showings
+          thisWeekShowings = thisWeekDbShowings;
+        }
+      } catch (calendarError) {
+        console.log('Calendar fetch failed, using database data:', calendarError);
+        thisWeekShowings = thisWeekDbShowings;
+      }
 
       res.json(thisWeekShowings);
     } catch (error) {
@@ -336,11 +412,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
       endOfMonth.setHours(0, 0, 0, 0);
 
-      const showings = await storage.getShowings({ managerId: req.user!.id });
-      const thisMonthShowings = showings.filter(showing => {
+      // Get database showings for ID mapping
+      const dbShowings = await storage.getShowings({ managerId: req.user!.id });
+      const thisMonthDbShowings = dbShowings.filter(showing => {
         const showingDate = new Date(showing.startDt);
         return showingDate >= startOfMonth && showingDate < endOfMonth;
       });
+
+      // Initialize with empty array - will be populated from calendar if connected
+      let thisMonthShowings: any[] = [];
+
+      try {
+        const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
+        
+        if (isConnected) {
+          // Get calendar events for the same time range
+          const calendarEvents = await googleCalendarService.getUserCalendarEvents(
+            req.user!.id, 
+            startOfMonth, 
+            endOfMonth
+          );
+
+          // Filter property showing events
+          const propertyShowingEvents = calendarEvents.filter(event => 
+            event.id && event.summary && event.summary.includes('Property Showing')
+          );
+
+          // Always use calendar as the source of truth when connected
+          thisMonthShowings = propertyShowingEvents.map(event => {
+            const eventStart = new Date(event.start?.dateTime || event.start?.date!);
+            const dbShowing = thisMonthDbShowings.find(s => s.calendarEventId === event.id);
+            
+            let clientEmail = '';
+            let clientPhone = '';
+            
+            if (event.description) {
+              const emailMatch = event.description.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+              if (emailMatch) clientEmail = emailMatch[1];
+              
+              const phoneMatch = event.description.match(/(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/);
+              if (phoneMatch) {
+                clientPhone = `(${phoneMatch[2]}) ${phoneMatch[3]}-${phoneMatch[4]}`;
+              }
+            }
+            
+            if (!clientEmail && event.attendees && event.attendees.length > 0) {
+              const clientAttendee = event.attendees.find(attendee => 
+                attendee.email && !attendee.organizer && attendee.responseStatus !== 'declined'
+              );
+              if (clientAttendee?.email) clientEmail = clientAttendee.email;
+            }
+            
+            return {
+              id: dbShowing?.id || event.id,
+              startDt: eventStart.toISOString(),
+              endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
+              status: 'SCHEDULED',
+              clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+              clientEmail: clientEmail,
+              clientPhone: clientPhone,
+              calendarHtmlLink: event.htmlLink,
+              calendarEventId: event.id,
+              lot: dbShowing?.lot || {
+                nameOrNumber: event.summary?.split(' - ')[1] || 'Unknown Lot',
+                park: { name: 'Unknown Park' }
+              }
+            };
+          });
+        } else {
+          // Calendar not connected, use database showings
+          thisMonthShowings = thisMonthDbShowings;
+        }
+      } catch (calendarError) {
+        console.log('Calendar fetch failed, using database data:', calendarError);
+        thisMonthShowings = thisMonthDbShowings;
+      }
 
       res.json(thisMonthShowings);
     } catch (error) {
@@ -3417,7 +3563,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updates.status || updates.startDt || updates.endDt) {
         try {
           if (updates.status === 'CANCELED' && updatedShowing.calendarEventId) {
-            await googleCalendarService.deleteCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId);
+            console.log(`Deleting calendar event ${updatedShowing.calendarEventId} for manager ${updatedShowing.managerId}`);
+            // Check if manager still has calendar connected
+            const isConnected = await googleCalendarService.isCalendarConnected(updatedShowing.managerId);
+            if (isConnected) {
+              await googleCalendarService.deleteCalendarEvent(updatedShowing.managerId, updatedShowing.calendarEventId);
+              console.log('Calendar event deleted successfully');
+            } else {
+              console.log('Manager calendar not connected - skipping calendar deletion');
+            }
           } else if (updatedShowing.calendarEventId) {
             // Fetch lot with park information for proper description
             const lotsWithPark = await storage.getLotsWithParkInfo({ includeInactive: true });
@@ -3443,9 +3597,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           console.log('Calendar sync successful for showing update');
-        } catch (error) {
+        } catch (error: any) {
           console.error('Calendar sync error:', error);
-          // Update showing with sync error
+          // Log more details about the error
+          if (error?.message) {
+            console.error('Error message:', error.message);
+          }
+          if (error?.code) {
+            console.error('Error code:', error.code);
+          }
+          // Update showing with sync error but don't fail the request
           await storage.updateShowing(req.params.id, { calendarSyncError: true } as any);
         }
       }
@@ -3454,6 +3615,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Update showing error:', error);
       res.status(400).json({ message: 'Invalid showing data' });
+    }
+  });
+
+  // Cancel calendar event directly (for calendar-first approach)
+  app.delete('/api/calendar/events/:eventId', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { eventId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`Attempting to delete calendar event ${eventId} for user ${userId}`);
+
+      // Check if user has calendar connected
+      const isConnected = await googleCalendarService.isCalendarConnected(userId);
+      if (!isConnected) {
+        return res.status(400).json({ message: 'Google Calendar not connected' });
+      }
+
+      // Delete the calendar event
+      await googleCalendarService.deleteCalendarEvent(userId, eventId);
+
+      // Also update the database if there's a corresponding showing
+      try {
+        const allShowings = await storage.getShowings({ managerId: userId });
+        const dbShowing = allShowings.find(s => s.calendarEventId === eventId);
+        if (dbShowing) {
+          await storage.updateShowing(dbShowing.id, { status: 'CANCELED' as any });
+          console.log(`Updated database showing ${dbShowing.id} to CANCELED`);
+        }
+      } catch (dbError) {
+        console.log('Could not update database showing, but calendar event was deleted:', dbError);
+        // Don't fail the request if database update fails
+      }
+
+      res.json({ message: 'Calendar event deleted successfully' });
+    } catch (error: any) {
+      console.error('Delete calendar event error:', error);
+      res.status(500).json({ message: error?.message || 'Failed to delete calendar event' });
     }
   });
 

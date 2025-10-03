@@ -35,6 +35,8 @@ interface Showing {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  calendarEventId?: string;
+  calendarHtmlLink?: string;
   lot?: {
     id: string;
     nameOrNumber: string;
@@ -92,10 +94,16 @@ export default function ManagerBookings() {
     enabled: user?.role === 'MANAGER',
   });
 
-  // Mutation to cancel a showing
+  // Mutation to cancel a showing - cancels directly in Google Calendar
   const cancelShowingMutation = useMutation({
-    mutationFn: async (showingId: string) => {
-      return apiRequest('PATCH', `/api/showings/${showingId}`, { status: 'CANCELED' });
+    mutationFn: async (showing: Showing) => {
+      // If there's a calendar event ID, cancel it in the calendar
+      if (showing.calendarEventId) {
+        return apiRequest('DELETE', `/api/calendar/events/${showing.calendarEventId}`, null);
+      } else {
+        // Fallback to database-only cancellation if no calendar event
+        return apiRequest('PATCH', `/api/showings/${showing.id}`, { status: 'CANCELED' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/manager/showings/today"] });
@@ -251,7 +259,7 @@ export default function ManagerBookings() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => cancelShowingMutation.mutate(showing.id)}
+                                  onClick={() => cancelShowingMutation.mutate(showing)}
                                   disabled={cancelShowingMutation.isPending}
                                 >
                                   Cancel
