@@ -349,7 +349,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(asc(parks.name));
     
-    // Extract only park data from the joined result
+    // Extract park data and include company information from the joined result
     const parksResult = results.map(row => ({
       id: row.parks.id,
       companyId: row.parks.companyId,
@@ -361,7 +361,10 @@ export class DatabaseStorage implements IStorage {
       description: row.parks.description,
       amenities: row.parks.amenities,
       isActive: row.parks.isActive,
-      createdAt: row.parks.createdAt
+      createdAt: row.parks.createdAt,
+      company: {
+        name: row.companies.name
+      }
     }));
     
     return { parks: parksResult };
