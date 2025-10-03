@@ -216,7 +216,7 @@ export default function ManagerTenants() {
       queryClient.invalidateQueries({ queryKey: ['tenants'] });
       toast({
         title: "Status Updated",
-        description: `Tenant status has been updated to ${updatedtenant.status}.`,
+        description: `Tenant status has been updated to ${updatedTenant.status}.`,
       });
     },
     onError: (error: any) => {

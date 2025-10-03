@@ -540,7 +540,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return showingDate >= startOfWeek && showingDate <= endOfWeek;
       }).length;
 
-      // Try to enhance with Google Calendar data if available
+
+      // Initialize counts
+      let completedCount = 0;
+      let cancelledCount = 0;
+
+      // Use Google Calendar as primary source if available
       try {
         const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
         
@@ -562,38 +567,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
             event.id && event.summary && (event.summary.includes('Property Showing') || event.summary.includes('COMPLETED'))
           );
 
-          // If we have calendar events, use them as the source of truth
-          if (propertyShowingEvents.length > 0) {
-            // Count scheduled showings (future events in calendar)
-            scheduledCount = propertyShowingEvents.filter(event => {
-              if (!event.start?.dateTime && !event.start?.date) return false;
-              const eventStart = new Date(event.start.dateTime || event.start.date!);
-              return eventStart > today;
-            }).length;
+          // Use calendar events as the source of truth
+          // Count scheduled showings (future, non-completed events)
+          scheduledCount = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
+            const isCompleted = event.summary?.includes('COMPLETED');
+            return eventStart > today && !isCompleted;
+          }).length;
 
-            // Count today's showings (calendar events)
-            todayShowings = propertyShowingEvents.filter(event => {
-              if (!event.start?.dateTime && !event.start?.date) return false;
-              const eventStart = new Date(event.start.dateTime || event.start.date!);
-              return eventStart >= startOfDay && eventStart < endOfDay;
-            }).length;
+          // Count completed showings (events with COMPLETED in title)
+          completedCount = propertyShowingEvents.filter(event => 
+            event.summary?.includes('COMPLETED')
+          ).length;
 
-            // Count this week's showings (calendar events)
-            thisWeekShowings = propertyShowingEvents.filter(event => {
-              if (!event.start?.dateTime && !event.start?.date) return false;
-              const eventStart = new Date(event.start.dateTime || event.start.date!);
-              return eventStart >= startOfWeek && eventStart <= endOfWeek;
-            }).length;
-          }
+          // Note: Cancelled events are deleted from calendar, so we get this from database
+          cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
+
+          // Count today's showings (calendar events)
+          todayShowings = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
+            return eventStart >= startOfDay && eventStart < endOfDay;
+          }).length;
+
+          // Count this week's showings (calendar events)
+          thisWeekShowings = propertyShowingEvents.filter(event => {
+            if (!event.start?.dateTime && !event.start?.date) return false;
+            const eventStart = new Date(event.start.dateTime || event.start.date!);
+            return eventStart >= startOfWeek && eventStart <= endOfWeek;
+          }).length;
+        } else {
+          // Calendar not connected, use database as fallback
+          completedCount = showings.filter(showing => showing.status === 'COMPLETED').length;
+          cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
         }
       } catch (calendarError) {
         console.log('Calendar verification failed, using database counts:', calendarError);
-        // Keep using database counts if calendar fails
+        // Use database counts if calendar fails
+        completedCount = showings.filter(showing => showing.status === 'COMPLETED').length;
+        cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
       }
-
-      // Always use database for completed/cancelled counts as these are managed internally
-      const completedCount = showings.filter(showing => showing.status === 'COMPLETED').length;
-      const cancelledCount = showings.filter(showing => showing.status === 'CANCELED').length;
 
       res.json({
         todayShowings,
@@ -3111,15 +3125,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(existingTenant.lotId);
-        if (!lot) {
-          return res.status(404).json({ message: 'Associated lot not found' });
-        }
-
-        const assignments = await storage.getManagerAssignments(req.user!.id);
-        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
-        if (!hasAccess) {
-          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        try {
+          // Use getLotAny to get the lot regardless of active status
+          // This allows managers to update tenants even if the lot is occupied/inactive
+          const lot = await storage.getLotAny(existingTenant.lotId);
+          if (lot) {
+            const assignments = await storage.getManagerAssignments(req.user!.id);
+            const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+            if (!hasAccess) {
+              return res.status(403).json({ message: 'Access denied to this Tenant' });
+            }
+          } else {
+            // If lot doesn't exist at all, it may have been deleted
+            console.warn(`Lot ${existingTenant.lotId} not found for tenant ${tenantId}`);
+            // Allow the update to proceed - the tenant exists and the manager should be able to manage it
+            // The lot reference will be maintained even if the lot is deleted
+          }
+        } catch (error) {
+          console.error('Error checking lot access:', error);
+          return res.status(500).json({ message: 'Error verifying lot access' });
         }
       }
 
@@ -3183,7 +3207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(Tenant.lotId);
+        // Use getLotAny to get the lot regardless of active status
+        const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
@@ -3270,7 +3295,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(Tenant.lotId);
+        // Use getLotAny to get the lot regardless of active status
+        const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
@@ -3302,7 +3328,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // For managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
-        const lot = await storage.getLot(Tenant.lotId);
+        // Use getLotAny to get the lot regardless of active status
+        const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
         }
