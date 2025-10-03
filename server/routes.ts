@@ -694,7 +694,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Request body types:', Object.keys(req.body).map(key => `${key}: ${typeof req.body[key]}`));
       
       // Verify manager owns the lot (through park assignment)
-      const lot = await storage.getLot(req.params.id);
+      // Use getLotAny to allow updating hidden (isActive: false) lots
+      const lot = await storage.getLotAny(req.params.id);
       if (!lot) {
         return res.status(404).json({ message: 'Lot not found' });
       }
