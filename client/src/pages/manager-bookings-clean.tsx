@@ -124,10 +124,16 @@ export default function ManagerBookings() {
     }
   });
 
-  // Mutation to complete a showing
+  // Mutation to complete a showing - marks it as completed in Google Calendar
   const completeShowingMutation = useMutation({
-    mutationFn: async (showingId: string) => {
-      return apiRequest('PATCH', `/api/showings/${showingId}`, { status: 'COMPLETED' });
+    mutationFn: async (showing: Showing) => {
+      // If there's a calendar event ID, mark it as completed in the calendar
+      if (showing.calendarEventId) {
+        return apiRequest('PATCH', `/api/calendar/events/${showing.calendarEventId}/complete`, null);
+      } else {
+        // Fallback to database-only completion if no calendar event
+        return apiRequest('PATCH', `/api/showings/${showing.id}`, { status: 'COMPLETED' });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/manager/showings/today"] });
@@ -266,7 +272,7 @@ export default function ManagerBookings() {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  onClick={() => completeShowingMutation.mutate(showing.id)}
+                                  onClick={() => completeShowingMutation.mutate(showing)}
                                   disabled={completeShowingMutation.isPending}
                                 >
                                   Complete

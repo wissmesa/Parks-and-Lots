@@ -229,9 +229,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endOfDay
           );
 
-          // Filter property showing events
+          // Filter property showing events (including completed ones)
           const propertyShowingEvents = calendarEvents.filter(event => 
-            event.id && event.summary && event.summary.includes('Property Showing')
+            event.id && event.summary && (event.summary.includes('Property Showing') || event.summary.includes('COMPLETED'))
           );
 
           // Always use calendar as the source of truth when connected
@@ -278,8 +278,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 id: dbShowing?.id || event.id, // Use database showing ID if available, fallback to event ID
                 startDt: eventStart.toISOString(),
                 endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
-                status: 'SCHEDULED',
-                clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+                status: event.summary?.includes('COMPLETED') ? 'COMPLETED' : 'SCHEDULED',
+                clientName: event.summary?.replace('COMPLETED - ', '').replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
                 clientEmail: clientEmail,
                 clientPhone: clientPhone,
                 calendarHtmlLink: event.htmlLink,
@@ -341,9 +341,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endOfWeek
           );
 
-          // Filter property showing events
+          // Filter property showing events (including completed ones)
           const propertyShowingEvents = calendarEvents.filter(event => 
-            event.id && event.summary && event.summary.includes('Property Showing')
+            event.id && event.summary && (event.summary.includes('Property Showing') || event.summary.includes('COMPLETED'))
           );
 
           // Always use calendar as the source of truth when connected
@@ -375,8 +375,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: dbShowing?.id || event.id,
               startDt: eventStart.toISOString(),
               endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
-              status: 'SCHEDULED',
-              clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+              status: event.summary?.includes('COMPLETED') ? 'COMPLETED' : 'SCHEDULED',
+              clientName: event.summary?.replace('COMPLETED - ', '').replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
               clientEmail: clientEmail,
               clientPhone: clientPhone,
               calendarHtmlLink: event.htmlLink,
@@ -433,9 +433,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             endOfMonth
           );
 
-          // Filter property showing events
+          // Filter property showing events (including completed ones)
           const propertyShowingEvents = calendarEvents.filter(event => 
-            event.id && event.summary && event.summary.includes('Property Showing')
+            event.id && event.summary && (event.summary.includes('Property Showing') || event.summary.includes('COMPLETED'))
           );
 
           // Always use calendar as the source of truth when connected
@@ -467,8 +467,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: dbShowing?.id || event.id,
               startDt: eventStart.toISOString(),
               endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
-              status: 'SCHEDULED',
-              clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+              status: event.summary?.includes('COMPLETED') ? 'COMPLETED' : 'SCHEDULED',
+              clientName: event.summary?.replace('COMPLETED - ', '').replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
               clientEmail: clientEmail,
               clientPhone: clientPhone,
               calendarHtmlLink: event.htmlLink,
@@ -557,9 +557,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sixMonthsForward
           );
 
-          // Filter property showing events
+          // Filter property showing events (including completed ones)
           const propertyShowingEvents = calendarEvents.filter(event => 
-            event.id && event.summary && event.summary.includes('Property Showing')
+            event.id && event.summary && (event.summary.includes('Property Showing') || event.summary.includes('COMPLETED'))
           );
 
           // If we have calendar events, use them as the source of truth
@@ -3652,6 +3652,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Delete calendar event error:', error);
       res.status(500).json({ message: error?.message || 'Failed to delete calendar event' });
+    }
+  });
+
+  // Complete calendar event directly (for calendar-first approach)
+  app.patch('/api/calendar/events/:eventId/complete', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { eventId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`Attempting to mark calendar event ${eventId} as completed for user ${userId}`);
+
+      // Check if user has calendar connected
+      const isConnected = await googleCalendarService.isCalendarConnected(userId);
+      if (!isConnected) {
+        return res.status(400).json({ message: 'Google Calendar not connected' });
+      }
+
+      // Get the current event to update its title
+      const calendar = await googleCalendarService.createCalendarClient(userId);
+      const currentEvent = await calendar.events.get({
+        calendarId: 'primary',
+        eventId: eventId
+      });
+
+      // Update the event title to include COMPLETED
+      let newSummary = currentEvent.data.summary || 'Property Showing';
+      if (!newSummary.includes('COMPLETED')) {
+        newSummary = `COMPLETED - ${newSummary}`;
+      }
+
+      // Update the calendar event
+      await googleCalendarService.updateCalendarEvent(userId, eventId, {
+        summary: newSummary,
+        description: currentEvent.data.description,
+        start: currentEvent.data.start,
+        end: currentEvent.data.end,
+        status: 'confirmed'
+      });
+
+      // Also update the database if there's a corresponding showing
+      try {
+        const allShowings = await storage.getShowings({ managerId: userId });
+        const dbShowing = allShowings.find(s => s.calendarEventId === eventId);
+        if (dbShowing) {
+          await storage.updateShowing(dbShowing.id, { status: 'COMPLETED' as any });
+          console.log(`Updated database showing ${dbShowing.id} to COMPLETED`);
+        }
+      } catch (dbError) {
+        console.log('Could not update database showing, but calendar event was updated:', dbError);
+        // Don't fail the request if database update fails
+      }
+
+      res.json({ message: 'Calendar event marked as completed successfully' });
+    } catch (error: any) {
+      console.error('Complete calendar event error:', error);
+      res.status(500).json({ message: error?.message || 'Failed to mark calendar event as completed' });
     }
   });
 
