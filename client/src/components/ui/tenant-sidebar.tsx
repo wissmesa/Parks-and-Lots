@@ -43,12 +43,12 @@ export function TenantSidebar({ className = "" }: TenantSidebarProps) {
       icon: User,
       current: location === "/tenant/info"
     },
-    {
-      name: "Payments",
-      href: "/tenant/payments",
-      icon: CreditCard,
-      current: location === "/tenant/payments"
-    }
+    // {
+    //   name: "Payments",
+    //   href: "/tenant/payments",
+    //   icon: CreditCard,
+    //   current: location === "/tenant/payments"
+    // }
   ];
 
   const SidebarContent = () => (
