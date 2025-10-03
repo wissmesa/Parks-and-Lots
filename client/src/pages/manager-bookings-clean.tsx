@@ -265,9 +265,6 @@ export default function ManagerBookings() {
                                 </Button>
                               </>
                             )}
-                            <Button size="sm" variant="ghost">
-                              View Details
-                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
