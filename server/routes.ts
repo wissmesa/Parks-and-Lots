@@ -208,11 +208,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-      const showings = await storage.getShowings({ managerId: req.user!.id });
-      const todayShowings = showings.filter(showing => {
+      // Always get database showings first as the primary source
+      const dbShowings = await storage.getShowings({ managerId: req.user!.id });
+      const todayDbShowings = dbShowings.filter(showing => {
         const showingDate = new Date(showing.startDt);
         return showingDate >= startOfDay && showingDate < endOfDay;
       });
+
+      // Try to enhance with Google Calendar data if available
+      let todayShowings = todayDbShowings;
+
+      try {
+        const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
+        
+        if (isConnected) {
+          // Get calendar events for the same time range
+          const calendarEvents = await googleCalendarService.getUserCalendarEvents(
+            req.user!.id, 
+            startOfDay, 
+            endOfDay
+          );
+
+          // Filter property showing events
+          const propertyShowingEvents = calendarEvents.filter(event => 
+            event.id && event.summary && event.summary.includes('Property Showing')
+          );
+
+          // If we have calendar events, use them as the source of truth
+          // This ensures consistency with the stats endpoint
+          if (propertyShowingEvents.length > 0) {
+            todayShowings = propertyShowingEvents.map(event => {
+              const eventStart = new Date(event.start?.dateTime || event.start?.date!);
+              return {
+                id: event.id,
+                startDt: eventStart.toISOString(),
+                endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
+                status: 'SCHEDULED',
+                clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
+                clientEmail: '',
+                clientPhone: '',
+                calendarHtmlLink: event.htmlLink,
+                lot: {
+                  nameOrNumber: event.summary?.split(' - ')[1] || 'Unknown Lot',
+                  park: {
+                    name: 'Unknown Park'
+                  }
+                }
+              };
+            });
+          }
+        }
+      } catch (calendarError) {
+        console.log('Calendar verification failed, using database data:', calendarError);
+        // Keep using database data if calendar fails
+      }
 
       res.json(todayShowings);
     } catch (error) {
@@ -297,13 +346,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       endOfWeek.setDate(startOfWeek.getDate() + 6);
       endOfWeek.setHours(23, 59, 59, 999);
 
-      // Try to get accurate counts from Google Calendar
-      let scheduledCount = 0;
-      let todayShowings = 0;
-      let thisWeekShowings = 0;
+      // Use database as primary source for consistency
+      let scheduledCount = showings.filter(showing => 
+        showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
+      ).length;
 
+      let todayShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfDay && showingDate < endOfDay;
+      }).length;
+
+      let thisWeekShowings = showings.filter(showing => {
+        const showingDate = new Date(showing.startDt);
+        return showingDate >= startOfWeek && showingDate <= endOfWeek;
+      }).length;
+
+      // Try to enhance with Google Calendar data if available
       try {
-        // Check if manager has Google Calendar connected
         const isConnected = await googleCalendarService.isCalendarConnected(req.user!.id);
         
         if (isConnected) {
@@ -319,63 +378,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sixMonthsForward
           );
 
-          // Filter property showing events - Google Calendar is the source of truth
+          // Filter property showing events
           const propertyShowingEvents = calendarEvents.filter(event => 
             event.id && event.summary && event.summary.includes('Property Showing')
           );
 
-          // Count scheduled showings (future events in calendar)
-          scheduledCount = propertyShowingEvents.filter(event => {
-            if (!event.start?.dateTime && !event.start?.date) return false;
-            const eventStart = new Date(event.start.dateTime || event.start.date!);
-            return eventStart > today;
-          }).length;
+          // If we have calendar events, use them as the source of truth
+          if (propertyShowingEvents.length > 0) {
+            // Count scheduled showings (future events in calendar)
+            scheduledCount = propertyShowingEvents.filter(event => {
+              if (!event.start?.dateTime && !event.start?.date) return false;
+              const eventStart = new Date(event.start.dateTime || event.start.date!);
+              return eventStart > today;
+            }).length;
 
-          // Count today's showings (calendar events)
-          todayShowings = propertyShowingEvents.filter(event => {
-            if (!event.start?.dateTime && !event.start?.date) return false;
-            const eventStart = new Date(event.start.dateTime || event.start.date!);
-            return eventStart >= startOfDay && eventStart < endOfDay;
-          }).length;
+            // Count today's showings (calendar events)
+            todayShowings = propertyShowingEvents.filter(event => {
+              if (!event.start?.dateTime && !event.start?.date) return false;
+              const eventStart = new Date(event.start.dateTime || event.start.date!);
+              return eventStart >= startOfDay && eventStart < endOfDay;
+            }).length;
 
-          // Count this week's showings (calendar events)
-          thisWeekShowings = propertyShowingEvents.filter(event => {
-            if (!event.start?.dateTime && !event.start?.date) return false;
-            const eventStart = new Date(event.start.dateTime || event.start.date!);
-            return eventStart >= startOfWeek && eventStart <= endOfWeek;
-          }).length;
-        } else {
-          // Fallback to database counts if calendar not connected
-          scheduledCount = showings.filter(showing => 
-            showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
-          ).length;
-
-          todayShowings = showings.filter(showing => {
-            const showingDate = new Date(showing.startDt);
-            return showingDate >= startOfDay && showingDate < endOfDay;
-          }).length;
-
-          thisWeekShowings = showings.filter(showing => {
-            const showingDate = new Date(showing.startDt);
-            return showingDate >= startOfWeek && showingDate <= endOfWeek;
-          }).length;
+            // Count this week's showings (calendar events)
+            thisWeekShowings = propertyShowingEvents.filter(event => {
+              if (!event.start?.dateTime && !event.start?.date) return false;
+              const eventStart = new Date(event.start.dateTime || event.start.date!);
+              return eventStart >= startOfWeek && eventStart <= endOfWeek;
+            }).length;
+          }
         }
       } catch (calendarError) {
-        console.log('Calendar verification failed, falling back to database counts:', calendarError);
-        // Fallback to database counts
-        scheduledCount = showings.filter(showing => 
-          showing.status === 'SCHEDULED' || showing.status === 'CONFIRMED'
-        ).length;
-
-        todayShowings = showings.filter(showing => {
-          const showingDate = new Date(showing.startDt);
-          return showingDate >= startOfDay && showingDate < endOfDay;
-        }).length;
-
-        thisWeekShowings = showings.filter(showing => {
-          const showingDate = new Date(showing.startDt);
-          return showingDate >= startOfWeek && showingDate <= endOfWeek;
-        }).length;
+        console.log('Calendar verification failed, using database counts:', calendarError);
+        // Keep using database counts if calendar fails
       }
 
       // Always use database for completed/cancelled counts as these are managed internally
