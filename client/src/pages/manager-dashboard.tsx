@@ -10,6 +10,7 @@ import {
   Calendar,
   Home,
   Phone,
+  Mail,
   ExternalLink,
   MapPin,
   Building
@@ -183,9 +184,19 @@ export default function ManagerDashboard() {
                       </div>
                       
                       {/* Contact Info */}
-                      <div className="col-span-3 flex items-center">
-                        <Phone className="w-4 h-4 mr-2 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{showing.clientPhone}</span>
+                      <div className="col-span-3">
+                        {showing.clientPhone && (
+                          <div className="flex items-center mb-1">
+                            <Phone className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">{showing.clientPhone}</span>
+                          </div>
+                        )}
+                        {showing.clientEmail && (
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">{showing.clientEmail}</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Actions */}

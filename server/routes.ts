@@ -239,14 +239,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (propertyShowingEvents.length > 0) {
             todayShowings = propertyShowingEvents.map(event => {
               const eventStart = new Date(event.start?.dateTime || event.start?.date!);
+              
+              // Extract contact information from event description
+              let clientEmail = '';
+              let clientPhone = '';
+              
+              if (event.description) {
+                // Look for email pattern in description
+                const emailMatch = event.description.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+                if (emailMatch) {
+                  clientEmail = emailMatch[1];
+                }
+                
+                // Look for phone pattern in description (various formats)
+                const phoneMatch = event.description.match(/(\+?1?[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/);
+                if (phoneMatch) {
+                  // Reconstruct phone number
+                  const areaCode = phoneMatch[2];
+                  const firstPart = phoneMatch[3];
+                  const secondPart = phoneMatch[4];
+                  clientPhone = `(${areaCode}) ${firstPart}-${secondPart}`;
+                }
+              }
+              
+              // Also check attendees for email information
+              if (!clientEmail && event.attendees && event.attendees.length > 0) {
+                const clientAttendee = event.attendees.find(attendee => 
+                  attendee.email && !attendee.organizer && attendee.responseStatus !== 'declined'
+                );
+                if (clientAttendee?.email) {
+                  clientEmail = clientAttendee.email;
+                }
+              }
+              
               return {
                 id: event.id,
                 startDt: eventStart.toISOString(),
                 endDt: event.end?.dateTime ? new Date(event.end.dateTime).toISOString() : new Date(eventStart.getTime() + 30 * 60 * 1000).toISOString(),
                 status: 'SCHEDULED',
                 clientName: event.summary?.replace('Property Showing - ', '').split(' - ')[0] || 'Unknown',
-                clientEmail: '',
-                clientPhone: '',
+                clientEmail: clientEmail,
+                clientPhone: clientPhone,
                 calendarHtmlLink: event.htmlLink,
                 lot: {
                   nameOrNumber: event.summary?.split(' - ')[1] || 'Unknown Lot',
