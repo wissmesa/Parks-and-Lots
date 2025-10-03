@@ -174,6 +174,21 @@ export default function ManagerBookings() {
   const filteredThisWeekShowings = filterShowings(thisWeekShowings || []);
   const filteredThisMonthShowings = filterShowings(thisMonthShowings || []);
 
+  // Calculate completed and cancelled counts from all showings data
+  const allShowings = [
+    ...(todayShowings || []),
+    ...(thisWeekShowings || []),
+    ...(thisMonthShowings || [])
+  ];
+  
+  // Remove duplicates based on showing ID
+  const uniqueShowings = allShowings.filter((showing, index, self) => 
+    index === self.findIndex(s => s.id === showing.id)
+  );
+  
+  const completedCount = uniqueShowings.filter(showing => showing.status === 'COMPLETED').length;
+  const cancelledCount = uniqueShowings.filter(showing => showing.status === 'CANCELED').length;
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'SCHEDULED': return 'secondary';
@@ -331,7 +346,7 @@ export default function ManagerBookings() {
                   <CheckCircle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="text-meetings-completed">0</div>
+                  <div className="text-2xl font-bold" data-testid="text-meetings-completed">{completedCount}</div>
                   <p className="text-xs text-muted-foreground">
                     Successfully completed
                   </p>
@@ -344,7 +359,7 @@ export default function ManagerBookings() {
                   <XCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold" data-testid="text-meetings-cancelled">0</div>
+                  <div className="text-2xl font-bold" data-testid="text-meetings-cancelled">{cancelledCount}</div>
                   <p className="text-xs text-muted-foreground">
                     Cancelled meetings
                   </p>
