@@ -21,12 +21,15 @@ export function ManagerSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
 
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const basePath = '/manager';
+  
   const navigationItems = [
-    { href: "/manager", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/manager/parks", icon: TreePine, label: "My Parks" },
-    { href: "/manager/lots", icon: Home, label: "My Lots" },
-    { href: "/manager/tenants", icon: Users, label: "My Tenants" },
-    { href: "/manager/bookings", icon: Calendar, label: "Bookings" },
+    { href: basePath, icon: LayoutDashboard, label: "Dashboard" },
+    { href: `${basePath}/parks`, icon: TreePine, label: isCompanyManager ? "Company Parks" : "My Parks" },
+    { href: `${basePath}/lots`, icon: Home, label: isCompanyManager ? "Company Lots" : "My Lots" },
+    { href: `${basePath}/tenants`, icon: Users, label: isCompanyManager ? "Company Tenants" : "My Tenants" },
+    { href: `${basePath}/bookings`, icon: Calendar, label: "Bookings" },
   ];
 
   const handleLogout = async () => {
@@ -44,12 +47,14 @@ export function ManagerSidebar() {
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
           <UserCog className="text-primary-foreground w-4 h-4" />
         </div>
-        <span className="font-bold text-foreground">Manager Panel</span>
+        <span className="font-bold text-foreground">
+          {isCompanyManager ? "Company Manager Panel" : "Manager Panel"}
+        </span>
       </div>
       
       <nav className="space-y-2 flex-1">
         {navigationItems.map((item) => {
-          const isActive = location === item.href || (item.href !== "/manager" && location.startsWith(item.href));
+          const isActive = location === item.href || (item.href !== basePath && location.startsWith(item.href));
           const Icon = item.icon;
           
           return (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,6 +34,7 @@ export default function AdminInvites() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Validation functions
@@ -65,19 +67,20 @@ export default function AdminInvites() {
   });
 
   const createInviteMutation = useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
       return apiRequest("POST", "/api/auth/invites", {
         email,
-        role: "MANAGER"
+        role
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/invites"] });
       setIsCreateModalOpen(false);
       setInviteEmail("");
+      setInviteRole("MANAGER");
       toast({
         title: "Success",
-        description: "Manager invite sent successfully",
+        description: `${inviteRole === "MANAGER" ? "Manager" : "Company Manager"} invite sent successfully`,
       });
     },
     onError: () => {
@@ -135,7 +138,7 @@ export default function AdminInvites() {
     }
     
     if (inviteEmail.trim()) {
-      createInviteMutation.mutate(inviteEmail.trim());
+      createInviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
     }
   };
 
@@ -175,7 +178,7 @@ export default function AdminInvites() {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Invite New Manager</DialogTitle>
+                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Company Manager"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
@@ -200,9 +203,23 @@ export default function AdminInvites() {
                       </p>
                     )}
                   </div>
+                  
+                  <div>
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => setInviteRole(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MANAGER">Manager</SelectItem>
+                        <SelectItem value="COMPANY_MANAGER">Company Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
                   <div className="bg-muted p-3 rounded-lg">
                     <p className="text-sm text-muted-foreground">
-                      An invitation email will be sent to this address with instructions to join as a park manager.
+                      An invitation email will be sent to this address with instructions to join as a {inviteRole === "MANAGER" ? "park manager" : "company manager"}.
                     </p>
                   </div>
                   <div className="flex justify-end space-x-2">
@@ -310,7 +327,7 @@ export default function AdminInvites() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => createInviteMutation.mutate(invite.email)}
+                                onClick={() => createInviteMutation.mutate({ email: invite.email, role: invite.role })}
                               >
                                 Resend
                               </Button>

@@ -2,7 +2,8 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'TENANT';
+  role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT';
+  companyId?: string;
 }
 
 interface AuthTokens {

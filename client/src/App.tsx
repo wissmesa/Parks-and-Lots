@@ -72,22 +72,23 @@ function Router() {
           <RequireRole role="ADMIN"><AdminInvites /></RequireRole>
         )} />
         
-        {/* Protected manager routes */}
+        {/* Protected manager routes - accessible by both MANAGER and COMPANY_MANAGER */}
         <Route path="/manager" component={() => (
-          <RequireRole role="MANAGER"><ManagerDashboard /></RequireRole>
+          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerDashboard /></RequireRole>
         )} />
         <Route path="/manager/parks" component={() => (
-          <RequireRole role="MANAGER"><ManagerParks /></RequireRole>
+          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerParks /></RequireRole>
         )} />
         <Route path="/manager/lots" component={() => (
-          <RequireRole role="MANAGER"><ManagerLots /></RequireRole>
+          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerLots /></RequireRole>
         )} />
         <Route path="/manager/tenants" component={() => (
-          <RequireRole role="MANAGER"><ManagerTenants /></RequireRole>
+          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerTenants /></RequireRole>
         )} />
         <Route path="/manager/bookings" component={() => (
-          <RequireRole role="MANAGER"><ManagerBookings /></RequireRole>
+          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerBookings /></RequireRole>
         )} />
+        
         
         {/* Protected TENANT routes */}
         <Route path="/tenant" component={() => (

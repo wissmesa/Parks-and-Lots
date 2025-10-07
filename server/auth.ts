@@ -58,7 +58,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-export function requireRole(role: 'ADMIN' | 'MANAGER' | 'TENANT') {
+export function requireRole(role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT') {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -91,6 +91,21 @@ export async function requireParkAccess(req: AuthRequest, res: Response, next: N
     return res.status(400).json({ message: 'Park ID required' });
   }
 
+  // For COMPANY_MANAGER, check if the park belongs to their company
+  if (req.user.role === 'COMPANY_MANAGER') {
+    if (!req.user.companyId) {
+      return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+    }
+    
+    const park = await storage.getPark(parkId);
+    if (!park || park.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Access denied to this park' });
+    }
+    
+    return next();
+  }
+
+  // For regular MANAGER, check park assignments
   const assignments = await storage.getManagerAssignments(req.user.id, parkId);
   if (assignments.length === 0) {
     return res.status(403).json({ message: 'Access denied to this park' });
@@ -119,6 +134,21 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return res.status(404).json({ message: 'Lot not found' });
   }
 
+  // For COMPANY_MANAGER, check if the lot's park belongs to their company
+  if (req.user.role === 'COMPANY_MANAGER') {
+    if (!req.user.companyId) {
+      return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+    }
+    
+    const park = await storage.getPark(lot.parkId);
+    if (!park || park.companyId !== req.user.companyId) {
+      return res.status(403).json({ message: 'Access denied to this lot' });
+    }
+    
+    return next();
+  }
+
+  // For regular MANAGER, check park assignments
   const assignments = await storage.getManagerAssignments(req.user.id, lot.parkId);
   if (assignments.length === 0) {
     return res.status(403).json({ message: 'Access denied to this lot' });

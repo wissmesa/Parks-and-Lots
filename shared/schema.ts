@@ -16,7 +16,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'TENANT']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'COMPANY_MANAGER', 'TENANT']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
@@ -33,6 +33,7 @@ export const users = pgTable("users", {
   fullName: varchar("full_name").notNull(),
   role: userRoleEnum("role").notNull(),
   tenantId: varchar("tenant_id").references(() => tenants.id),
+  companyId: varchar("company_id").references(() => companies.id), // For COMPANY_MANAGER role
   isActive: boolean("is_active").default(true).notNull(),
   resetToken: varchar("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
@@ -234,6 +235,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.tenantId],
     references: [tenants.id],
   }),
+  company: one(companies, {
+    fields: [users.companyId],
+    references: [companies.id],
+  }),
   managerAssignments: many(managerAssignments),
   showings: many(showings),
   oauthAccounts: many(oauthAccounts),
@@ -241,6 +246,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 
 export const companiesRelations = relations(companies, ({ many }) => ({
   parks: many(parks),
+  companyManagers: many(users),
 }));
 
 export const parksRelations = relations(parks, ({ one, many }) => ({

@@ -134,11 +134,14 @@ export default function ManagerTenants() {
     },
   });
 
-  // Fetch lots for Tenant creation (only manager's assigned parks)
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+
+  // Fetch lots for Tenant creation (only manager's assigned parks or company lots)
   const { data: lots } = useQuery({
     queryKey: ['manager-lots-for-tenants'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/manager/lots');
+      const endpoint = isCompanyManager ? '/api/company-manager/lots' : '/api/manager/lots';
+      const response = await apiRequest('GET', endpoint);
       return response.json();
     },
     enabled: showCreateModal,

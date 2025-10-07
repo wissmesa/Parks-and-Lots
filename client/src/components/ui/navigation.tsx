@@ -67,6 +67,17 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
+                {user?.role === 'COMPANY_MANAGER' && (
+                  <Link href="/manager">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={isOnManagerPage ? "hidden md:inline-flex" : ""}
+                    >
+                      Company Manager Panel
+                    </Button>
+                  </Link>
+                )}
                 {user?.role === 'TENANT' && !isOnTenantPage && (
                   <Link href="/tenant">
                     <Button 

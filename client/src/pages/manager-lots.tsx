@@ -217,12 +217,14 @@ export default function ManagerLots() {
     parkId: ''
   });
 
-  // Redirect if not manager
+  // Redirect if not manager or company manager
   useEffect(() => {
-    if (user && user.role !== 'MANAGER') {
+    if (user && user.role !== 'MANAGER' && user.role !== 'COMPANY_MANAGER') {
       window.location.href = '/';
     }
   }, [user]);
+
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
 
   // Fetch manager assignments (parks)
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<{
@@ -237,10 +239,10 @@ export default function ManagerLots() {
     enabled: user?.role === 'MANAGER',
   });
 
-  // Fetch lots for assigned parks
+  // Fetch lots for assigned parks or company lots
   const { data: lots, isLoading } = useQuery<Lot[]>({
-    queryKey: ["/api/manager/lots"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   // Special statuses query for the selected park
@@ -838,7 +840,7 @@ export default function ManagerLots() {
     return sorted;
   }, [lots, sortBy, sortOrder, filters]);
   
-  if (user?.role !== 'MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>

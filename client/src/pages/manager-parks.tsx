@@ -77,26 +77,39 @@ export default function ManagerParks() {
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
   // Redirect if not manager
-  if (user?.role !== 'MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
     window.location.href = '/';
     return null;
   }
+
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
 
   const { data: assignments, isLoading: assignmentsLoading, error } = useQuery<Assignment[]>({
     queryKey: ["/api/manager/assignments"],
     enabled: user?.role === 'MANAGER',
   });
 
-  // Get park IDs from assignments and fetch full park details
-  const parkIds = assignments?.map(a => a.parkId) || [];
+  const { data: companyParksResponse, isLoading: companyParksLoading } = useQuery<{parks: Park[]}>({
+    queryKey: ["/api/company-manager/parks"],
+    enabled: user?.role === 'COMPANY_MANAGER',
+  });
+
+  // Get park IDs from assignments or company parks
+  const parkIds = isCompanyManager 
+    ? (companyParksResponse?.parks?.map(p => p.id) || [])
+    : (assignments?.map(a => a.parkId) || []);
   
   const { data: parksResponse, isLoading: parksLoading } = useQuery<{parks: Park[]}>({
     queryKey: ["/api/parks"],
-    enabled: parkIds.length > 0,
+    enabled: !isCompanyManager && parkIds.length > 0,
   });
 
-  const allParks = parksResponse?.parks || [];
-  const isLoading = assignmentsLoading || parksLoading;
+  const allParks = isCompanyManager 
+    ? (companyParksResponse?.parks || [])
+    : (parksResponse?.parks || []);
+  const isLoading = isCompanyManager 
+    ? companyParksLoading 
+    : (assignmentsLoading || parksLoading);
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {

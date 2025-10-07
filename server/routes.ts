@@ -143,7 +143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/managers', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
       const managers = await storage.getUsers({ role: 'MANAGER' });
-      res.json(managers);
+      const companyManagers = await storage.getUsers({ role: 'COMPANY_MANAGER' });
+      const allManagers = [...managers, ...companyManagers];
+      res.json(allManagers);
     } catch (error) {
       console.error('Managers list error:', error);
       res.status(500).json({ message: 'Failed to fetch managers' });
@@ -154,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/admin/managers/:id/toggle-active', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
       const manager = await storage.getUser(req.params.id);
-      if (!manager || manager.role !== 'MANAGER') {
+      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'COMPANY_MANAGER')) {
         return res.status(404).json({ message: 'Manager not found' });
       }
       const updatedManager = await storage.updateUser(req.params.id, {
@@ -171,19 +173,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
     try {
       const manager = await storage.getUser(req.params.id);
-      if (!manager || manager.role !== 'MANAGER') {
+      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'COMPANY_MANAGER')) {
         return res.status(404).json({ message: 'Manager not found' });
       }
       
-      // Only allow updating fullName for now
-      const { fullName } = req.body;
+      // Allow updating fullName and companyId
+      const { fullName, companyId } = req.body;
       if (!fullName || typeof fullName !== 'string' || fullName.trim() === '') {
         return res.status(400).json({ message: 'Full name is required' });
       }
       
-      const updatedManager = await storage.updateUser(req.params.id, {
+      const updateData: any = {
         fullName: fullName.trim()
-      });
+      };
+      
+      // Only update companyId if provided and user is COMPANY_MANAGER
+      if (companyId && manager.role === 'COMPANY_MANAGER') {
+        updateData.companyId = companyId;
+      }
+      
+      const updatedManager = await storage.updateUser(req.params.id, updateData);
       res.json(updatedManager);
     } catch (error) {
       console.error('Update manager error:', error);
@@ -199,6 +208,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Manager assignments error:', error);
       res.status(500).json({ message: 'Failed to fetch assignments' });
+    }
+  });
+
+  // Company Manager API Endpoints
+  app.get('/api/company-manager/parks', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const parks = await storage.getParksByCompany(req.user!.companyId);
+      res.json(parks);
+    } catch (error) {
+      console.error('Company manager parks error:', error);
+      res.status(500).json({ message: 'Failed to fetch parks' });
+    }
+  });
+
+  app.get('/api/company-manager/lots', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const lots = await storage.getLotsByCompany(req.user!.companyId);
+      res.json(lots);
+    } catch (error) {
+      console.error('Company manager lots error:', error);
+      res.status(500).json({ message: 'Failed to fetch lots' });
+    }
+  });
+
+  app.get('/api/company-manager/showings/today', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const showings = await storage.getShowingsByCompany(req.user!.companyId, 'today');
+      res.json(showings);
+    } catch (error) {
+      console.error('Company manager today showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch today showings' });
+    }
+  });
+
+  app.get('/api/company-manager/showings/this-week', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const showings = await storage.getShowingsByCompany(req.user!.companyId, 'this-week');
+      res.json(showings);
+    } catch (error) {
+      console.error('Company manager this week showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch this week showings' });
+    }
+  });
+
+  app.get('/api/company-manager/showings/this-month', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const showings = await storage.getShowingsByCompany(req.user!.companyId, 'this-month');
+      res.json(showings);
+    } catch (error) {
+      console.error('Company manager this month showings error:', error);
+      res.status(500).json({ message: 'Failed to fetch this month showings' });
+    }
+  });
+
+  app.get('/api/company-manager/stats', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const stats = await storage.getCompanyManagerStats(req.user!.companyId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Company manager stats error:', error);
+      res.status(500).json({ message: 'Failed to fetch stats' });
     }
   });
 
@@ -802,7 +896,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id, 
           email: user.email, 
           fullName: user.fullName, 
-          role: user.role 
+          role: user.role,
+          companyId: user.companyId
         },
         ...tokens
       });
@@ -837,7 +932,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id, 
           email: user.email, 
           fullName: user.fullName, 
-          role: user.role 
+          role: user.role,
+          companyId: user.companyId
         },
         ...tokens
       });
@@ -1176,7 +1272,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       email: req.user!.email,
       fullName: req.user!.fullName,
       role: req.user!.role,
-      tenantId: req.user!.tenantId
+      tenantId: req.user!.tenantId,
+      companyId: req.user!.companyId
     });
   });
 
@@ -1508,7 +1605,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id, 
           email: user.email, 
           fullName: user.fullName, 
-          role: user.role 
+          role: user.role,
+          companyId: user.companyId
         },
         ...tokens
       });
@@ -2807,6 +2905,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({ tenants: filteredTenants });
         }
         
+        // For company managers, filter by their company's parks
+        if (req.user!.role === 'COMPANY_MANAGER') {
+          if (!req.user!.companyId) {
+            return res.json({ tenants: [] });
+          }
+          
+          const companyParks = await storage.getParksByCompany(req.user!.companyId);
+          const parkIds = companyParks.parks.map(p => p.id);
+          
+          if (parkIds.length === 0) {
+            return res.json({ tenants: [] });
+          }
+          
+          const filteredTenants = tenants.filter(Tenant => 
+            Tenant.lot && parkIds.includes(Tenant.lot.parkId)
+          );
+          return res.json({ tenants: filteredTenants });
+        }
+        
         res.json({ tenants });
       } catch (dbError) {
         console.log('Database not ready for tenants, returning empty array:', dbError);
@@ -2946,6 +3063,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this lot' });
+        }
+      }
+
+      // For company managers, verify they have access to the specified lot
+      if (req.user!.role === 'COMPANY_MANAGER') {
+        const lot = await storage.getLot(tenantData.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Lot not found' });
+        }
+
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+
+        const companyParks = await storage.getParksByCompany(req.user!.companyId);
+        const hasAccess = companyParks.parks.some(park => park.id === lot.parkId);
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this lot' });
         }
@@ -3148,6 +3283,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // For company managers, check if they have access to this Tenant's lot
+      if (req.user!.role === 'COMPANY_MANAGER') {
+        try {
+          const lot = await storage.getLotAny(existingTenant.lotId);
+          if (lot) {
+            if (!req.user!.companyId) {
+              return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+            }
+
+            const companyParks = await storage.getParksByCompany(req.user!.companyId);
+            const hasAccess = companyParks.parks.some(park => park.id === lot.parkId);
+            if (!hasAccess) {
+              return res.status(403).json({ message: 'Access denied to this Tenant' });
+            }
+          } else {
+            console.warn(`Lot ${existingTenant.lotId} not found for tenant ${tenantId}`);
+          }
+        } catch (error) {
+          console.error('Error checking lot access:', error);
+          return res.status(500).json({ message: 'Error verifying lot access' });
+        }
+      }
+
       // Handle date string conversion for lease dates
       if (updates.leaseStartDate) {
         if (typeof updates.leaseStartDate === 'string') {
@@ -3216,6 +3374,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        }
+      }
+
+      // For company managers, check if they have access to this Tenant's lot
+      if (req.user!.role === 'COMPANY_MANAGER') {
+        const lot = await storage.getLotAny(Tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+
+        const companyParks = await storage.getParksByCompany(req.user!.companyId);
+        const hasAccess = companyParks.parks.some(park => park.id === lot.parkId);
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
@@ -3304,6 +3480,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        }
+      }
+
+      // For company managers, check if they have access to this Tenant's lot
+      if (req.user!.role === 'COMPANY_MANAGER') {
+        const lot = await storage.getLotAny(Tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+
+        const companyParks = await storage.getParksByCompany(req.user!.companyId);
+        const hasAccess = companyParks.parks.some(park => park.id === lot.parkId);
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this Tenant' });
         }

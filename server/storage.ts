@@ -47,7 +47,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
-  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'TENANT' }): Promise<User[]>;
+  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   getUserWithTenant(id: string): Promise<any | undefined>;
@@ -154,6 +154,12 @@ export interface IStorage {
   updatePayment(id: string, updates: Partial<InsertPayment>): Promise<Payment>;
   deletePayment(id: string): Promise<void>;
   getPaymentsWithTenantInfo(filters?: { status?: string; parkId?: string; overdue?: boolean }): Promise<any[]>;
+  
+  // Company Manager operations
+  getParksByCompany(companyId: string): Promise<{ parks: Park[] }>;
+  getLotsByCompany(companyId: string): Promise<any[]>;
+  getShowingsByCompany(companyId: string, period: 'today' | 'this-week' | 'this-month'): Promise<any[]>;
+  getCompanyManagerStats(companyId: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -229,7 +235,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'TENANT' }): Promise<User[]> {
+  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' }): Promise<User[]> {
     let query = db.select().from(users);
     const conditions = [];
 
@@ -1337,6 +1343,180 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(users.email, tenants.email))
       .where(eq(users.id, userId));
     return Tenant ? Tenant.tenants : undefined;
+  }
+
+  // Company Manager operations
+  async getParksByCompany(companyId: string): Promise<{ parks: Park[] }> {
+    const parksList = await db.select().from(parks).where(eq(parks.companyId, companyId));
+    return { parks: parksList };
+  }
+
+  async getLotsByCompany(companyId: string): Promise<any[]> {
+    const lotsWithInfo = await db.select({
+      id: lots.id,
+      nameOrNumber: lots.nameOrNumber,
+      status: lots.status,
+      price: lots.price,
+      priceForRent: lots.priceForRent,
+      priceForSale: lots.priceForSale,
+      priceRentToOwn: lots.priceRentToOwn,
+      priceContractForDeed: lots.priceContractForDeed,
+      description: lots.description,
+      bedrooms: lots.bedrooms,
+      bathrooms: lots.bathrooms,
+      sqFt: lots.sqFt,
+      houseManufacturer: lots.houseManufacturer,
+      houseModel: lots.houseModel,
+      isActive: lots.isActive,
+      park: {
+        id: parks.id,
+        name: parks.name,
+        address: parks.address,
+        city: parks.city,
+        state: parks.state,
+        zip: parks.zip,
+        companyId: parks.companyId,
+      },
+      specialStatus: {
+        id: specialStatuses.id,
+        name: specialStatuses.name,
+        color: specialStatuses.color,
+      }
+    })
+    .from(lots)
+    .innerJoin(parks, eq(lots.parkId, parks.id))
+    .leftJoin(specialStatuses, eq(lots.specialStatusId, specialStatuses.id))
+    .where(eq(parks.companyId, companyId))
+    .orderBy(asc(parks.name), asc(lots.nameOrNumber));
+
+    return lotsWithInfo;
+  }
+
+  async getShowingsByCompany(companyId: string, period: 'today' | 'this-week' | 'this-month'): Promise<any[]> {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+
+    switch (period) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        break;
+      case 'this-week':
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        startDate = startOfWeek;
+        endDate = new Date(startOfWeek);
+        endDate.setDate(startOfWeek.getDate() + 7);
+        break;
+      case 'this-month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+      default:
+        startDate = new Date(0);
+        endDate = new Date();
+    }
+
+    const showingsResult = await db.select({
+      id: showings.id,
+      startDt: showings.startDt,
+      endDt: showings.endDt,
+      clientName: showings.clientName,
+      clientEmail: showings.clientEmail,
+      clientPhone: showings.clientPhone,
+      status: showings.status,
+      calendarEventId: showings.calendarEventId,
+      calendarHtmlLink: showings.calendarHtmlLink,
+      calendarSyncError: showings.calendarSyncError,
+      createdAt: showings.createdAt,
+      lot: {
+        id: lots.id,
+        nameOrNumber: lots.nameOrNumber,
+        parkId: lots.parkId,
+      },
+      park: {
+        id: parks.id,
+        name: parks.name,
+        address: parks.address,
+        city: parks.city,
+        state: parks.state,
+        zip: parks.zip,
+      },
+      manager: {
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+      }
+    })
+    .from(showings)
+    .innerJoin(lots, eq(showings.lotId, lots.id))
+    .innerJoin(parks, eq(lots.parkId, parks.id))
+    .innerJoin(users, eq(showings.managerId, users.id))
+    .where(
+      and(
+        eq(parks.companyId, companyId),
+        gte(showings.startDt, startDate),
+        lte(showings.startDt, endDate)
+      )
+    )
+    .orderBy(asc(showings.startDt));
+
+    return showingsResult;
+  }
+
+  async getCompanyManagerStats(companyId: string): Promise<any> {
+    // Get parks for the company
+    const companyParks = await this.getParksByCompany(companyId);
+    const parkIds = companyParks.parks.map(p => p.id);
+
+    // Get lots for the company
+    const companyLots = await this.getLotsByCompany(companyId);
+    const activeLots = companyLots.filter(lot => lot.isActive);
+
+    // Get showings for this month
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+    const nextMonth = new Date(thisMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+    const monthlyShowings = await db.select()
+      .from(showings)
+      .innerJoin(lots, eq(showings.lotId, lots.id))
+      .innerJoin(parks, eq(lots.parkId, parks.id))
+      .where(
+        and(
+          eq(parks.companyId, companyId),
+          gte(showings.startDt, thisMonth),
+          lte(showings.startDt, nextMonth)
+        )
+      );
+
+    // Get today's showings
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    const todayShowings = await db.select()
+      .from(showings)
+      .innerJoin(lots, eq(showings.lotId, lots.id))
+      .innerJoin(parks, eq(lots.parkId, parks.id))
+      .where(
+        and(
+          eq(parks.companyId, companyId),
+          gte(showings.startDt, startOfDay),
+          lte(showings.startDt, endOfDay)
+        )
+      );
+
+    return {
+      totalParks: companyParks.parks.length,
+      activeLots: activeLots.length,
+      monthlyBookings: monthlyShowings.length,
+      todayBookings: todayShowings.length
+    };
   }
 }
 

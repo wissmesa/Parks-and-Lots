@@ -64,6 +64,13 @@
       "when": 1759333000000,
       "tag": "0008_add_company_contact_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1759852868950,
+      "tag": "0009_serious_nitro",
+      "breakpoints": true
     }
   ]
 }

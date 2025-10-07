@@ -63,11 +63,13 @@ export default function ManagerBookings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Redirect if not manager
-  if (user?.role !== 'MANAGER') {
+  // Redirect if not manager or company manager
+  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
     window.location.href = '/';
     return null;
   }
+
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
 
   const { data: assignments } = useQuery<Assignment[]>({
     queryKey: ["/api/manager/assignments"],
@@ -75,23 +77,23 @@ export default function ManagerBookings() {
   });
 
   const { data: todayShowings } = useQuery<Showing[]>({
-    queryKey: ["/api/manager/showings/today"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/showings/today"] : ["/api/manager/showings/today"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   const { data: thisWeekShowings } = useQuery<Showing[]>({
-    queryKey: ["/api/manager/showings/this-week"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/showings/this-week"] : ["/api/manager/showings/this-week"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   const { data: thisMonthShowings } = useQuery<Showing[]>({
-    queryKey: ["/api/manager/showings/this-month"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/showings/this-month"] : ["/api/manager/showings/this-month"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   const { data: stats } = useQuery<ManagerStats>({
-    queryKey: ["/api/manager/stats"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   // Mutation to cancel a showing - cancels directly in Google Calendar

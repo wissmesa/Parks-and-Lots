@@ -21,30 +21,41 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Redirect if not manager
+  // Redirect if not manager or company manager
   useEffect(() => {
-    if (user && user.role !== 'MANAGER') {
+    if (user && user.role !== 'MANAGER' && user.role !== 'COMPANY_MANAGER') {
       window.location.href = '/';
     }
   }, [user]);
 
+  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+
   const { data: assignments } = useQuery({
-    queryKey: ["/api/manager/assignments"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/parks"] : ["/api/manager/assignments"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   const { data: todayShowings } = useQuery({
-    queryKey: ["/api/manager/showings/today"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/showings/today"] : ["/api/manager/showings/today"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["/api/manager/stats"],
-    enabled: user?.role === 'MANAGER',
+    queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"],
+    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
   });
 
 
-  const managerStats = stats as { todayShowings: number; availableLots: number; parkCount: number; totalLots: number } || {
+  const managerStats = stats as { 
+    todayShowings: number; 
+    availableLots: number; 
+    parkCount: number; 
+    totalLots: number;
+    totalParks?: number;
+    activeLots?: number;
+    monthlyBookings?: number;
+    todayBookings?: number;
+  } || {
     todayShowings: 0,
     availableLots: 0,
     parkCount: 0,
@@ -52,11 +63,13 @@ export default function ManagerDashboard() {
   };
   
   // Type-safe access to arrays
-  const assignedParksArray = Array.isArray(assignments) ? assignments : [];
+  const assignedParksArray = isCompanyManager 
+    ? (Array.isArray(assignments?.parks) ? assignments.parks : [])
+    : (Array.isArray(assignments) ? assignments : []);
   const showingsArray = Array.isArray(todayShowings) ? todayShowings : [];
 
 
-  if (user?.role !== 'MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>
@@ -83,7 +96,10 @@ export default function ManagerDashboard() {
                 Welcome back, {user.fullName?.split(' ')[0] || 'Manager'}
               </h1>
               <p className="text-muted-foreground">
-                Managing {assignedParksArray.length > 0 ? assignedParksArray.map((a: any) => a.parkName).join(', ') : 'No parks assigned'}
+                {isCompanyManager 
+                  ? `Managing ${assignedParksArray.length > 0 ? assignedParksArray.map((p: any) => p.name).join(', ') : 'No company parks'}`
+                  : `Managing ${assignedParksArray.length > 0 ? assignedParksArray.map((a: any) => a.parkName).join(', ') : 'No parks assigned'}`
+                }
               </p>
             </div>
             
@@ -101,7 +117,9 @@ export default function ManagerDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Today's Showings</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-todays-showings">{managerStats.todayShowings}</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-todays-showings">
+                      {isCompanyManager ? (managerStats.todayBookings || 0) : managerStats.todayShowings}
+                    </p>
                   </div>
                   <Calendar className="w-8 h-8 text-primary" />
                 </div>
@@ -112,8 +130,10 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">My Parks</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-parks">{managerStats.parkCount}</p>
+                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'Company Parks' : 'My Parks'}</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-parks">
+                      {isCompanyManager ? (managerStats.totalParks || 0) : managerStats.parkCount}
+                    </p>
                   </div>
                   <MapPin className="w-8 h-8 text-emerald-500" />
                 </div>
@@ -124,8 +144,10 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">My Lots</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-lots">{managerStats.totalLots}</p>
+                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'Company Lots' : 'My Lots'}</p>
+                    <p className="text-2xl font-bold text-foreground" data-testid="text-my-lots">
+                      {isCompanyManager ? (managerStats.activeLots || 0) : managerStats.totalLots}
+                    </p>
                   </div>
                   <Building className="w-8 h-8 text-blue-500" />
                 </div>

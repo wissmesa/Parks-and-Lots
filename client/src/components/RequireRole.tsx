@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 
 interface RequireRoleProps {
-  role: 'ADMIN' | 'MANAGER' | 'TENANT';
+  role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' | ('MANAGER' | 'COMPANY_MANAGER')[];
   children: React.ReactNode;
 }
 
@@ -27,8 +27,13 @@ export function RequireRole({ role, children }: RequireRoleProps) {
     return null;
   }
 
+  // Check if user has required role(s)
+  const hasRequiredRole = Array.isArray(role) 
+    ? role.includes(user.role as any)
+    : user.role === role;
+
   // Show 404 if user doesn't have required role
-  if (user.role !== role) {
+  if (!hasRequiredRole) {
     return <NotFound />;
   }
 
