@@ -35,6 +35,7 @@ export default function AdminInvites() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
+  const [inviteCompanyId, setInviteCompanyId] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Validation functions
@@ -66,11 +67,17 @@ export default function AdminInvites() {
     enabled: user?.role === 'ADMIN',
   });
 
+  const { data: companies } = useQuery({
+    queryKey: ["/api/companies"],
+    enabled: user?.role === 'ADMIN',
+  });
+
   const createInviteMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+    mutationFn: async ({ email, role, companyId }: { email: string; role: string; companyId?: string }) => {
       return apiRequest("POST", "/api/auth/invites", {
         email,
-        role
+        role,
+        companyId: companyId || undefined
       });
     },
     onSuccess: () => {
@@ -78,6 +85,7 @@ export default function AdminInvites() {
       setIsCreateModalOpen(false);
       setInviteEmail("");
       setInviteRole("MANAGER");
+      setInviteCompanyId("");
       toast({
         title: "Success",
         description: `${inviteRole === "MANAGER" ? "Manager" : "Company Manager"} invite sent successfully`,
@@ -136,9 +144,23 @@ export default function AdminInvites() {
       });
       return;
     }
+
+    // Validate company selection for COMPANY_MANAGER role
+    if (inviteRole === 'COMPANY_MANAGER' && !inviteCompanyId) {
+      toast({
+        title: "Error",
+        description: "Please select a company for Company Manager role",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (inviteEmail.trim()) {
-      createInviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
+      createInviteMutation.mutate({ 
+        email: inviteEmail.trim(), 
+        role: inviteRole,
+        companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined
+      });
     }
   };
 
@@ -206,7 +228,12 @@ export default function AdminInvites() {
                   
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => setInviteRole(value)}>
+                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => {
+                      setInviteRole(value);
+                      if (value === "MANAGER") {
+                        setInviteCompanyId(""); // Clear company selection for regular managers
+                      }
+                    }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
@@ -216,6 +243,24 @@ export default function AdminInvites() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {inviteRole === "COMPANY_MANAGER" && (
+                    <div>
+                      <Label htmlFor="company">Company</Label>
+                      <Select value={inviteCompanyId} onValueChange={setInviteCompanyId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies?.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   
                   <div className="bg-muted p-3 rounded-lg">
                     <p className="text-sm text-muted-foreground">

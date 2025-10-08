@@ -15,7 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag, MoreHorizontal, List, Grid3X3 } from "lucide-react";
+import { TreePine, Plus, Edit, Trash2, MapPin, Camera, X, Home, Tag, MoreHorizontal, List, Grid3X3, Facebook } from "lucide-react";
+import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
 
 interface Park {
   id: string;
@@ -86,6 +87,15 @@ export default function AdminParks() {
 
   // View toggle state
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
+
+  // Facebook post dialog state
+  const [facebookPostDialog, setFacebookPostDialog] = useState<{
+    isOpen: boolean;
+    park: Park | null;
+  }>({
+    isOpen: false,
+    park: null
+  });
 
   // Redirect if not admin
   if (user?.role !== 'ADMIN') {
@@ -620,6 +630,13 @@ export default function AdminParks() {
                               Manage Special Statuses
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => setFacebookPostDialog({ isOpen: true, park })}
+                              data-testid={`facebook-post-${park.id}`}
+                            >
+                              <Facebook className="w-4 h-4 mr-2" />
+                              Get Facebook Post
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => {
                                 if (confirm("Are you sure you want to delete this park?")) {
                                   deleteMutation.mutate(park.id);
@@ -702,6 +719,10 @@ export default function AdminParks() {
                           <DropdownMenuItem onClick={() => setManageSpecialStatuses(park)}>
                             <Tag className="w-4 h-4 mr-2" />
                             Special Statuses
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setFacebookPostDialog({ isOpen: true, park })}>
+                            <Facebook className="w-4 h-4 mr-2" />
+                            Get Facebook Post
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => deletePark(park.id)}
@@ -1164,6 +1185,15 @@ export default function AdminParks() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Facebook Post Dialog */}
+        <FacebookPostDialog
+          isOpen={facebookPostDialog.isOpen}
+          onClose={() => setFacebookPostDialog({ isOpen: false, park: null })}
+          parkName={facebookPostDialog.park?.name || ''}
+          parkId={facebookPostDialog.park?.id}
+          userId={user?.id}
+        />
       </div>
     </div>
   );

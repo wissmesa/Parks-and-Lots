@@ -1347,8 +1347,30 @@ export class DatabaseStorage implements IStorage {
 
   // Company Manager operations
   async getParksByCompany(companyId: string): Promise<{ parks: Park[] }> {
-    const parksList = await db.select().from(parks).where(eq(parks.companyId, companyId));
-    return { parks: parksList };
+    const results = await db.select()
+      .from(parks)
+      .innerJoin(companies, eq(parks.companyId, companies.id))
+      .where(eq(parks.companyId, companyId));
+    
+    // Extract park data and include company information from the joined result
+    const parksResult = results.map(row => ({
+      id: row.parks.id,
+      companyId: row.parks.companyId,
+      name: row.parks.name,
+      address: row.parks.address,
+      city: row.parks.city,
+      state: row.parks.state,
+      zip: row.parks.zip,
+      description: row.parks.description,
+      amenities: row.parks.amenities,
+      isActive: row.parks.isActive,
+      createdAt: row.parks.createdAt,
+      company: {
+        name: row.companies.name
+      }
+    }));
+    
+    return { parks: parksResult };
   }
 
   async getLotsByCompany(companyId: string): Promise<any[]> {

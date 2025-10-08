@@ -71,6 +71,13 @@
       "when": 1759852868950,
       "tag": "0009_serious_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1759869917210,
+      "tag": "0010_confused_doctor_faustus",
+      "breakpoints": true
     }
   ]
 }

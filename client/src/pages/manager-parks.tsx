@@ -14,7 +14,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3 } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook } from "lucide-react";
+import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
 
 interface Park {
   id: string;
@@ -75,6 +76,15 @@ export default function ManagerParks() {
 
   // View toggle state
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
+
+  // Facebook post dialog state
+  const [facebookPostDialog, setFacebookPostDialog] = useState<{
+    isOpen: boolean;
+    park: Park | null;
+  }>({
+    isOpen: false,
+    park: null
+  });
 
   // Redirect if not manager
   if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
@@ -441,6 +451,13 @@ export default function ManagerParks() {
                                 <Tag className="w-4 h-4 mr-2" />
                                 Manage Special Statuses
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => park && setFacebookPostDialog({ isOpen: true, park })}
+                                data-testid={`facebook-post-${park?.id || 'unknown'}`}
+                              >
+                                <Facebook className="w-4 h-4 mr-2" />
+                                Get Facebook Post
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -507,6 +524,10 @@ export default function ManagerParks() {
                               <DropdownMenuItem onClick={() => park && setManageSpecialStatuses(park)}>
                                 <Tag className="w-4 h-4 mr-2" />
                                 Special Statuses
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => park && setFacebookPostDialog({ isOpen: true, park })}>
+                                <Facebook className="w-4 h-4 mr-2" />
+                                Get Facebook Post
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -898,6 +919,15 @@ export default function ManagerParks() {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Facebook Post Dialog */}
+          <FacebookPostDialog
+            isOpen={facebookPostDialog.isOpen}
+            onClose={() => setFacebookPostDialog({ isOpen: false, park: null })}
+            parkName={facebookPostDialog.park?.name || ''}
+            parkId={facebookPostDialog.park?.id}
+            userId={user?.id}
+          />
         </div>
       </div>
     </div>

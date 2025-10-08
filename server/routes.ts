@@ -1579,6 +1579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           passwordHash,
           fullName: finalFullName,
           role: invite.role,
+          companyId: invite.companyId, // Set companyId for COMPANY_MANAGER
           isActive: true
         });
       }
@@ -1596,6 +1597,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (tenantError) {
           console.error('Failed to update tenant status:', tenantError);
           // Don't fail the entire request if tenant status update fails
+        }
+      }
+
+      // If this is a COMPANY_MANAGER, automatically assign all company parks
+      if (invite.role === 'COMPANY_MANAGER' && invite.companyId) {
+        try {
+          const companyParks = await storage.getParks({ companyId: invite.companyId });
+          for (const park of companyParks.parks) {
+            await storage.assignManagerToPark(user.id, park.id);
+          }
+          console.log(`Auto-assigned ${companyParks.parks.length} parks to COMPANY_MANAGER ${user.email}`);
+        } catch (parkError) {
+          console.error('Failed to auto-assign company parks:', parkError);
+          // Don't fail the entire request if park assignment fails
         }
       }
 
