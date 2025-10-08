@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
+import { ManagedParksDisplay } from "@/components/ui/managed-parks-display";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,13 +132,14 @@ export default function AdminDashboard() {
         {/* Main Content */}
         <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
           {/* Dashboard Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-              <p className="text-muted-foreground">Manage your parks and lots platform</p>
-            </div>
-            
-            <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+                <p className="text-muted-foreground">Manage your parks and lots platform</p>
+              </div>
+              
+              <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-invite-manager">
                   <UserPlus className="w-4 h-4 mr-2" />
@@ -196,6 +198,16 @@ export default function AdminDashboard() {
                 </form>
               </DialogContent>
             </Dialog>
+            </div>
+            
+            {/* Managed Parks Display */}
+            <ManagedParksDisplay
+              parks={parks}
+              title="All Parks"
+              emptyMessage="No parks created yet"
+              isAssignment={false}
+              className="mb-6"
+            />
           </div>
 
           {/* Stats Grid */}

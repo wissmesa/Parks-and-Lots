@@ -128,6 +128,7 @@ export default function ManagerParks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/manager/assignments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/parks"] });
       setEditingPark(null);
       resetForm();
       toast({

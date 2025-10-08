@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Check, ExternalLink, Unlink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
 
 interface CalendarStatus {
@@ -12,8 +13,14 @@ interface CalendarStatus {
 
 export function CalendarConnection() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
+
+  // Only show calendar connection for regular managers
+  if (user?.role !== 'MANAGER') {
+    return null;
+  }
 
   const { data: status, isLoading } = useQuery<CalendarStatus>({
     queryKey: ["/api/auth/google/status"],

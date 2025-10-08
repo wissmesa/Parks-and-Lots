@@ -239,6 +239,19 @@ export default function ManagerLots() {
     enabled: user?.role === 'MANAGER',
   });
 
+  // Fetch company manager parks
+  const { data: companyParks, isLoading: companyParksLoading } = useQuery<{
+    parks: {
+      id: string;
+      name: string;
+      city: string;
+      state: string;
+    }[];
+  }>({
+    queryKey: ["/api/company-manager/parks"],
+    enabled: user?.role === 'COMPANY_MANAGER',
+  });
+
   // Fetch lots for assigned parks or company lots
   const { data: lots, isLoading } = useQuery<Lot[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"],
@@ -254,7 +267,29 @@ export default function ManagerLots() {
   // Create lot mutation
   const createLotMutation = useMutation({
     mutationFn: async (lotData: typeof formData) => {
-      const response = await apiRequest("POST", "/api/manager/lots", lotData);
+      const endpoint = isCompanyManager ? "/api/company-manager/lots" : "/api/manager/lots";
+      
+      // Process the form data to handle empty strings for numeric fields
+      console.log('Original form data:', lotData);
+      
+      const processedData = {
+        ...lotData,
+        price: '0', // Legacy price field - required by database
+        bedrooms: lotData.bedrooms || 0,
+        bathrooms: lotData.bathrooms || 0,
+        sqFt: lotData.sqFt || 0,
+        priceForRent: lotData.priceForRent || null,
+        priceForSale: lotData.priceForSale || null,
+        priceRentToOwn: lotData.priceRentToOwn || null,
+        priceContractForDeed: lotData.priceContractForDeed || null,
+        houseManufacturer: lotData.houseManufacturer || null,
+        houseModel: lotData.houseModel || null,
+        description: lotData.description || null,
+      };
+      
+      console.log('Processed data:', processedData);
+      
+      const response = await apiRequest("POST", endpoint, processedData);
       return response.json();
     },
     onSuccess: () => {
@@ -279,7 +314,7 @@ export default function ManagerLots() {
         houseModel: '',
         parkId: ''
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
     },
     onError: (error) => {
       toast({
@@ -294,7 +329,25 @@ export default function ManagerLots() {
   const updateLotMutation = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<typeof formData>) => {
       console.log(updates, "updates");
-      const response = await apiRequest("PATCH", `/api/manager/lots/${id}`, updates);
+      const endpoint = isCompanyManager ? `/api/company-manager/lots/${id}` : `/api/manager/lots/${id}`;
+      
+      // Process the updates to handle empty strings for numeric fields
+      const processedUpdates = {
+        ...updates,
+        price: updates.price || '0', // Legacy price field - required by database
+        bedrooms: updates.bedrooms || 0,
+        bathrooms: updates.bathrooms || 0,
+        sqFt: updates.sqFt || 0,
+        priceForRent: updates.priceForRent || null,
+        priceForSale: updates.priceForSale || null,
+        priceRentToOwn: updates.priceRentToOwn || null,
+        priceContractForDeed: updates.priceContractForDeed || null,
+        houseManufacturer: updates.houseManufacturer || null,
+        houseModel: updates.houseModel || null,
+        description: updates.description || null,
+      };
+      
+      const response = await apiRequest("PATCH", endpoint, processedUpdates);
       return response.json();
     },
     onSuccess: () => {
@@ -304,7 +357,7 @@ export default function ManagerLots() {
       });
       setIsEditModalOpen(false);
       setEditingLot(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
     },
     onError: (error) => {
       toast({
@@ -318,14 +371,15 @@ export default function ManagerLots() {
   // Delete lot mutation
   const deleteLotMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/manager/lots/${id}`);
+      const endpoint = isCompanyManager ? `/api/company-manager/lots/${id}` : `/api/manager/lots/${id}`;
+      await apiRequest("DELETE", endpoint);
     },
     onSuccess: () => {
       toast({
         title: "Lot Deleted",
         description: "Lot has been deleted successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
     },
     onError: (error) => {
       toast({
@@ -347,8 +401,8 @@ export default function ManagerLots() {
         title: "Lot Updated",
         description: `Lot ${updatedLot.isActive ? 'enabled' : 'disabled'} successfully.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/stats"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"] });
     },
     onError: (error) => {
       toast({
@@ -364,7 +418,7 @@ export default function ManagerLots() {
       return apiRequest("PUT", `/api/lots/${lotId}/special-status`, { specialStatusId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/lots"] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
       setAssigningSpecialStatus(null);
       setSelectedSpecialStatusId("");
       toast({
@@ -384,7 +438,8 @@ export default function ManagerLots() {
   // Bulk upload mutation for managers
   const bulkUploadMutation = useMutation({
     mutationFn: async (data: any[]) => {
-      return await apiRequest('POST', '/api/manager/lots/bulk', { lots: data });
+      const endpoint = isCompanyManager ? '/api/company-manager/lots/bulk' : '/api/manager/lots/bulk';
+      return await apiRequest('POST', endpoint, { lots: data });
     },
     onSuccess: async (response) => {
       const results = await response.json();
@@ -392,7 +447,7 @@ export default function ManagerLots() {
       setImportProgress(100);
       
       // Refresh lots data
-      queryClient.invalidateQueries({ queryKey: ['/api/manager/lots'] });
+      queryClient.invalidateQueries({ queryKey: isCompanyManager ? ['/api/company-manager/lots'] : ['/api/manager/lots'] });
       
       // Switch to results step after a brief delay
       setTimeout(() => {
@@ -654,7 +709,15 @@ export default function ManagerLots() {
     await toggleLotActiveMutation.mutateAsync(id);
   };
 
-  const assignedParks = assignments || [];
+  const toggleVisibility = async (id: string, isActive: boolean) => {
+    await toggleLotActiveMutation.mutateAsync(id);
+  };
+
+  const deleteLot = async (id: string) => {
+    await deleteLotMutation.mutateAsync(id);
+  };
+
+  const assignedParks = isCompanyManager ? (companyParks?.parks || []) : (assignments || []);
 
   // Filter and sort lots using useMemo for performance
   const sortedLots = useMemo(() => {
@@ -894,11 +957,15 @@ export default function ManagerLots() {
                         <SelectValue placeholder="Select a park" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Array.isArray(assignedParks) && assignedParks.map((assignment: any) => (
-                          <SelectItem key={assignment.parkId} value={assignment.parkId}>
-                            {assignment.parkName}
-                          </SelectItem>
-                        ))}
+                        {Array.isArray(assignedParks) && assignedParks.map((park: any) => {
+                          const parkId = isCompanyManager ? park.id : park.parkId;
+                          const parkName = isCompanyManager ? park.name : park.parkName;
+                          return (
+                            <SelectItem key={parkId} value={parkId}>
+                              {parkName}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -973,7 +1040,7 @@ export default function ManagerLots() {
                         type="number"
                         min="1"
                         value={formData.bedrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: e.target.value ? e.target.value ? parseInt(e.target.value) : 0 : 0 }))}
                         required
                       />
                     </div>
@@ -984,7 +1051,7 @@ export default function ManagerLots() {
                         type="number"
                         min="1"
                         value={formData.bathrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseInt(e.target.value) }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: e.target.value ? e.target.value ? parseInt(e.target.value) : 0 : 0 }))}
                         required
                       />
                     </div>
@@ -997,7 +1064,7 @@ export default function ManagerLots() {
                       type="number"
                       min="1"
                       value={formData.sqFt}
-                      onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
                       placeholder="e.g., 1200"
                       required
                     />
@@ -1217,19 +1284,23 @@ export default function ManagerLots() {
                       <PopoverContent className="w-64" align="start">
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                           <Label className="text-sm font-medium">Parks</Label>
-                          {assignedParks.map((assignment) => (
-                            <div key={assignment.parkId} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`manager-park-${assignment.parkId}`}
-                                checked={filters.parkId.includes(assignment.parkId)}
-                                onCheckedChange={() => toggleFilter("parkId", assignment.parkId)}
-                                data-testid={`manager-park-filter-${assignment.parkId}`}
-                              />
-                              <Label htmlFor={`manager-park-${assignment.parkId}`} className="text-sm cursor-pointer">
-                                {assignment.parkName}
-                              </Label>
-                            </div>
-                          ))}
+                          {assignedParks.map((park: any) => {
+                            const parkId = isCompanyManager ? park.id : park.parkId;
+                            const parkName = isCompanyManager ? park.name : park.parkName;
+                            return (
+                              <div key={parkId} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`manager-park-${parkId}`}
+                                  checked={filters.parkId.includes(parkId)}
+                                  onCheckedChange={() => toggleFilter("parkId", parkId)}
+                                  data-testid={`manager-park-filter-${parkId}`}
+                                />
+                                <Label htmlFor={`manager-park-${parkId}`} className="text-sm cursor-pointer">
+                                  {parkName}
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </div>
                       </PopoverContent>
                     </Popover>
@@ -1936,7 +2007,7 @@ export default function ManagerLots() {
                         type="number"
                         min="1"
                         value={formData.bedrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: e.target.value ? parseInt(e.target.value) : 0 }))}
                         required
                         className="mt-1"
                       />
@@ -1949,7 +2020,7 @@ export default function ManagerLots() {
                         min="1"
                         step="0.5"
                         value={formData.bathrooms}
-                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseInt(e.target.value) }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: e.target.value ? parseInt(e.target.value) : 0 }))}
                         required
                         className="mt-1"
                       />
@@ -1961,7 +2032,7 @@ export default function ManagerLots() {
                         type="number"
                         min="1"
                         value={formData.sqFt}
-                        onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
                         required
                         className="mt-1"
                       />

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { CalendarConnection } from "@/components/ui/calendar-connection";
+import { ManagedParksDisplay } from "@/components/ui/managed-parks-display";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Calendar,
@@ -90,19 +91,19 @@ export default function ManagerDashboard() {
         {/* Main Content */}
         <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
           {/* Manager Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                Welcome back, {user.fullName?.split(' ')[0] || 'Manager'}
-              </h1>
-              <p className="text-muted-foreground">
-                {isCompanyManager 
-                  ? `Managing ${assignedParksArray.length > 0 ? assignedParksArray.map((p: any) => p.name).join(', ') : 'No company parks'}`
-                  : `Managing ${assignedParksArray.length > 0 ? assignedParksArray.map((a: any) => a.parkName).join(', ') : 'No parks assigned'}`
-                }
-              </p>
-            </div>
+          <div className="mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
+              Welcome back, {user.fullName?.split(' ')[0] || 'Manager'}
+            </h1>
             
+            {/* Managed Parks Display */}
+            <ManagedParksDisplay
+              parks={assignedParksArray}
+              title={isCompanyManager ? "Company Parks" : "My Parks"}
+              emptyMessage={isCompanyManager ? "No company parks assigned" : "No parks assigned to you yet"}
+              isAssignment={!isCompanyManager}
+              className="mb-6"
+            />
           </div>
 
           {/* Calendar Connection */}

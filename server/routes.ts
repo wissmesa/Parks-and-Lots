@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import path from "path";
@@ -237,6 +237,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Company manager lots error:', error);
       res.status(500).json({ message: 'Failed to fetch lots' });
+    }
+  });
+
+  app.post('/api/company-manager/lots', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      // Verify company manager has access to the park
+      const park = await storage.getPark(req.body.parkId);
+      if (!park || park.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'You can only create lots in your company parks' });
+      }
+      
+      const lotData = insertLotSchema.parse(req.body);
+      const lot = await storage.createLot(lotData);
+      res.status(201).json(lot);
+    } catch (error) {
+      console.error('Create lot error:', error);
+      res.status(400).json({ message: 'Invalid lot data' });
+    }
+  });
+
+  app.patch('/api/company-manager/lots/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      console.log('=== COMPANY MANAGER LOT UPDATE DEBUG ===');
+      console.log('Lot ID:', req.params.id);
+      console.log('Raw request body:', JSON.stringify(req.body, null, 2));
+      
+      // Verify company manager owns the lot (through company park)
+      const lot = await storage.getLotAny(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      
+      const park = await storage.getPark(lot.parkId);
+      if (!park || park.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'You can only update lots in your company parks' });
+      }
+      
+      const updates = insertLotSchema.partial().parse(req.body);
+      const updatedLot = await storage.updateLot(req.params.id, updates);
+      res.json(updatedLot);
+    } catch (error) {
+      console.error('Update lot error:', error);
+      res.status(400).json({ message: 'Invalid lot data' });
+    }
+  });
+
+  app.delete('/api/company-manager/lots/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      // Verify company manager owns the lot (through company park)
+      const lot = await storage.getLotAny(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      
+      const park = await storage.getPark(lot.parkId);
+      if (!park || park.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'You can only delete lots in your company parks' });
+      }
+      
+      await storage.deleteLot(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete lot error:', error);
+      res.status(500).json({ message: 'Failed to delete lot' });
+    }
+  });
+
+  app.post('/api/company-manager/lots/bulk', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      const { lots } = req.body;
+      
+      if (!Array.isArray(lots) || lots.length === 0) {
+        return res.status(400).json({ message: 'Lots array is required' });
+      }
+
+      if (lots.length > 1000) {
+        return res.status(400).json({ message: 'Maximum 1000 lots per upload' });
+      }
+
+      // Get company parks
+      const companyParks = await storage.getParksByCompany(req.user!.companyId);
+      if (companyParks.parks.length === 0) {
+        return res.status(403).json({ message: 'Company has no parks' });
+      }
+
+      // Handle single vs multi-park scenarios
+      const isMultiPark = companyParks.parks.length > 1;
+      let defaultParkId: string | null = null;
+      let assignedParkName = '';
+      
+      if (!isMultiPark) {
+        // Single park - use automatic assignment
+        defaultParkId = companyParks.parks[0].id;
+        assignedParkName = companyParks.parks[0].name;
+      }
+
+      const results: { successful: any[], failed: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
+        successful: [], 
+        failed: [],
+        assignedPark: assignedParkName,
+        multiPark: isMultiPark,
+        assignedParks: companyParks.parks.map(p => ({ id: p.id, name: p.name }))
+      };
+
+      for (const lotData of lots) {
+        try {
+          // Auto-assign to single park if only one park
+          if (defaultParkId && !lotData.parkId) {
+            lotData.parkId = defaultParkId;
+          }
+          
+          // Validate park assignment
+          if (lotData.parkId) {
+            const park = companyParks.parks.find(p => p.id === lotData.parkId);
+            if (!park) {
+              results.failed.push({
+                ...lotData,
+                error: `Park ${lotData.parkId} not found in your company parks`
+              });
+              continue;
+            }
+          } else if (isMultiPark) {
+            results.failed.push({
+              ...lotData,
+              error: 'Park ID required when company has multiple parks'
+            });
+            continue;
+          }
+
+          const parsedLot = insertLotSchema.parse(lotData);
+          const createdLot = await storage.createLot(parsedLot);
+          results.successful.push(createdLot);
+        } catch (error) {
+          console.error('Bulk lot creation error for lot:', lotData, error);
+          results.failed.push({
+            ...lotData,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      console.error('Bulk lot creation error:', error);
+      res.status(500).json({ message: 'Failed to create lots' });
     }
   });
 
@@ -1975,11 +2136,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user has access to the park this special status belongs to
       // This uses the same park access logic as other endpoints
-      const managerAssignments = req.user?.role === 'MANAGER' 
-        ? await storage.getManagerAssignments(req.user.id, existingStatus.parkId)
-        : [];
-      const hasAccess = req.user?.role === 'ADMIN' || 
-        (req.user?.role === 'MANAGER' && managerAssignments.length > 0);
+      let hasAccess: boolean = false;
+      
+      if (req.user?.role === 'ADMIN') {
+        hasAccess = true;
+      } else if (req.user?.role === 'MANAGER') {
+        const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
+        hasAccess = managerAssignments.length > 0;
+      } else if (req.user?.role === 'COMPANY_MANAGER') {
+        if (!req.user.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+        const park = await storage.getPark(existingStatus.parkId);
+        hasAccess = !!(park && park.companyId === req.user.companyId);
+      }
       
       if (!hasAccess) {
         return res.status(403).json({ message: 'Access denied' });
@@ -2009,11 +2179,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check if user has access to the park this special status belongs to
-      const managerAssignments = req.user?.role === 'MANAGER' 
-        ? await storage.getManagerAssignments(req.user.id, existingStatus.parkId)
-        : [];
-      const hasAccess = req.user?.role === 'ADMIN' || 
-        (req.user?.role === 'MANAGER' && managerAssignments.length > 0);
+      let hasAccess: boolean = false;
+      
+      if (req.user?.role === 'ADMIN') {
+        hasAccess = true;
+      } else if (req.user?.role === 'MANAGER') {
+        const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
+        hasAccess = managerAssignments.length > 0;
+      } else if (req.user?.role === 'COMPANY_MANAGER') {
+        if (!req.user.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+        const park = await storage.getPark(existingStatus.parkId);
+        hasAccess = !!(park && park.companyId === req.user.companyId);
+      }
       
       if (!hasAccess) {
         return res.status(403).json({ message: 'Access denied' });
@@ -2905,7 +3084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           q: q as string
         });
         
-        // For managers, filter by their assigned parks
+        // For managers and company managers, filter by their assigned parks
         if (req.user!.role === 'MANAGER') {
           const assignments = await storage.getManagerAssignments(req.user!.id);
           const parkIds = assignments.map(a => a.parkId);
@@ -2918,12 +3097,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             Tenant.lot && parkIds.includes(Tenant.lot.parkId)
           );
           return res.json({ tenants: filteredTenants });
-        }
-        
-        // For company managers, filter by their company's parks
-        if (req.user!.role === 'COMPANY_MANAGER') {
+        } else if (req.user!.role === 'COMPANY_MANAGER') {
           if (!req.user!.companyId) {
-            return res.json({ tenants: [] });
+            return res.status(400).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const companyParks = await storage.getParksByCompany(req.user!.companyId);
@@ -2962,7 +3138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this tenant's lot
+      // For managers and company managers, check if they have access to this tenant's lot
       if (req.user!.role === 'MANAGER') {
         console.log(`Manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
         
@@ -2983,6 +3159,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Lot park ID:`, lot.parkId);
             const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
             console.log(`Manager has access:`, hasAccess);
+            if (!hasAccess) {
+              console.log(`❌ Access denied to tenant ${tenantId}`);
+              return res.status(403).json({ message: 'Access denied to this tenant' });
+            }
+          }
+        }
+      } else if (req.user!.role === 'COMPANY_MANAGER') {
+        console.log(`Company manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
+        
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+        
+        // If tenant has no lot assigned, allow access (tenant might not be assigned to a lot yet)
+        if (!tenant.lotId) {
+          console.log(`✅ Tenant has no lot assigned, allowing access`);
+        } else {
+          const lot = await storage.getLotAny(tenant.lotId);
+          console.log(`Lot found:`, !!lot);
+          
+          if (!lot) {
+            console.log(`⚠️ Lot ${tenant.lotId} not found, but allowing access to tenant`);
+            // Don't block access if lot is missing - this is a data integrity issue
+            // The tenant still exists and should be viewable
+          } else {
+            const park = await storage.getPark(lot.parkId);
+            console.log(`Park found:`, !!park);
+            console.log(`Park company ID:`, park?.companyId);
+            console.log(`User company ID:`, req.user!.companyId);
+            const hasAccess = park && park.companyId === req.user!.companyId;
+            console.log(`Company manager has access:`, hasAccess);
             if (!hasAccess) {
               console.log(`❌ Access denied to tenant ${tenantId}`);
               return res.status(403).json({ message: 'Access denied to this tenant' });
@@ -3443,7 +3650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { status, tenantId, lotId, type } = req.query;
       
-      // For managers, filter by their assigned parks
+      // For managers and company managers, filter by their assigned parks
       let payments;
       if (req.user!.role === 'MANAGER') {
         const assignments = await storage.getManagerAssignments(req.user!.id);
@@ -3454,6 +3661,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Get payments with Tenant info and filter by manager's parks
+        const allPayments = await storage.getPaymentsWithTenantInfo({
+          status: status as string
+        });
+        
+        payments = allPayments.filter(payment => 
+          payment.park && parkIds.includes(payment.park.id)
+        );
+      } else if (req.user!.role === 'COMPANY_MANAGER') {
+        if (!req.user!.companyId) {
+          return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+        }
+        
+        const companyParks = await storage.getParksByCompany(req.user!.companyId);
+        const parkIds = companyParks.parks.map(p => p.id);
+        
+        if (parkIds.length === 0) {
+          return res.json({ payments: [] });
+        }
+        
+        // Get payments with Tenant info and filter by company's parks
         const allPayments = await storage.getPaymentsWithTenantInfo({
           status: status as string
         });
@@ -3536,7 +3763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers, check if they have access to this Tenant's lot
+      // For managers and company managers, check if they have access to this Tenant's lot
       if (req.user!.role === 'MANAGER') {
         // Use getLotAny to get the lot regardless of active status
         const lot = await storage.getLotAny(Tenant.lotId);
@@ -3546,6 +3773,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this Tenant' });
+        }
+      } else if (req.user!.role === 'COMPANY_MANAGER') {
+        const lot = await storage.getLotAny(Tenant.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+
+        const park = await storage.getPark(lot.parkId);
+        const hasAccess = park && park.companyId === req.user!.companyId;
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
@@ -3572,7 +3814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Payment not found' });
       }
 
-      // For managers, check if they have access to this payment's lot
+      // For managers and company managers, check if they have access to this payment's lot
       if (req.user!.role === 'MANAGER') {
         const lot = await storage.getLot(existingPayment.lotId);
         if (!lot) {
@@ -3581,6 +3823,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const assignments = await storage.getManagerAssignments(req.user!.id);
         const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Access denied to this payment' });
+        }
+      } else if (req.user!.role === 'COMPANY_MANAGER') {
+        const lot = await storage.getLot(existingPayment.lotId);
+        if (!lot) {
+          return res.status(404).json({ message: 'Associated lot not found' });
+        }
+
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+        }
+
+        const park = await storage.getPark(lot.parkId);
+        const hasAccess = park && park.companyId === req.user!.companyId;
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this payment' });
         }
@@ -4096,7 +4353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow both admins and managers with lot access
+        // For lots, allow admins, managers, and company managers with lot access
         if (req.user?.role === 'ADMIN') {
           // Admin can delete any lot photo
         } else if (req.user?.role === 'MANAGER') {
@@ -4111,11 +4368,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
+        } else if (req.user?.role === 'COMPANY_MANAGER') {
+          // Check if company manager has access to this lot
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          const park = await storage.getPark(lot.parkId);
+          if (!park || park.companyId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied to this lot' });
+          }
         } else {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
-        // For park photos, allow both admins and managers with park access
+        // For park photos, allow admins, managers, and company managers with park access
         if (req.user?.role === 'ADMIN') {
           // Admin can delete any park photo
         } else if (req.user?.role === 'MANAGER') {
@@ -4124,6 +4396,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hasAccess = assignments.some((assignment: any) => assignment.parkId === photo.entityId);
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+        } else if (req.user?.role === 'COMPANY_MANAGER') {
+          // Check if company manager has access to this park
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const park = await storage.getPark(photo.entityId);
+          if (!park || park.companyId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied to this park' });
           }
         } else {
           return res.status(403).json({ message: 'Access denied' });
@@ -4183,7 +4465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow both admins and managers with lot access
+        // For lots, allow admins, managers, and company managers with lot access
         if (req.user?.role === 'ADMIN') {
           // Admin can update any lot photo
         } else if (req.user?.role === 'MANAGER') {
@@ -4198,11 +4480,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
+        } else if (req.user?.role === 'COMPANY_MANAGER') {
+          // Check if company manager has access to this lot
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          const park = await storage.getPark(lot.parkId);
+          if (!park || park.companyId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied to this lot' });
+          }
         } else {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
-        // For park photos, allow admins and managers with park access
+        // For park photos, allow admins, managers, and company managers with park access
         if (req.user?.role === 'ADMIN') {
           // Admin can update any park photo
         } else if (req.user?.role === 'MANAGER') {
@@ -4211,6 +4508,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hasAccess = assignments.some((assignment: any) => assignment.parkId === photo.entityId);
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
+          }
+        } else if (req.user?.role === 'COMPANY_MANAGER') {
+          // Check if company manager has access to this park
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const park = await storage.getPark(photo.entityId);
+          if (!park || park.companyId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied to this park' });
           }
         } else {
           return res.status(403).json({ message: 'Access denied' });
