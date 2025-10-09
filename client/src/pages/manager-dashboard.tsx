@@ -65,7 +65,7 @@ export default function ManagerDashboard() {
   
   // Type-safe access to arrays
   const assignedParksArray = isCompanyManager 
-    ? (Array.isArray(assignments?.parks) ? assignments.parks : [])
+    ? (assignments && typeof assignments === 'object' && 'parks' in assignments && Array.isArray((assignments as any).parks) ? (assignments as any).parks : [])
     : (Array.isArray(assignments) ? assignments : []);
   const showingsArray = Array.isArray(todayShowings) ? todayShowings : [];
 
@@ -79,6 +79,27 @@ export default function ManagerDashboard() {
             <p className="text-muted-foreground">You don't have permission to access this page.</p>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Special restriction for Tammie - only allow Company Parks access
+  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <div className="flex">
+          <ManagerSidebar />
+          <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
+            <div className="flex items-center justify-center py-16">
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
+                  <p className="text-muted-foreground">This feature is not yet available. Please use the Company Parks option from the menu.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }

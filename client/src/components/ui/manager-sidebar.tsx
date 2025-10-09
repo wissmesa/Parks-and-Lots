@@ -22,6 +22,7 @@ export function ManagerSidebar() {
   const { user, logout } = useAuth();
 
   const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isTammie = user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie';
   const basePath = '/manager';
   
   const navigationItems = [
@@ -56,6 +57,18 @@ export function ManagerSidebar() {
         {navigationItems.map((item) => {
           const isActive = location === item.href || (item.href !== basePath && location.startsWith(item.href));
           const Icon = item.icon;
+          const isParksOption = item.href === `${basePath}/parks`;
+          
+          // For Tammie, only show Company Parks option, others show "Coming Soon"
+          if (isTammie && !isParksOption) {
+            return (
+              <div key={item.href} className="flex items-center space-x-3 px-3 py-2 rounded-lg text-muted-foreground cursor-not-allowed">
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
+                <span className="text-xs text-muted-foreground/60 ml-auto font-light">Coming Soon</span>
+              </div>
+            );
+          }
           
           return (
             <Link key={item.href} href={item.href}>

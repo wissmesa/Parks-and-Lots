@@ -69,6 +69,27 @@ export default function ManagerBookings() {
     return null;
   }
 
+  // Special restriction for Tammie - only allow Company Parks access
+  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <div className="flex">
+          <ManagerSidebar />
+          <main className="flex-1 p-4 md:p-8 pr-16 md:pr-8 pt-8">
+            <div className="flex items-center justify-center py-16">
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
+                  <p className="text-muted-foreground">This feature is not yet available. Please use the Company Parks option from the menu.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   const isCompanyManager = user?.role === 'COMPANY_MANAGER';
 
   const { data: assignments } = useQuery<Assignment[]>({
