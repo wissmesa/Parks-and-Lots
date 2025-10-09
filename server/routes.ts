@@ -1761,6 +1761,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // If this is a MANAGER, automatically assign the specified park
+      if (invite.role === 'MANAGER' && invite.parkId) {
+        try {
+          await storage.assignManagerToPark(user.id, invite.parkId);
+          console.log(`Auto-assigned park ${invite.parkId} to MANAGER ${user.email}`);
+        } catch (parkError) {
+          console.error('Failed to auto-assign park to manager:', parkError);
+          // Don't fail the entire request if park assignment fails
+        }
+      }
+
       // If this is a COMPANY_MANAGER, automatically assign all company parks
       if (invite.role === 'COMPANY_MANAGER' && invite.companyId) {
         try {

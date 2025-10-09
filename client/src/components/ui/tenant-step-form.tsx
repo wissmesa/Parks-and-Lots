@@ -47,9 +47,10 @@ interface TenantStepFormProps {
   onCancel: () => void;
   isLoading?: boolean;
   isManager?: boolean; // If true, only show lots from manager's assigned parks
+  isCompanyManager?: boolean; // If true, show lots from company manager's parks
 }
 
-export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManager = false }: TenantStepFormProps) {
+export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManager = false, isCompanyManager = false }: TenantStepFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<TenantFormData>({
     firstName: "",
@@ -67,11 +68,17 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
   const [parkSearch, setParkSearch] = useState("");
   const [lotSearch, setLotSearch] = useState("");
 
-  // Fetch parks (filtered for managers)
+  // Fetch parks (filtered for managers and company managers)
   const { data: parksData, isLoading: parksLoading } = useQuery({
-    queryKey: ['parks-for-tenant-form', isManager],
+    queryKey: ['parks-for-tenant-form', isManager, isCompanyManager],
     queryFn: async () => {
-      const response = await apiRequest('GET', isManager ? '/api/manager/parks' : '/api/parks');
+      let endpoint = '/api/parks';
+      if (isManager) {
+        endpoint = '/api/manager/parks';
+      } else if (isCompanyManager) {
+        endpoint = '/api/company-manager/parks';
+      }
+      const response = await apiRequest('GET', endpoint);
       return response.json();
     },
   });
@@ -90,22 +97,15 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
   const parks = parksData?.parks || [];
   const lots = lotsData?.lots || [];
 
-  // Filter parks based on search
-  const filteredParks = parks.filter((park: Park) =>
-    park.name.toLowerCase().includes(parkSearch.toLowerCase()) ||
-    park.city.toLowerCase().includes(parkSearch.toLowerCase()) ||
-    park.state.toLowerCase().includes(parkSearch.toLowerCase())
-  );
+  // Filter parks based on search - use all parks since Command component handles filtering
+  const filteredParks = parks;
 
-  // Filter lots based on search and selected park
+  // Filter lots based on selected park - Command component handles search filtering
   const filteredLots = lots.filter((lot: Lot) => {
-    const matchesSearch = lot.nameOrNumber.toLowerCase().includes(lotSearch.toLowerCase()) ||
-      (lot.park?.name && lot.park.name.toLowerCase().includes(lotSearch.toLowerCase()));
-    
     // For managers, ensure lot belongs to selected park
     const matchesPark = isManager ? lot.parkId === formData.parkId : true;
     
-    return matchesSearch && matchesPark;
+    return matchesPark;
   });
 
   const selectedPark = parks.find((park: Park) => park.id === formData.parkId);
@@ -274,20 +274,17 @@ export function TenantStepForm({ onSubmit, onCancel, isLoading = false, isManage
             <Command>
               <CommandInput
                 placeholder="Search parks..."
-                value={parkSearch}
-                onValueChange={setParkSearch}
               />
               <CommandList>
                 <CommandEmpty>No parks found.</CommandEmpty>
                 <CommandGroup>
-                  {filteredParks.map((park: Park) => (
+                  {parks.map((park: Park) => (
                     <CommandItem
                       key={park.id}
-                      value={park.id}
+                      value={`${park.name} ${park.city} ${park.state}`}
                       onSelect={() => {
                         setFormData(prev => ({ ...prev, parkId: park.id, lotId: "" }));
                         setParkOpen(false);
-                        setParkSearch("");
                       }}
                     >
                       <Check

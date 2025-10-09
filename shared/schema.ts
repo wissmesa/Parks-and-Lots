@@ -46,6 +46,7 @@ export const invites = pgTable("invites", {
   email: varchar("email").notNull(),
   role: userRoleEnum("role").notNull(),
   companyId: varchar("company_id").references(() => companies.id), // For COMPANY_MANAGER role
+  parkId: varchar("park_id").references(() => parks.id), // For MANAGER role
   expiresAt: timestamp("expires_at").notNull(),
   token: varchar("token").notNull().unique(),
   acceptedAt: timestamp("accepted_at"),
@@ -407,6 +408,7 @@ export const insertPhotoSchema = createInsertSchema(photos).omit({
 export const insertInviteSchema = createInsertSchema(invites, {
   email: z.string().email("Please enter a valid email address"),
   companyId: z.string().optional(),
+  parkId: z.string().optional(),
 }).omit({
   id: true,
   token: true,

@@ -63,14 +63,9 @@ export default function AdminDashboard() {
     mutationFn: async (data: { email: string; parkId?: string }) => {
       const response = await apiRequest("POST", "/api/auth/invites", {
         email: data.email,
-        role: "MANAGER"
+        role: "MANAGER",
+        parkId: data.parkId || undefined
       });
-      
-      // If park selected, assign manager after invite creation
-      if (data.parkId) {
-        // This would need to be handled in the accept-invite flow
-        // For now, we'll just create the invite
-      }
       
       return response.json();
     },
@@ -83,6 +78,7 @@ export default function AdminDashboard() {
       setSelectedParkForInvite("");
       setIsInviteModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/managers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/invites"] });
     },
     onError: (error) => {
       toast({
@@ -99,7 +95,7 @@ export default function AdminDashboard() {
     
     await inviteMutation.mutateAsync({
       email: inviteEmail,
-      parkId: selectedParkForInvite || undefined
+      parkId: selectedParkForInvite && selectedParkForInvite !== "none" ? selectedParkForInvite : undefined
     });
   };
 
@@ -171,8 +167,8 @@ export default function AdminDashboard() {
                         <SelectValue placeholder="Select a park" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No assignment</SelectItem>
-                        {parks.map((park: any) => (
+                        <SelectItem value="none">No assignment</SelectItem>
+                        {parks.filter((park: any) => park.id && park.name).map((park: any) => (
                           <SelectItem key={park.id} value={park.id}>
                             {park.name}
                           </SelectItem>

@@ -36,6 +36,7 @@ export default function AdminInvites() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
   const [inviteCompanyId, setInviteCompanyId] = useState("");
+  const [inviteParkId, setInviteParkId] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Validation functions
@@ -72,12 +73,18 @@ export default function AdminInvites() {
     enabled: user?.role === 'ADMIN',
   });
 
+  const { data: parks } = useQuery({
+    queryKey: ["/api/parks"],
+    enabled: user?.role === 'ADMIN',
+  });
+
   const createInviteMutation = useMutation({
-    mutationFn: async ({ email, role, companyId }: { email: string; role: string; companyId?: string }) => {
+    mutationFn: async ({ email, role, companyId, parkId }: { email: string; role: string; companyId?: string; parkId?: string }) => {
       return apiRequest("POST", "/api/auth/invites", {
         email,
         role,
-        companyId: companyId || undefined
+        companyId: companyId || undefined,
+        parkId: parkId || undefined
       });
     },
     onSuccess: () => {
@@ -86,6 +93,7 @@ export default function AdminInvites() {
       setInviteEmail("");
       setInviteRole("MANAGER");
       setInviteCompanyId("");
+      setInviteParkId("");
       toast({
         title: "Success",
         description: `${inviteRole === "MANAGER" ? "Manager" : "Company Manager"} invite sent successfully`,
@@ -154,12 +162,23 @@ export default function AdminInvites() {
       });
       return;
     }
+
+    // Validate park selection for MANAGER role
+    if (inviteRole === 'MANAGER' && !inviteParkId) {
+      toast({
+        title: "Error",
+        description: "Please select a park for Manager role",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (inviteEmail.trim()) {
       createInviteMutation.mutate({ 
         email: inviteEmail.trim(), 
         role: inviteRole,
-        companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined
+        companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined,
+        parkId: inviteRole === 'MANAGER' ? inviteParkId : undefined
       });
     }
   };
@@ -174,7 +193,7 @@ export default function AdminInvites() {
     return { status: 'PENDING', variant: 'secondary' as const };
   };
 
-  const invitesList = invites?.invites || invites || [];
+  const invitesList = (invites as any)?.invites || (invites as any) || [];
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -232,6 +251,8 @@ export default function AdminInvites() {
                       setInviteRole(value);
                       if (value === "MANAGER") {
                         setInviteCompanyId(""); // Clear company selection for regular managers
+                      } else if (value === "COMPANY_MANAGER") {
+                        setInviteParkId(""); // Clear park selection for company managers
                       }
                     }}>
                       <SelectTrigger>
@@ -252,9 +273,27 @@ export default function AdminInvites() {
                           <SelectValue placeholder="Select a company" />
                         </SelectTrigger>
                         <SelectContent>
-                          {companies?.map((company: any) => (
+                          {(companies as any)?.filter((company: any) => company.id && company.name).map((company: any) => (
                             <SelectItem key={company.id} value={company.id}>
                               {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {inviteRole === "MANAGER" && (
+                    <div>
+                      <Label htmlFor="park">Park</Label>
+                      <Select value={inviteParkId} onValueChange={setInviteParkId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a park" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(parks as any)?.parks?.filter((park: any) => park.id && park.name).map((park: any) => (
+                            <SelectItem key={park.id} value={park.id}>
+                              {park.name} - {park.city}, {park.state}
                             </SelectItem>
                           ))}
                         </SelectContent>

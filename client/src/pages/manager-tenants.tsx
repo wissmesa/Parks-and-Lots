@@ -341,7 +341,8 @@ export default function ManagerTenants() {
                     onSubmit={(data) => createTenantMutation.mutate(data)}
                     onCancel={() => setShowCreateModal(false)}
                     isLoading={createTenantMutation.isPending}
-                    isManager={true}
+                    isManager={!isCompanyManager}
+                    isCompanyManager={isCompanyManager}
                   />
                 </DialogContent>
               </Dialog>
