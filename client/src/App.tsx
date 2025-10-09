@@ -27,6 +27,7 @@ import ManagerParks from "@/pages/manager-parks";
 import ManagerLots from "@/pages/manager-lots";
 import ManagerTenants from "@/pages/manager-tenants";
 import ManagerBookings from "@/pages/manager-bookings";
+import ManagerInvites from "@/pages/manager-invites";
 import TenantPanel from "@/pages/tenant-panel";
 import NotFound from "@/pages/not-found";
 
@@ -87,6 +88,9 @@ function Router() {
         )} />
         <Route path="/manager/bookings" component={() => (
           <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerBookings /></RequireRole>
+        )} />
+        <Route path="/manager/invites" component={() => (
+          <RequireRole role="COMPANY_MANAGER"><ManagerInvites /></RequireRole>
         )} />
         
         

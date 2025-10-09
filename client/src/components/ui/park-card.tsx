@@ -11,6 +11,7 @@ interface Park {
   city: string;
   state: string;
   description?: string;
+  availableLotsCount?: number;
 }
 
 interface ParkCardProps {
@@ -69,7 +70,7 @@ export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
         </p>
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Available lots
+            Available Homes {park.availableLotsCount !== undefined ? `(${park.availableLotsCount})` : ''}
           </div>
           {showBookingLink && (
             <Link href={`/parks/${park.id}`}>

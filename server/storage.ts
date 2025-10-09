@@ -40,7 +40,7 @@ import {
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -108,7 +108,11 @@ export interface IStorage {
   
   // Invite operations
   getInvites(): Promise<Invite[]>;
+  getInvite(id: string): Promise<Invite | undefined>;
   getInviteByToken(token: string): Promise<Invite | undefined>;
+  getInviteByEmail(email: string): Promise<Invite | undefined>;
+  getUsersByCompany(companyId: string): Promise<User[]>;
+  getInvitesByCompany(companyId: string): Promise<Invite[]>;
   createInvite(invite: InsertInvite & { token: string; expiresAt: Date }): Promise<Invite>;
   acceptInvite(token: string): Promise<Invite>;
   deleteInvite(id: string): Promise<void>;
@@ -373,7 +377,22 @@ export class DatabaseStorage implements IStorage {
       }
     }));
     
-    return { parks: parksResult };
+    // Add lot counts for each park
+    const parksWithLotCounts = await Promise.all(parksResult.map(async (park) => {
+      const lotCount = await db.select({ count: sql<number>`count(*)` })
+        .from(lots)
+        .where(and(
+          eq(lots.parkId, park.id),
+          eq(lots.isActive, true)
+        ));
+      
+      return {
+        ...park,
+        availableLotsCount: lotCount[0]?.count || 0
+      };
+    }));
+    
+    return { parks: parksWithLotCounts };
   }
 
   async getPark(id: string): Promise<Park | undefined> {
@@ -885,6 +904,47 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invites.token, token))
       .returning();
     return invite;
+  }
+
+  async getInvite(id: string): Promise<Invite | undefined> {
+    const [invite] = await db.select().from(invites).where(eq(invites.id, id));
+    return invite;
+  }
+
+  async getInviteByEmail(email: string): Promise<Invite | undefined> {
+    const [invite] = await db.select().from(invites).where(eq(invites.email, email));
+    return invite;
+  }
+
+  async getUsersByCompany(companyId: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.companyId, companyId));
+  }
+
+  async getInvitesByCompany(companyId: string): Promise<Invite[]> {
+    // Get invites that either have the companyId set OR were created by users from the same company
+    const companyInvites = await db.select().from(invites).where(eq(invites.companyId, companyId));
+    
+    // Also get invites created by users from this company (for backward compatibility)
+    const companyUsers = await db.select({ id: users.id }).from(users).where(eq(users.companyId, companyId));
+    const companyUserIds = companyUsers.map(u => u.id);
+    
+    let additionalInvites: Invite[] = [];
+    if (companyUserIds.length > 0) {
+      additionalInvites = await db.select().from(invites).where(
+        and(
+          isNull(invites.companyId),
+          inArray(invites.createdByUserId, companyUserIds)
+        )
+      );
+    }
+    
+    // Combine and deduplicate
+    const allInvites = [...companyInvites, ...additionalInvites];
+    const uniqueInvites = allInvites.filter((invite, index, self) => 
+      index === self.findIndex(i => i.id === invite.id)
+    );
+    
+    return uniqueInvites;
   }
 
   async getManagerAssignments(userId?: string, parkId?: string): Promise<any[]> {

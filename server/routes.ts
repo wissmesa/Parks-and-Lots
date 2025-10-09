@@ -6,6 +6,9 @@ import { promises as fs } from "fs";
 import multer from "multer";
 import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
+import { db } from "./db";
+import { invites, users } from "@shared/schema";
+import { and, isNull, inArray } from "drizzle-orm";
 import { 
   authenticateToken, 
   requireRole, 
@@ -223,6 +226,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Company manager parks error:', error);
       res.status(500).json({ message: 'Failed to fetch parks' });
+    }
+  });
+
+  app.get('/api/company-manager/managers', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+      
+      // Get all managers (both MANAGER and COMPANY_MANAGER) for this company
+      const managers = await storage.getUsers({ role: 'MANAGER' });
+      const companyManagers = await storage.getUsers({ role: 'COMPANY_MANAGER' });
+      
+      // Filter managers by company (for MANAGER role, check their park assignments)
+      const companyManagersList = companyManagers.filter(manager => manager.companyId === req.user!.companyId);
+      
+      // For regular managers, check if they have park assignments in this company
+      const companyParksResponse = await storage.getParksByCompany(req.user!.companyId);
+      const companyParks = companyParksResponse.parks || [];
+      const companyParkIds = companyParks.map((park: any) => park.id);
+      
+      const companyManagersWithParks = [];
+      for (const manager of managers) {
+        const assignments = await storage.getManagerAssignments(manager.id);
+        const hasCompanyPark = assignments.some(assignment => companyParkIds.includes(assignment.parkId));
+        if (hasCompanyPark) {
+          // Get park names for this manager
+          const managerParks = assignments
+            .filter(assignment => companyParkIds.includes(assignment.parkId))
+            .map(assignment => ({
+              id: assignment.parkId,
+              name: assignment.parkName
+            }));
+          
+          companyManagersWithParks.push({
+            ...manager,
+            assignedParks: managerParks,
+            role: 'MANAGER'
+          });
+        }
+      }
+      
+      // Add company managers
+      const allManagers = [
+        ...companyManagersWithParks,
+        ...companyManagersList.map(manager => ({
+          ...manager,
+          assignedParks: [],
+          role: 'COMPANY_MANAGER'
+        }))
+      ];
+      
+      res.json({ managers: allManagers });
+    } catch (error) {
+      console.error('Company managers error:', error);
+      res.status(500).json({ message: 'Failed to fetch managers' });
     }
   });
 
@@ -1675,6 +1734,180 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(400).json({ message: 'Invalid invite data' });
       }
+    }
+  });
+
+  // Company Manager Invite Management
+  // Fix existing invites that don't have companyId set
+  app.post('/api/company-manager/fix-invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+
+      // Get all invites created by users from this company that don't have companyId set
+      const companyUsers = await storage.getUsersByCompany(req.user!.companyId);
+      const companyUserIds = companyUsers.map(u => u.id);
+      
+      if (companyUserIds.length > 0) {
+        // Update invites that don't have companyId but were created by company users
+        await db.update(invites)
+          .set({ companyId: req.user!.companyId })
+          .where(
+            and(
+              isNull(invites.companyId),
+              inArray(invites.createdByUserId, companyUserIds)
+            )
+          );
+      }
+
+      res.json({ message: 'Invites fixed successfully' });
+    } catch (error) {
+      console.error('Fix invites error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/company-manager/invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+
+      // Get all invites for the company (both sent by this manager and other managers in the same company)
+      const invites = await storage.getInvitesByCompany(req.user!.companyId);
+      
+      // Get creator information for each invite
+      const invitesWithDetails = await Promise.all(invites.map(async (invite) => {
+        const creator = await storage.getUser(invite.createdByUserId);
+        return {
+          ...invite,
+          token: invite.token,
+          createdByUserName: creator?.fullName || 'Unknown'
+        };
+      }));
+      
+      res.json(invitesWithDetails);
+    } catch (error) {
+      console.error('Get company invites error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/company-manager/invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+
+      const { email, fullName, role, parkId } = req.body;
+      
+      if (!email || !fullName || !role) {
+        return res.status(400).json({ message: 'Email, full name, and role are required' });
+      }
+
+      // Validate role
+      if (!['MANAGER', 'COMPANY_MANAGER'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role. Must be MANAGER or COMPANY_MANAGER' });
+      }
+
+      // Validate park selection for MANAGER role
+      if (role === 'MANAGER' && !parkId) {
+        return res.status(400).json({ message: 'Park selection is required for MANAGER role' });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: 'Invalid email format' });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: 'User with this email already exists' });
+      }
+
+      // Check if there's already a pending invite for this email
+      const existingInvite = await storage.getInviteByEmail(email);
+      if (existingInvite && !existingInvite.acceptedAt && existingInvite.expiresAt > new Date()) {
+        return res.status(409).json({ message: 'A pending invite already exists for this email' });
+      }
+
+      // For MANAGER role, validate that the park belongs to the company
+      if (role === 'MANAGER') {
+        const park = await storage.getPark(parkId);
+        if (!park || park.companyId !== req.user!.companyId) {
+          return res.status(400).json({ message: 'Park does not belong to your company' });
+        }
+      }
+
+      // Generate secure token
+      const token = randomBytes(32).toString('hex');
+      
+      // Set expiry to 7 days from now
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const invite = await storage.createInvite({
+        email,
+        role,
+        companyId: req.user!.companyId, // Both MANAGER and COMPANY_MANAGER belong to the same company
+        parkId: role === 'MANAGER' ? parkId : undefined,
+        createdByUserId: req.user!.id,
+        token,
+        expiresAt
+      } as any);
+
+      // Send invite email
+      const inviteUrl = `${req.protocol}://${req.get('host')}/accept-invite?token=${token}`;
+      const emailSent = await sendInviteEmail(
+        invite.email,
+        inviteUrl,
+        req.user!.fullName
+      );
+
+      if (!emailSent) {
+        console.error('Failed to send invite email to:', invite.email);
+      }
+
+      res.status(201).json({ 
+        ...invite,
+        token, // Include token for copy link functionality
+        inviteUrl,
+        emailSent
+      });
+    } catch (error) {
+      console.error('Create company manager invite error:', error);
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(400).json({ message: 'Invalid invite data' });
+      }
+    }
+  });
+
+  app.delete('/api/company-manager/invites/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.companyId) {
+        return res.status(400).json({ message: 'Company manager must be assigned to a company' });
+      }
+
+      const invite = await storage.getInvite(req.params.id);
+      if (!invite) {
+        return res.status(404).json({ message: 'Invite not found' });
+      }
+
+      // Check if the invite belongs to the same company
+      if (invite.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied to this invite' });
+      }
+
+      await storage.deleteInvite(req.params.id);
+      res.json({ message: 'Invite cancelled successfully' });
+    } catch (error) {
+      console.error('Delete company manager invite error:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 
