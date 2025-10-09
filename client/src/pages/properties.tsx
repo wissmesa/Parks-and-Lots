@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Bed, 
   Bath, 
@@ -104,10 +105,15 @@ export default function Properties() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [priceRange, setPriceRange] = useState("");
+  const [activeTab, setActiveTab] = useState("lots");
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(50); // Fixed at 50 per page
+  // Pagination state for lots
+  const [lotsCurrentPage, setLotsCurrentPage] = useState(1);
+  const [lotsItemsPerPage] = useState(50); // Fixed at 50 per page
+  
+  // Pagination state for parks
+  const [parksCurrentPage, setParksCurrentPage] = useState(1);
+  const [parksItemsPerPage] = useState(50); // Fixed at 50 per page
 
   // Parse URL parameters and set search immediately (only on initial load)
   useEffect(() => {
@@ -116,15 +122,21 @@ export default function Properties() {
     const urlState = params.get('state') || '';
     const urlStatus = params.get('status') || '';
     const urlPrice = params.get('price') || '';
+    const urlTab = params.get('tab') || 'lots';
     const urlPage = params.get('page') || '1';
-    const urlLimit = params.get('limit') || '50';
     
     setSearchInput(urlSearchQuery);
     setSearchQuery(urlSearchQuery); // Set immediately for URL params
     setSelectedState(urlState);
     setSelectedStatus(urlStatus);
     setPriceRange(urlPrice);
-    setCurrentPage(parseInt(urlPage));
+    setActiveTab(urlTab);
+    
+    if (urlTab === 'parks') {
+      setParksCurrentPage(parseInt(urlPage));
+    } else {
+      setLotsCurrentPage(parseInt(urlPage));
+    }
   }, []); // Only run once on mount, not on every location change
 
   // Debounced search function - only for manual input changes
@@ -148,17 +160,19 @@ export default function Properties() {
     return cleanup;
   }, [searchInput, debouncedSearch]);
 
-  // Parks data
+  // Parks data with pagination
   const { data: parksData, isLoading: parksLoading } = useQuery({
-    queryKey: ["/api/parks", searchQuery, selectedState, selectedStatus, priceRange],
+    queryKey: ["/api/parks", searchQuery, selectedState, selectedStatus, priceRange, parksCurrentPage, parksItemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
       if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
       if (priceRange && priceRange !== 'all') params.set('price', priceRange);
+      params.set('page', parksCurrentPage.toString());
+      params.set('limit', parksItemsPerPage.toString());
       
-      const url = `/api/parks${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/api/parks?${params.toString()}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
       return response.json();
@@ -166,29 +180,22 @@ export default function Properties() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Lots data
+  // Lots data with pagination
   const { data: lotsData, isLoading: lotsLoading } = useQuery({
-    queryKey: ["/api/public/lots", searchQuery, selectedState, selectedStatus, priceRange, currentPage, itemsPerPage],
+    queryKey: ["/api/public/lots", searchQuery, selectedState, selectedStatus, priceRange, lotsCurrentPage, lotsItemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
       if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
       if (priceRange && priceRange !== 'all') params.set('price', priceRange);
-      params.set('page', currentPage.toString());
-      params.set('limit', itemsPerPage.toString());
+      params.set('page', lotsCurrentPage.toString());
+      params.set('limit', lotsItemsPerPage.toString());
       
       const url = `/api/public/lots?${params.toString()}`;
-      console.log('Making request to:', url);
       const response = await fetch(url);
       if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
       const data = await response.json();
-      console.log('Received data:', {
-        lotsCount: data.lots?.length,
-        pagination: data.pagination,
-        currentPage: currentPage,
-        itemsPerPage: itemsPerPage
-      });
       return data;
     },
     staleTime: 5 * 60 * 1000,
@@ -196,11 +203,13 @@ export default function Properties() {
 
   const parks = parksData?.parks || [];
   const lots = (lotsData?.lots || []) as Lot[];
-  const pagination = lotsData?.pagination;
+  const lotsPagination = lotsData?.pagination;
+  const parksPagination = parksData?.pagination;
 
   // Reset to first page when filters change
   useEffect(() => {
-    setCurrentPage(1);
+    setLotsCurrentPage(1);
+    setParksCurrentPage(1);
   }, [searchQuery, selectedState, selectedStatus, priceRange]);
 
   const handleSearch = () => {
@@ -213,18 +222,19 @@ export default function Properties() {
     if (selectedState && selectedState !== 'all') params.set('state', selectedState);
     if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
     if (priceRange && priceRange !== 'all') params.set('price', priceRange);
-    
+    params.set('tab', activeTab);
     params.set('page', '1'); // Reset to first page on search
-    params.set('limit', itemsPerPage.toString());
     
     const queryString = params.toString();
     window.history.pushState(null, '', `/properties?${queryString}`);
   };
 
-  const handlePageChange = (newPage: number) => {
-    console.log('Page change requested:', { from: currentPage, to: newPage });
-    setCurrentPage(newPage);
-    // Don't update URL to avoid page refresh - React Query will handle the data fetching
+  const handleLotsPageChange = (newPage: number) => {
+    setLotsCurrentPage(newPage);
+  };
+
+  const handleParksPageChange = (newPage: number) => {
+    setParksCurrentPage(newPage);
   };
 
   const clearFilters = () => {
@@ -233,7 +243,8 @@ export default function Properties() {
     setSelectedState("");
     setSelectedStatus("");
     setPriceRange("");
-    setCurrentPage(1);
+    setLotsCurrentPage(1);
+    setParksCurrentPage(1);
     window.history.pushState(null, '', `/properties`);
   };
 
@@ -331,28 +342,29 @@ export default function Properties() {
           </CardContent>
         </Card>
 
-        {/* Parks Section */}
-        {parks.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <Home className="w-6 h-6 mr-2" />
+        {/* Tabs for Parks and Lots */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="lots" className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Lots
+              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="parks" className="flex items-center gap-2">
+              <TreePine className="w-4 h-4" />
               Parks
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {parks.map((park: Park) => (
-                <ParkCard key={park.id} park={park} />
-              ))}
-            </div>
-          </div>
-        )}
+              {parksPagination?.total && <Badge variant="secondary" className="ml-2">{parksPagination.total}</Badge>}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Lots Section */}
-        {lots.length > 0 && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <MapPin className="w-6 h-6 mr-2" />
-              Available Lots
-            </h2>
+          {/* Lots Tab Content */}
+          <TabsContent value="lots">
+            {lots.length > 0 ? (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <MapPin className="w-6 h-6 mr-2" />
+                  Available Lots
+                </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
                 <Card key={lot.id} className="hover:shadow-lg transition-all duration-200 bg-card">
@@ -468,119 +480,196 @@ export default function Properties() {
               ))}
             </div>
             
-            {/* Pagination Controls */}
-            {pagination && (
-              <div className="mt-8 p-6 bg-muted/50 rounded-lg">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Page info */}
-                  <div className="text-sm text-muted-foreground">
-                    Page {pagination?.currentPage || currentPage} of {pagination?.totalPages || Math.ceil((pagination?.total || lots.length) / 50)} • Showing {pagination?.startItem || ((currentPage - 1) * 50 + 1)}-{pagination?.endItem || Math.min(currentPage * 50, pagination?.total || lots.length)} of {pagination?.total || lots.length} lots
-                  </div>
-                  
-                  {/* Pagination buttons */}
-                  <div className="flex items-center gap-2">
-                    {/* First page */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(1);
-                      }}
-                      disabled={currentPage <= 1}
-                      className="hidden sm:flex"
-                      type="button"
-                    >
-                      <ChevronsLeft className="w-4 h-4" />
-                    </Button>
-                    
-                    {/* Previous page */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(currentPage - 1);
-                      }}
-                      disabled={currentPage <= 1}
-                      type="button"
-                    >
-                      <ChevronLeft className="w-4 h-4 mr-1" />
-                      Previous
-                    </Button>
-                    
-                    {/* Page numbers */}
-                    <div className="flex items-center gap-1">
-                      {pagination?.pageNumbers && pagination.pageNumbers.length > 0 ? pagination.pageNumbers.map((pageNum) => (
+                {/* Pagination Controls for Lots */}
+                {lotsPagination && (
+                  <div className="mt-8 p-6 bg-muted/50 rounded-lg">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      {/* Page info */}
+                      <div className="text-sm text-muted-foreground">
+                        Page {lotsPagination.currentPage} of {lotsPagination.totalPages} • Showing {lotsPagination.startItem}-{lotsPagination.endItem} of {lotsPagination.total} lots
+                      </div>
+                      
+                      {/* Pagination buttons */}
+                      <div className="flex items-center gap-2">
+                        {/* First page */}
                         <Button
-                          key={pageNum}
-                          variant={pageNum === (pagination?.currentPage || currentPage) ? "default" : "outline"}
+                          variant="outline"
                           size="sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handlePageChange(pageNum);
-                          }}
-                          className="w-10 h-10"
+                          onClick={() => handleLotsPageChange(1)}
+                          disabled={lotsCurrentPage <= 1}
+                          className="hidden sm:flex"
                           type="button"
                         >
-                          {pageNum}
+                          <ChevronsLeft className="w-4 h-4" />
                         </Button>
-                      )) : (
+                        
+                        {/* Previous page */}
                         <Button
-                          variant="default"
+                          variant="outline"
                           size="sm"
-                          className="w-10 h-10"
+                          onClick={() => handleLotsPageChange(lotsCurrentPage - 1)}
+                          disabled={lotsCurrentPage <= 1}
                           type="button"
                         >
-                          {pagination?.currentPage || currentPage}
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Previous
                         </Button>
-                      )}
+                        
+                        {/* Page numbers */}
+                        <div className="flex items-center gap-1">
+                          {lotsPagination.pageNumbers?.map((pageNum: number) => (
+                            <Button
+                              key={pageNum}
+                              variant={pageNum === lotsCurrentPage ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleLotsPageChange(pageNum)}
+                              className="w-10 h-10"
+                              type="button"
+                            >
+                              {pageNum}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        {/* Next page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLotsPageChange(lotsCurrentPage + 1)}
+                          disabled={lotsCurrentPage >= lotsPagination.totalPages}
+                          type="button"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                        
+                        {/* Last page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleLotsPageChange(lotsPagination.totalPages)}
+                          disabled={lotsCurrentPage >= lotsPagination.totalPages}
+                          className="hidden sm:flex"
+                          type="button"
+                        >
+                          <ChevronsRight className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    
-                    {/* Next page */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(currentPage + 1);
-                      }}
-                      disabled={currentPage >= Math.ceil((pagination?.total || lots.length) / 50)}
-                      type="button"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
-                    
-                    {/* Last page */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(Math.ceil((pagination?.total || lots.length) / 50));
-                      }}
-                      disabled={currentPage >= Math.ceil((pagination?.total || lots.length) / 50)}
-                      className="hidden sm:flex"
-                      type="button"
-                    >
-                      <ChevronsRight className="w-4 h-4" />
-                    </Button>
                   </div>
-                </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <MapPin className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Lots Found</h3>
+                <p className="text-muted-foreground">Try adjusting your search criteria</p>
               </div>
             )}
-          </div>
-        )}
+          </TabsContent>
 
-        {/* No Results */}
-        {parks.length === 0 && lots.length === 0 && !isLoading && (
-          <div className="text-center py-12">
-            <Home className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Properties Found</h3>
-            <p className="text-muted-foreground">Try adjusting your search criteria</p>
-          </div>
-        )}
+          {/* Parks Tab Content */}
+          <TabsContent value="parks">
+            {parks.length > 0 ? (
+              <div>
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <TreePine className="w-6 h-6 mr-2" />
+                  Parks
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {parks.map((park: Park) => (
+                    <ParkCard key={park.id} park={park} />
+                  ))}
+                </div>
+
+                {/* Pagination Controls for Parks */}
+                {parksPagination && (
+                  <div className="mt-8 p-6 bg-muted/50 rounded-lg">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      {/* Page info */}
+                      <div className="text-sm text-muted-foreground">
+                        Page {parksPagination.currentPage} of {parksPagination.totalPages} • Showing {parksPagination.startItem}-{parksPagination.endItem} of {parksPagination.total} parks
+                      </div>
+                      
+                      {/* Pagination buttons */}
+                      <div className="flex items-center gap-2">
+                        {/* First page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleParksPageChange(1)}
+                          disabled={parksCurrentPage <= 1}
+                          className="hidden sm:flex"
+                          type="button"
+                        >
+                          <ChevronsLeft className="w-4 h-4" />
+                        </Button>
+                        
+                        {/* Previous page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleParksPageChange(parksCurrentPage - 1)}
+                          disabled={parksCurrentPage <= 1}
+                          type="button"
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Previous
+                        </Button>
+                        
+                        {/* Page numbers */}
+                        <div className="flex items-center gap-1">
+                          {parksPagination.pageNumbers?.map((pageNum: number) => (
+                            <Button
+                              key={pageNum}
+                              variant={pageNum === parksCurrentPage ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleParksPageChange(pageNum)}
+                              className="w-10 h-10"
+                              type="button"
+                            >
+                              {pageNum}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        {/* Next page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleParksPageChange(parksCurrentPage + 1)}
+                          disabled={parksCurrentPage >= parksPagination.totalPages}
+                          type="button"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                        
+                        {/* Last page */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleParksPageChange(parksPagination.totalPages)}
+                          disabled={parksCurrentPage >= parksPagination.totalPages}
+                          className="hidden sm:flex"
+                          type="button"
+                        >
+                          <ChevronsRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <TreePine className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Parks Found</h3>
+                <p className="text-muted-foreground">Try adjusting your search criteria</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
