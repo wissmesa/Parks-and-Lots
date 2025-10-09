@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { AuthManager } from "@/lib/auth";
 import { Upload, Trash2, Edit, Camera, GripVertical } from "lucide-react";
 
 interface Photo {
@@ -52,22 +53,34 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         formData.append('photos', file);
       });
       
-      // Append captions as an array in the same order as files
+      // Append captions as a JSON string
       const captionArray = files.map(file => fileCaptions[file.name] || '');
-      captionArray.forEach(caption => {
-        formData.append('captions', caption);
-      });
+      formData.append('captions', JSON.stringify(captionArray));
+
+      // Debug: Log FormData contents
+      console.log('FormData entries:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+      
+      // Debug: Log the specific captions being sent
+      console.log('Files being uploaded:', files.map(f => f.name));
+      console.log('Captions object:', fileCaptions);
+      console.log('Caption array being sent:', captionArray);
 
       const response = await fetch(`/api/${endpointBase}/${entityId}/photos`, {
         method: 'POST',
         body: formData,
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        }
+          ...AuthManager.getAuthHeaders()
+        },
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorText = await response.text();
+        console.error('Upload failed:', response.status, errorText);
+        throw new Error(`Upload failed: ${response.status} ${errorText}`);
       }
 
       return response.json();
@@ -206,6 +219,12 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
   const handleUpload = () => {
     if (selectedFiles.length === 0) return;
+    
+    // Debug: Log what we're sending
+    console.log('Uploading files:', selectedFiles.map(f => f.name));
+    console.log('Captions being sent:', captions);
+    console.log('Caption array:', selectedFiles.map(file => captions[file.name] || ''));
+    
     uploadMutation.mutate({ files: selectedFiles, captions });
   };
   

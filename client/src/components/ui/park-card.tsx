@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TreePine } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 interface Park {
   id: string;
@@ -21,9 +22,21 @@ export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
   const { data: photos } = useQuery({
     queryKey: ["/api/parks", park.id, "photos"],
   });
+  const [imageError, setImageError] = useState(false);
 
   const parkPhotos = Array.isArray(photos) ? photos : [];
-  const hasPhotos = parkPhotos.length > 0;
+  const hasPhotos = parkPhotos.length > 0 && !imageError;
+
+  // Debug logging
+  if (parkPhotos.length > 0) {
+    console.log(`Park ${park.name} (${park.id}) has ${parkPhotos.length} photos:`, parkPhotos.map(p => p.urlOrPath));
+  }
+
+  const handleImageError = () => {
+    console.error('Failed to load park image:', parkPhotos[0]?.urlOrPath);
+    console.error('Park ID:', park.id, 'Park name:', park.name);
+    setImageError(true);
+  };
 
   return (
     <Card className="overflow-hidden hover:shadow-xl transition-shadow" data-testid={`card-park-${park.id}`}>
@@ -33,6 +46,7 @@ export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
             src={parkPhotos[0].urlOrPath} 
             alt={`${park.name} preview`}
             className="w-full h-full object-cover"
+            onError={handleImageError}
           />
         ) : (
           <div className="h-full bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center">

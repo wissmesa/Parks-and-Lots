@@ -1883,16 +1883,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'At least one photo file required' });
       }
 
+      // Debug: Log the request body to see what captions are being sent
+      console.log('Company photo upload request body:', req.body);
+      console.log('Captions string:', req.body.captions);
+      console.log('Single caption:', req.body.caption);
+
+      // Parse captions from JSON string
+      let captionsArray = [];
+      try {
+        if (req.body.captions) {
+          captionsArray = JSON.parse(req.body.captions);
+        }
+      } catch (error) {
+        console.error('Error parsing captions JSON:', error);
+        // Fallback to empty array
+        captionsArray = [];
+      }
+      console.log('Parsed captions array:', captionsArray);
+
       const photos = [];
       const currentPhotoCount = (await storage.getPhotos('COMPANY', req.params.id)).length;
 
       for (let i = 0; i < allFiles.length; i++) {
         const file = allFiles[i];
+        
+        // Extract caption for this specific photo
+        let caption = '';
+        if (Array.isArray(captionsArray) && captionsArray[i]) {
+          caption = captionsArray[i];
+        } else if (req.body.caption) {
+          caption = req.body.caption;
+        }
+        
+        console.log(`Company photo ${i} caption:`, caption);
+        
         const photo = await storage.createPhoto({
           entityType: 'COMPANY',
           entityId: req.params.id,
           urlOrPath: `/static/uploads/${file.filename}`,
-          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          caption: caption,
           sortOrder: currentPhotoCount + i
         });
         photos.push(photo);
@@ -2048,16 +2077,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'At least one photo file required' });
       }
 
+      // Debug: Log the request body to see what captions are being sent
+      console.log('Photo upload request body:', req.body);
+      console.log('Captions string:', req.body.captions);
+      console.log('Single caption:', req.body.caption);
+
+      // Parse captions from JSON string
+      let captionsArray = [];
+      try {
+        if (req.body.captions) {
+          captionsArray = JSON.parse(req.body.captions);
+        }
+      } catch (error) {
+        console.error('Error parsing captions JSON:', error);
+        // Fallback to empty array
+        captionsArray = [];
+      }
+      console.log('Parsed captions array:', captionsArray);
+
       const photos = [];
       const currentPhotoCount = (await storage.getPhotos('PARK', req.params.id)).length;
 
       for (let i = 0; i < allFiles.length; i++) {
         const file = allFiles[i];
+        
+        // Extract caption for this specific photo
+        let caption = '';
+        if (Array.isArray(captionsArray) && captionsArray[i]) {
+          caption = captionsArray[i];
+        } else if (req.body.caption) {
+          caption = req.body.caption;
+        }
+        
+        console.log(`Photo ${i} caption:`, caption);
+        
         const photo = await storage.createPhoto({
           entityType: 'PARK',
           entityId: req.params.id,
           urlOrPath: `/static/uploads/${file.filename}`,
-          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          caption: caption,
           sortOrder: currentPhotoCount + i
         });
         photos.push(photo);
@@ -2951,16 +3009,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'At least one photo file required' });
       }
 
+      // Debug: Log the request body to see what captions are being sent
+      console.log('Lot photo upload request body:', req.body);
+      console.log('Captions string:', req.body.captions);
+      console.log('Single caption:', req.body.caption);
+
+      // Parse captions from JSON string
+      let captionsArray = [];
+      try {
+        if (req.body.captions) {
+          captionsArray = JSON.parse(req.body.captions);
+        }
+      } catch (error) {
+        console.error('Error parsing captions JSON:', error);
+        // Fallback to empty array
+        captionsArray = [];
+      }
+      console.log('Parsed captions array:', captionsArray);
+
       const photos = [];
       const currentPhotoCount = (await storage.getPhotos('LOT', req.params.id)).length;
 
       for (let i = 0; i < allFiles.length; i++) {
         const file = allFiles[i];
+        
+        // Extract caption for this specific photo
+        let caption = '';
+        if (Array.isArray(captionsArray) && captionsArray[i]) {
+          caption = captionsArray[i];
+        } else if (req.body.caption) {
+          caption = req.body.caption;
+        }
+        
+        console.log(`Lot photo ${i} caption:`, caption);
+        
         const photo = await storage.createPhoto({
           entityType: 'LOT',
           entityId: req.params.id,
           urlOrPath: `/static/uploads/${file.filename}`,
-          caption: Array.isArray(req.body.captions) ? req.body.captions[i] || '' : req.body.caption || '',
+          caption: caption,
           sortOrder: currentPhotoCount + i
         });
         photos.push(photo);

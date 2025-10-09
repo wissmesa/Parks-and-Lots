@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import type { Park } from "@shared/schema";
 // Lot preview image component
 function LotPreviewImage({ lotId }: { lotId: string }) {
   const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
+  const [imageError, setImageError] = useState(false);
   
   if (isLoading) {
     return (
@@ -47,19 +49,23 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
     );
   }
   
-  if (hasPhotos && firstPhoto) {
+  if (hasPhotos && firstPhoto && !imageError) {
     return (
       <div className="w-48 h-32 flex-shrink-0 overflow-hidden">
         <img 
           src={firstPhoto.urlOrPath || firstPhoto.url}
           alt="Lot preview"
           className="w-full h-full object-cover"
+          onError={() => {
+            console.error('Failed to load lot image:', firstPhoto.urlOrPath || firstPhoto.url);
+            setImageError(true);
+          }}
         />
       </div>
     );
   }
   
-  // Fallback placeholder when no photos
+  // Fallback placeholder when no photos or image error
   return (
     <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0">
       <div className="text-center">

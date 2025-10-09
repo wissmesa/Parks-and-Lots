@@ -400,7 +400,19 @@ export default function LotDetail() {
                             src={photo.urlOrPath || photo.url} 
                             alt={photo.caption || `Lot photo ${index + 1}`}
                             className="w-full h-64 md:h-96 object-cover rounded-lg" 
+                            onError={(e) => {
+                              console.error('Failed to load lot photo:', photo.urlOrPath || photo.url);
+                              e.currentTarget.style.display = 'none';
+                              const fallback = e.currentTarget.parentElement?.querySelector('.fallback-content');
+                              if (fallback) {
+                                (fallback as HTMLElement).style.display = 'flex';
+                              }
+                            }}
                           />
+                          <div className="fallback-content absolute inset-0 bg-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground" style={{ display: 'none' }}>
+                            <Home className="w-12 h-12 mb-2" />
+                            <span className="text-sm">Photo unavailable</span>
+                          </div>
                         </div>
                       </CarouselItem>
                     ))}

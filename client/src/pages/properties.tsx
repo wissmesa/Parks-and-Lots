@@ -28,6 +28,7 @@ import { ParkCard } from "@/components/ui/park-card";
 // Lot preview image component for card layout
 function LotPreviewImageCard({ lotId }: { lotId: string }) {
   const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
+  const [imageError, setImageError] = useState(false);
   
   if (isLoading) {
     return (
@@ -37,19 +38,23 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
     );
   }
   
-  if (hasPhotos && firstPhoto) {
+  if (hasPhotos && firstPhoto && !imageError) {
     return (
       <div className="h-48 overflow-hidden">
         <img 
           src={firstPhoto.urlOrPath || firstPhoto.url}
           alt="Lot preview"
           className="w-full h-full object-cover"
+          onError={() => {
+            console.error('Failed to load lot image:', firstPhoto.urlOrPath || firstPhoto.url);
+            setImageError(true);
+          }}
         />
       </div>
     );
   }
   
-  // Fallback placeholder when no photos
+  // Fallback placeholder when no photos or image error
   return (
     <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
       <div className="text-center">
