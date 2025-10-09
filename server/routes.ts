@@ -1670,7 +1670,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Create invite error:', error);
-      res.status(400).json({ message: 'Invalid invite data' });
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(400).json({ message: 'Invalid invite data' });
+      }
     }
   });
 

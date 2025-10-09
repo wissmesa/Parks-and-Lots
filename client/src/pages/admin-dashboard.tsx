@@ -29,6 +29,8 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
+  const [inviteCompanyId, setInviteCompanyId] = useState("");
   const [selectedParkForInvite, setSelectedParkForInvite] = useState("");
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
@@ -49,6 +51,11 @@ export default function AdminDashboard() {
     enabled: user?.role === 'ADMIN',
   });
 
+  const { data: companies } = useQuery({
+    queryKey: ["/api/companies"],
+    enabled: user?.role === 'ADMIN',
+  });
+
   const { data: recentBookings } = useQuery({
     queryKey: ["/api/admin/recent-bookings"],
     enabled: user?.role === 'ADMIN',
@@ -60,10 +67,11 @@ export default function AdminDashboard() {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (data: { email: string; parkId?: string }) => {
+    mutationFn: async (data: { email: string; role: string; companyId?: string; parkId?: string }) => {
       const response = await apiRequest("POST", "/api/auth/invites", {
         email: data.email,
-        role: "MANAGER",
+        role: data.role,
+        companyId: data.companyId || undefined,
         parkId: data.parkId || undefined
       });
       
@@ -72,9 +80,11 @@ export default function AdminDashboard() {
     onSuccess: () => {
       toast({
         title: "Invite Sent",
-        description: "Manager invitation has been sent successfully.",
+        description: `${inviteRole === "MANAGER" ? "Manager" : "Company Manager"} invitation has been sent successfully.`,
       });
       setInviteEmail("");
+      setInviteRole("MANAGER");
+      setInviteCompanyId("");
       setSelectedParkForInvite("");
       setIsInviteModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/managers"] });
@@ -93,9 +103,21 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     
+    // Validate company selection for COMPANY_MANAGER role
+    if (inviteRole === 'COMPANY_MANAGER' && !inviteCompanyId) {
+      toast({
+        title: "Error",
+        description: "Please select a company for Company Manager role",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     await inviteMutation.mutateAsync({
       email: inviteEmail,
-      parkId: selectedParkForInvite && selectedParkForInvite !== "none" ? selectedParkForInvite : undefined
+      role: inviteRole,
+      companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined,
+      parkId: inviteRole === 'MANAGER' ? (selectedParkForInvite && selectedParkForInvite !== "none" ? selectedParkForInvite : undefined) : undefined
     });
   };
 
@@ -139,12 +161,12 @@ export default function AdminDashboard() {
               <DialogTrigger asChild>
                 <Button data-testid="button-invite-manager">
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Invite Manager
+                  Send Invite
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Invite New Manager</DialogTitle>
+                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Company Manager"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleInviteSubmit} className="space-y-4">
                   <div>
@@ -161,7 +183,53 @@ export default function AdminDashboard() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="park">Assign to Park (Optional)</Label>
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => {
+                      setInviteRole(value);
+                      if (value === "MANAGER") {
+                        setInviteCompanyId(""); // Clear company selection for regular managers
+                        setSelectedParkForInvite(""); // Reset park selection
+                      } else if (value === "COMPANY_MANAGER") {
+                        setSelectedParkForInvite(""); // Clear park selection for company managers
+                        setInviteCompanyId(""); // Reset company selection
+                      }
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MANAGER">Manager</SelectItem>
+                        <SelectItem value="COMPANY_MANAGER">Company Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {inviteRole === "COMPANY_MANAGER" && (
+                    <div>
+                      <Label htmlFor="company">Company</Label>
+                      <Select value={inviteCompanyId} onValueChange={setInviteCompanyId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a company" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(companies as any)?.filter((company: any) => company.id && company.name).map((company: any) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                          {(!companies || (companies as any)?.length === 0) && (
+                            <SelectItem value="no-companies" disabled>
+                              No companies available
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  {inviteRole === "MANAGER" && (
+                    <div>
+                      <Label htmlFor="park">Assign to Park (Optional)</Label>
                     <Select value={selectedParkForInvite} onValueChange={setSelectedParkForInvite}>
                       <SelectTrigger data-testid="select-invite-park">
                         <SelectValue placeholder="Select a park" />
@@ -176,6 +244,7 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+                  )}
                   
                   <div className="bg-muted p-4 rounded-lg">
                     <p className="text-sm text-muted-foreground">
