@@ -89,6 +89,9 @@ export default function LotDetail() {
   // Calculator states
   const [showCalculator, setShowCalculator] = useState<boolean>(false);
   const [showCalculatorSelection, setShowCalculatorSelection] = useState<boolean>(false);
+  
+  // Booking dialog state
+  const [showBookingDialog, setShowBookingDialog] = useState<boolean>(false);
 
   const { data: lot, isLoading: lotLoading, error: lotError } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
@@ -389,7 +392,7 @@ export default function LotDetail() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Lot Photos Carousel */}
-            <div className="mb-8">
+            <div className="mb-8 relative">
               {photos.length > 0 ? (
                 <Carousel className="w-full">
                   <CarouselContent>
@@ -431,6 +434,18 @@ export default function LotDetail() {
                   </div>
                 </div>
               )}
+              
+              {/* Request Showing Button - Positioned over photo */}
+              <div className="absolute bottom-4 right-4 z-10">
+                <Button 
+                  onClick={() => setShowBookingDialog(true)}
+                  className="py-3 px-6 shadow-lg bg-blue-600/90 hover:bg-blue-600"
+                  size="lg"
+                >
+                  <Calendar className="w-5 h-5 mr-2" />
+                  Request a Showing
+                </Button>
+              </div>
             </div>
 
             {/* Lot Details */}
@@ -515,129 +530,11 @@ export default function LotDetail() {
                 </p>
               </CardContent>
             </Card>
-
-            {/* Weekly Schedule Availability */}
-            <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Showing Availability</h3>
-                <div className="text-sm text-muted-foreground mb-4">
-                  Weekly schedule from 8am to 7pm
-                </div>
-                
-                <div className="overflow-x-auto" style={{ touchAction: 'manipulation' }}>
-                  <div className="grid grid-cols-6 gap-1 text-center text-xs mb-4 min-w-[600px]">
-                    {/* Time column header */}
-                    <div className="font-medium text-muted-foreground py-2">Time</div>
-                    
-                    {/* Day headers */}
-                    {weeklySchedule.map(day => (
-                      <div key={day.dayName} className="font-medium text-muted-foreground py-2">
-                        <div>{day.dayName}</div>
-                        <div className="text-xs opacity-70">{day.dayNumber}</div>
-                      </div>
-                    ))}
-                    
-                    {/* Time slots - 30-minute intervals from 8am to 7pm */}
-                    {Array.from({length: 24}, (_, slotIndex) => {
-                      const hour = 8 + Math.floor(slotIndex / 2); // Start from 8am
-                      const minute = (slotIndex % 2) * 30; // 0 or 30
-                      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-                      const timeDisplay = `${displayHour}:${minute.toString().padStart(2, '0')}${hour >= 12 ? 'pm' : 'am'}`;
-                      
-                      return [
-                        // Time label - always first column
-                        <div key={`time-${hour}-${minute}`} className="py-1 text-xs font-medium text-muted-foreground">
-                          {timeDisplay}
-                        </div>,
-                        
-                        // Day slots - one for each weekday
-                        ...weeklySchedule.map(day => {
-                          const slot = day.slots.find(s => s.hour === hour && s.minute === minute);
-                          if (!slot) {
-                            return <div key={`${day.dayName}-${hour}-${minute}-empty`} className="py-1"></div>;
-                          }
-                          
-                          const handleSlotClick = () => {
-                            if (slot.isAvailable) {
-                              const selectedDate = slot.date.toISOString().split('T')[0];
-                              const selectedTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                              
-                              setSelectedSlot(currentSelectedSlot => {
-                                if (currentSelectedSlot && currentSelectedSlot.date === selectedDate && currentSelectedSlot.time === selectedTime) {
-                                  return null;
-                                } else {
-                                  return { date: selectedDate, time: selectedTime };
-                                }
-                              });
-                            }
-                          };
-                          
-                          const slotDate = slot.date.toISOString().split('T')[0];
-                          const slotTime = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-                          const isSelected = selectedSlot && selectedSlot.date === slotDate && selectedSlot.time === slotTime;
-                        
-                          return (
-                            <button 
-                              key={`${day.dayName}-${hour}-${minute}`}
-                              type="button"
-                              data-testid={`slot-${day.dayName}-${hour}-${minute}`}
-                              onPointerUp={(e) => {
-                                e.preventDefault();
-                                handleSlotClick();
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  handleSlotClick();
-                                }
-                              }}
-                              disabled={!slot.isAvailable}
-                              aria-pressed={slot.isAvailable ? (isSelected ? "true" : "false") : undefined}
-                              className={`py-1 px-1 rounded text-xs transition-all pointer-events-auto ${
-                                !slot.isAvailable 
-                                  ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
-                                  : isSelected
-                                    ? 'bg-blue-100 border-2 border-blue-400 text-blue-800 cursor-pointer shadow-sm hover:bg-blue-200'
-                                    : 'bg-green-50 border border-green-200 hover:bg-green-100 cursor-pointer'
-                              }`}
-                              title={
-                                !slot.isAvailable 
-                                  ? 'Busy' 
-                                  : isSelected 
-                                    ? 'Selected - Click to deselect' 
-                                    : 'Available - Click to book'
-                              }
-                            >
-                              {!slot.isAvailable ? '●' : isSelected ? '★' : '✓'}
-                            </button>
-                          );
-                        })
-                      ];
-                    }).flat()}
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-6 text-xs">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-50 border border-green-200 rounded mr-2"></div>
-                    Available (✓) - Click to book
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-blue-100 border-2 border-blue-400 rounded mr-2"></div>
-                    Selected (★) - Ready to book
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-gray-100 rounded mr-2"></div>
-                    Busy (●)
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Booking Form Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-24 space-y-4">
+            <div id="booking-form-section" className="sticky top-24 space-y-4">
               {/* Calculator Card */}
               <Card>
                 <CardContent className="p-4">
@@ -675,6 +572,33 @@ export default function LotDetail() {
           </div>
         </div>
       </div>
+
+      {/* Booking Request Dialog */}
+      <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Request a Showing</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Fill out the form below to request a showing for {lot?.nameOrNumber || 'this property'}
+            </p>
+          </DialogHeader>
+          <div className="py-4">
+            <BookingForm 
+              lotId={lot?.id || ''} 
+              selectedSlot={selectedSlot}
+              onSlotUsed={() => setSelectedSlot(null)}
+              onSuccess={() => {
+                toast({
+                  title: "Showing Requested", 
+                  description: "Your showing request has been submitted successfully.",
+                });
+                setSelectedSlot(null);
+                setShowBookingDialog(false);
+              }} 
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Calculator Selection Dialog */}
       <Dialog open={showCalculatorSelection} onOpenChange={setShowCalculatorSelection}>
