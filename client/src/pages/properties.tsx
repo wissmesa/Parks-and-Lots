@@ -160,15 +160,35 @@ export default function Properties() {
     return cleanup;
   }, [searchInput, debouncedSearch]);
 
-  // Parks data with pagination
+  // Get all parks and lots for state filtering (without pagination)
+  const { data: allParksData } = useQuery({
+    queryKey: ["/api/parks/all"],
+    queryFn: async () => {
+      const response = await fetch('/api/parks?limit=1000');
+      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      return response.json();
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: allLotsData } = useQuery({
+    queryKey: ["/api/public/lots/all"],
+    queryFn: async () => {
+      const response = await fetch('/api/public/lots?limit=1000');
+      if (!response.ok) throw new Error(`${response.status}: ${response.statusText}`);
+      return response.json();
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Parks data with pagination (status and price filters only apply to homes/lots)
   const { data: parksData, isLoading: parksLoading } = useQuery({
-    queryKey: ["/api/parks", searchQuery, selectedState, selectedStatus, priceRange, parksCurrentPage, parksItemsPerPage],
+    queryKey: ["/api/parks", searchQuery, selectedState, parksCurrentPage, parksItemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
-      if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
-      if (priceRange && priceRange !== 'all') params.set('price', priceRange);
+      // Note: status and price filters are NOT applied to parks, only to homes/lots
       params.set('page', parksCurrentPage.toString());
       params.set('limit', parksItemsPerPage.toString());
       
@@ -206,11 +226,27 @@ export default function Properties() {
   const lotsPagination = lotsData?.pagination;
   const parksPagination = parksData?.pagination;
 
+  // Get unique states from all parks and lots (not just paginated data)
+  const allParks = allParksData?.parks || [];
+  const allLots = allLotsData?.lots || [];
+  const availableStates = Array.from(
+    new Set([
+      ...allParks.map((park: Park) => park.state),
+      ...allLots.map((lot: Lot) => lot.park?.state).filter(Boolean)
+    ])
+  ).sort();
+
   // Reset to first page when filters change
   useEffect(() => {
     setLotsCurrentPage(1);
     setParksCurrentPage(1);
   }, [searchQuery, selectedState, selectedStatus, priceRange]);
+
+  // Clear search when switching tabs
+  useEffect(() => {
+    setSearchInput("");
+    setSearchQuery("");
+  }, [activeTab]);
 
   const handleSearch = () => {
     // Update search query immediately to trigger API calls
@@ -277,7 +313,7 @@ export default function Properties() {
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="lg:col-span-2">
+                <div className={activeTab === 'parks' ? 'lg:col-span-3' : 'lg:col-span-2'}>
                   <Input
                     placeholder="Search parks and homes..."
                     value={searchInput}
@@ -293,41 +329,48 @@ export default function Properties() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All States</SelectItem>
-                    <SelectItem value="CA">California</SelectItem>
-                    <SelectItem value="TX">Texas</SelectItem>
-                    <SelectItem value="FL">Florida</SelectItem>
-                    <SelectItem value="NY">New York</SelectItem>
+                    {availableStates.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="FOR_RENT">For Rent</SelectItem>
-                    <SelectItem value="FOR_SALE">For Sale</SelectItem>
-                    <SelectItem value="RENT_TO_OWN">Rent to Own</SelectItem>
-                    <SelectItem value="CONTRACT_FOR_DEED">Contract for Deed</SelectItem>
-                  </SelectContent>
-                </Select>
+                {/* Only show Type filter for Homes tab */}
+                {activeTab === 'lots' && (
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="FOR_RENT">For Rent</SelectItem>
+                      <SelectItem value="FOR_SALE">For Sale</SelectItem>
+                      <SelectItem value="RENT_TO_OWN">Rent to Own</SelectItem>
+                      <SelectItem value="CONTRACT_FOR_DEED">Contract for Deed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Select value={priceRange} onValueChange={setPriceRange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Price Range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Prices</SelectItem>
-                    <SelectItem value="0-100000">Under $100k</SelectItem>
-                    <SelectItem value="100000-200000">$100k - $200k</SelectItem>
-                    <SelectItem value="200000-300000">$200k - $300k</SelectItem>
-                    <SelectItem value="300000+">Over $300k</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Only show Price Range filter for Homes tab */}
+              {activeTab === 'lots' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Select value={priceRange} onValueChange={setPriceRange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Price Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Prices</SelectItem>
+                      <SelectItem value="0-100000">Under $100k</SelectItem>
+                      <SelectItem value="100000-200000">$100k - $200k</SelectItem>
+                      <SelectItem value="200000-300000">$200k - $300k</SelectItem>
+                      <SelectItem value="300000+">Over $300k</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <Button 
