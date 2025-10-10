@@ -105,7 +105,7 @@ export default function Properties() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [priceRange, setPriceRange] = useState("");
-  const [activeTab, setActiveTab] = useState("lots");
+  const [activeTab, setActiveTab] = useState("parks");
   
   // Pagination state for lots
   const [lotsCurrentPage, setLotsCurrentPage] = useState(1);
@@ -122,7 +122,7 @@ export default function Properties() {
     const urlState = params.get('state') || '';
     const urlStatus = params.get('status') || '';
     const urlPrice = params.get('price') || '';
-    const urlTab = params.get('tab') || 'lots';
+    const urlTab = params.get('tab') || 'parks';
     const urlPage = params.get('page') || '1';
     
     setSearchInput(urlSearchQuery);
@@ -345,16 +345,23 @@ export default function Properties() {
         {/* Tabs for Parks and Lots */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-            <TabsTrigger value="lots" className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Lots
-              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="parks" className="flex items-center gap-2">
+          <TabsTrigger 
+              value="parks" 
+              className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
               <TreePine className="w-4 h-4" />
               Parks
               {parksPagination?.total && <Badge variant="secondary" className="ml-2">{parksPagination.total}</Badge>}
             </TabsTrigger>
+            <TabsTrigger 
+              value="lots" 
+              className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            >
+              <MapPin className="w-4 h-4" />
+              Lots
+              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
+            </TabsTrigger>
+         
           </TabsList>
 
           {/* Lots Tab Content */}

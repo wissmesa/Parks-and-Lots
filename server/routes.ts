@@ -1995,17 +1995,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await storage.getParks(filters);
       const parksArray = result.parks;
       
-      // Add pagination logic here if needed
+      // Pagination logic
       const pageNum = parseInt(page as string);
       const limitNum = Math.min(parseInt(limit as string), 100);
       const startIndex = (pageNum - 1) * limitNum;
       const endIndex = startIndex + limitNum;
+      const paginatedParks = parksArray.slice(startIndex, endIndex);
+      const totalParks = parksArray.length;
+      const totalPages = Math.ceil(totalParks / limitNum);
+      
+      // Generate page numbers for pagination UI (max 5 pages)
+      const pageNumbers = [];
+      const maxPages = 5;
+      let startPage = Math.max(1, pageNum - Math.floor(maxPages / 2));
+      let endPage = Math.min(totalPages, startPage + maxPages - 1);
+      
+      if (endPage - startPage < maxPages - 1) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+      }
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+      }
       
       res.json({
-        parks: parksArray.slice(startIndex, endIndex),
-        totalCount: parksArray.length,
-        page: pageNum,
-        limit: limitNum
+        parks: paginatedParks,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: totalPages,
+          total: totalParks,
+          limit: limitNum,
+          startItem: totalParks > 0 ? startIndex + 1 : 0,
+          endItem: Math.min(endIndex, totalParks),
+          pageNumbers: pageNumbers
+        }
       });
     } catch (error) {
       console.error('Get parks error:', error);
