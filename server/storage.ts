@@ -491,6 +491,8 @@ export class DatabaseStorage implements IStorage {
       priceForSale: lots.priceForSale,
       priceRentToOwn: lots.priceRentToOwn,
       priceContractForDeed: lots.priceContractForDeed,
+      lotRent: lots.lotRent,
+      showingLink: lots.showingLink,
       description: lots.description,
       bedrooms: lots.bedrooms,
       bathrooms: lots.bathrooms,
@@ -641,7 +643,9 @@ export class DatabaseStorage implements IStorage {
             houseModel: lots.houseModel,
             parkId: lots.parkId,
             isActive: lots.isActive,
-            specialStatusId: lots.specialStatusId
+            specialStatusId: lots.specialStatusId,
+            lotRent: lots.lotRent,
+            showingLink: lots.showingLink
           })
           .from(lots)
           .innerJoin(parks, eq(lots.parkId, parks.id))
@@ -662,9 +666,7 @@ export class DatabaseStorage implements IStorage {
             priceForRent: null,
             priceForSale: null,
             priceRentToOwn: null,
-            priceContractForDeed: null,
-            lotRent: null,
-            showingLink: null
+            priceContractForDeed: null
           };
         } catch (fallbackError) {
           console.error('Fallback query also failed:', fallbackError);
@@ -1445,6 +1447,8 @@ export class DatabaseStorage implements IStorage {
       priceForSale: lots.priceForSale,
       priceRentToOwn: lots.priceRentToOwn,
       priceContractForDeed: lots.priceContractForDeed,
+      lotRent: lots.lotRent,
+      showingLink: lots.showingLink,
       description: lots.description,
       bedrooms: lots.bedrooms,
       bathrooms: lots.bathrooms,
