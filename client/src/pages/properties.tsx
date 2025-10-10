@@ -279,7 +279,7 @@ export default function Properties() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="lg:col-span-2">
                   <Input
-                    placeholder="Search parks and lots..."
+                    placeholder="Search parks and homes..."
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -345,23 +345,19 @@ export default function Properties() {
         {/* Tabs for Parks and Lots */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-          <TabsTrigger 
-              value="parks" 
-              className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-            >
+         
+            <TabsTrigger value="lots"  className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+              <MapPin className="w-4 h-4" />
+              Homes
+              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="parks"  className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
               <TreePine className="w-4 h-4" />
               Parks
               {parksPagination?.total && <Badge variant="secondary" className="ml-2">{parksPagination.total}</Badge>}
             </TabsTrigger>
-            <TabsTrigger 
-              value="lots" 
-              className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-            >
-              <MapPin className="w-4 h-4" />
-              Lots
-              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
-            </TabsTrigger>
-         
           </TabsList>
 
           {/* Lots Tab Content */}
@@ -370,7 +366,7 @@ export default function Properties() {
               <div>
                 <h2 className="text-2xl font-bold mb-6 flex items-center">
                   <MapPin className="w-6 h-6 mr-2" />
-                  Available Lots
+                  Available Homes
                 </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {lots.map((lot) => (
@@ -493,7 +489,7 @@ export default function Properties() {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                       {/* Page info */}
                       <div className="text-sm text-muted-foreground">
-                        Page {lotsPagination.currentPage} of {lotsPagination.totalPages} • Showing {lotsPagination.startItem}-{lotsPagination.endItem} of {lotsPagination.total} lots
+                        Page {lotsPagination.currentPage} of {lotsPagination.totalPages} • Showing {lotsPagination.startItem}-{lotsPagination.endItem} of {lotsPagination.total} homes
                       </div>
                       
                       {/* Pagination buttons */}

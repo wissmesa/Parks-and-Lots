@@ -102,7 +102,7 @@ function AvailableLotsCard({ totalLots, isLoading }: { totalLots: number; isLoad
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Available Lots</h3>
+          <h3 className="text-lg font-semibold">Available Homes</h3>
           <Home className="w-5 h-5 text-primary" />
         </div>
         
@@ -115,7 +115,7 @@ function AvailableLotsCard({ totalLots, isLoading }: { totalLots: number; isLoad
             <div>
               <div className="text-4xl font-bold text-primary mb-2">{totalLots}</div>
               <p className="text-sm text-muted-foreground">
-                {totalLots === 1 ? 'lot available' : 'lots available'}
+                {totalLots === 1 ? 'home available' : 'homes available'}
               </p>
             </div>
           )}
@@ -340,18 +340,18 @@ export default function ParkDetail() {
               </CardContent>
             </Card>
 
-            {/* Available Lots */}
+            {/* Available Homes */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold">Available Lots</h3>
+                  <h3 className="text-xl font-semibold">Available Homes</h3>
                   <div className="flex items-center space-x-4">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                       <SelectTrigger className="w-32">
-                        <SelectValue placeholder="All Lots" />
+                        <SelectValue placeholder="All Homes" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Lots</SelectItem>
+                        <SelectItem value="all">All Homes</SelectItem>
                         <SelectItem value="FOR_RENT">For Rent</SelectItem>
                         <SelectItem value="FOR_SALE">For Sale</SelectItem>
                         <SelectItem value="RENT_TO_OWN">Rent to Own</SelectItem>
