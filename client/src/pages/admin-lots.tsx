@@ -91,6 +91,8 @@ export default function AdminLots() {
     priceForSale: "",
     priceRentToOwn: "",
     priceContractForDeed: "",
+    lotRent: "",
+    showingLink: "",
     description: "",
     bedrooms: 1,
     bathrooms: 1,
@@ -566,6 +568,8 @@ export default function AdminLots() {
       priceForSale: "",
       priceRentToOwn: "",
       priceContractForDeed: "",
+      lotRent: "",
+      showingLink: "",
       description: "",
       bedrooms: 1,
       bathrooms: 1,
@@ -586,6 +590,8 @@ export default function AdminLots() {
       priceForSale: lot.priceForSale || "",
       priceRentToOwn: lot.priceRentToOwn || "",
       priceContractForDeed: lot.priceContractForDeed || "",
+      lotRent: lot.lotRent || "",
+      showingLink: lot.showingLink || "",
       description: lot.description || "",
       bedrooms: lot.bedrooms || 1,
       bathrooms: lot.bathrooms || 1,
@@ -617,6 +623,16 @@ export default function AdminLots() {
         lotId: assigningSpecialStatus.id,
         specialStatusId
       });
+    }
+  };
+
+  const toggleVisibility = (id: string, isActive: boolean) => {
+    toggleMutation.mutate(id);
+  };
+
+  const deleteLot = (id: string) => {
+    if (confirm("Are you sure you want to delete this lot?")) {
+      deleteMutation.mutate(id);
     }
   };
 
@@ -940,6 +956,17 @@ export default function AdminLots() {
                           placeholder="Monthly contract payment"
                         />
                       </div>
+                      <div>
+                        <Label htmlFor="lotRent">Lot Rent ($)</Label>
+                        <Input
+                          id="lotRent"
+                          type="number"
+                          step="0.01"
+                          value={formData.lotRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
+                          placeholder="Monthly lot rent amount"
+                        />
+                      </div>
                     </div>
                   </div>
                   
@@ -1033,6 +1060,17 @@ export default function AdminLots() {
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Describe the lot features..."
                       rows={3}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="showingLink">Showing Link</Label>
+                    <Input
+                      id="showingLink"
+                      type="url"
+                      value={formData.showingLink}
+                      onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
+                      placeholder="https://example.com/showing-link"
                     />
                   </div>
                   
@@ -1970,6 +2008,18 @@ export default function AdminLots() {
                           className="mt-1"
                         />
                       </div>
+                      <div>
+                        <Label htmlFor="edit-lotRent" className="text-sm">Lot Rent ($/month)</Label>
+                        <Input
+                          id="edit-lotRent"
+                          type="number"
+                          step="0.01"
+                          value={formData.lotRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
+                          placeholder="Monthly lot rent amount"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2046,6 +2096,18 @@ export default function AdminLots() {
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     rows={3}
                     placeholder="Additional details about the lot..."
+                    className="mt-1"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit-showingLink">Showing Link</Label>
+                  <Input
+                    id="edit-showingLink"
+                    type="url"
+                    value={formData.showingLink}
+                    onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
+                    placeholder="https://example.com/showing-link"
                     className="mt-1"
                   />
                 </div>
