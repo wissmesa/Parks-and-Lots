@@ -252,10 +252,23 @@ export default function AdminParks() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Auto-add any pending amenity before saving
+    let finalFormData = { ...formData };
+    if (newAmenity.trim()) {
+      finalFormData = {
+        ...formData,
+        amenities: [...formData.amenities, newAmenity.trim()]
+      };
+      // Update the form state to include the new amenity
+      setFormData(finalFormData);
+      setNewAmenity(''); // Clear the input
+    }
+    
     if (editingPark) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(finalFormData);
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(finalFormData);
     }
   };
 
@@ -427,7 +440,7 @@ export default function AdminParks() {
                   Add Park
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Create New Park</DialogTitle>
                 </DialogHeader>
@@ -743,7 +756,7 @@ export default function AdminParks() {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Park</DialogTitle>
             </DialogHeader>

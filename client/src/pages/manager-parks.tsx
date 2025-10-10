@@ -182,8 +182,21 @@ export default function ManagerParks() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Auto-add any pending amenity before saving
+    let finalFormData = { ...formData };
+    if (newAmenity.trim()) {
+      finalFormData = {
+        ...formData,
+        amenities: [...formData.amenities, newAmenity.trim()]
+      };
+      // Update the form state to include the new amenity
+      setFormData(finalFormData);
+      setNewAmenity(''); // Clear the input
+    }
+    
     if (editingPark) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(finalFormData);
     }
   };
 
@@ -543,7 +556,7 @@ export default function ManagerParks() {
 
           {/* Edit Park Dialog */}
           <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Edit Park</DialogTitle>
               </DialogHeader>
