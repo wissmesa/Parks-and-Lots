@@ -341,8 +341,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'You can only update lots in your company parks' });
       }
       
-      const updates = insertLotSchema.partial().parse(req.body);
-      const updatedLot = await storage.updateLot(req.params.id, updates);
+      // Clean up empty strings in the request body
+      const cleanedBody = { ...req.body };
+      Object.keys(cleanedBody).forEach(key => {
+        if (cleanedBody[key] === '') {
+          cleanedBody[key] = null;
+        }
+      });
+      
+      console.log('Cleaned body:', JSON.stringify(cleanedBody, null, 2));
+      
+      // Try validation with detailed error reporting
+      const validation = insertLotSchema.partial().safeParse(cleanedBody);
+      if (!validation.success) {
+        console.log('❌ Schema validation failed:');
+        console.log('Validation errors:', JSON.stringify(validation.error.errors, null, 2));
+        return res.status(400).json({ 
+          message: 'Schema validation failed', 
+          errors: validation.error.errors,
+          receivedData: cleanedBody
+        });
+      }
+      
+      console.log('✅ Schema validation passed');
+      console.log('Validated updates:', JSON.stringify(validation.data, null, 2));
+      
+      const updatedLot = await storage.updateLot(req.params.id, validation.data);
+      console.log('✅ Database update successful');
       res.json(updatedLot);
     } catch (error) {
       console.error('Update lot error:', error);
@@ -2673,6 +2698,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
             sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
+            lotRent: lotData.lotRent && String(lotData.lotRent).trim() !== "" ? String(lotData.lotRent) : null,
+            showingLink: lotData.showingLink && String(lotData.showingLink).trim() !== "" ? String(lotData.showingLink).trim() : null,
+            houseManufacturer: lotData.houseManufacturer && String(lotData.houseManufacturer).trim() !== "" ? String(lotData.houseManufacturer).trim() : null,
+            houseModel: lotData.houseModel && String(lotData.houseModel).trim() !== "" ? String(lotData.houseModel).trim() : null,
             specialStatusId,
             isActive: true
           };
@@ -2842,6 +2871,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
             sqFt: lotData.sqFt && String(lotData.sqFt).trim() !== "" ? parseInt(lotData.sqFt) || null : null,
+            lotRent: lotData.lotRent && String(lotData.lotRent).trim() !== "" ? String(lotData.lotRent) : null,
+            showingLink: lotData.showingLink && String(lotData.showingLink).trim() !== "" ? String(lotData.showingLink).trim() : null,
+            houseManufacturer: lotData.houseManufacturer && String(lotData.houseManufacturer).trim() !== "" ? String(lotData.houseManufacturer).trim() : null,
+            houseModel: lotData.houseModel && String(lotData.houseModel).trim() !== "" ? String(lotData.houseModel).trim() : null,
             specialStatusId,
             isActive: true
           };

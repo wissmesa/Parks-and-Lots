@@ -58,6 +58,8 @@ interface Lot {
   priceForSale?: string | null;
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
+  lotRent?: string | null;
+  showingLink?: string | null;
   description: string;
   bedrooms: number;
   bathrooms: number;
@@ -181,6 +183,27 @@ export default function ManagerLots() {
     });
   };
 
+  const resetForm = () => {
+    setFormData({
+      nameOrNumber: '',
+      status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
+      price: '',
+      priceForRent: '',
+      priceForSale: '',
+      priceRentToOwn: '',
+      priceContractForDeed: '',
+      lotRent: '',
+      showingLink: '',
+      description: '',
+      bedrooms: 1,
+      bathrooms: 1,
+      sqFt: 0,
+      houseManufacturer: '',
+      houseModel: '',
+      parkId: ''
+    });
+  };
+
   const hasActiveFilters = () => {
     return filters.status.length > 0 ||
            filters.visibility.length > 0 ||
@@ -276,7 +299,7 @@ export default function ManagerLots() {
       
       const processedData = {
         ...lotData,
-        price: '0', // Legacy price field - required by database
+        price: '0', // Legacy price field - required by database (as string for decimal)
         bedrooms: lotData.bedrooms || 0,
         bathrooms: lotData.bathrooms || 0,
         sqFt: lotData.sqFt || 0,
@@ -334,24 +357,32 @@ export default function ManagerLots() {
   // Update lot mutation
   const updateLotMutation = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<typeof formData>) => {
-      console.log(updates, "updates");
+      console.log('=== MANAGER LOT UPDATE DEBUG ===');
+      console.log('Original updates:', updates);
+      console.log('Updates types:', Object.keys(updates).map(key => `${key}: ${typeof updates[key]}`));
+      
       const endpoint = isCompanyManager ? `/api/company-manager/lots/${id}` : `/api/manager/lots/${id}`;
       
       // Process the updates to handle empty strings for numeric fields
       const processedUpdates = {
         ...updates,
-        price: updates.price || '0', // Legacy price field - required by database
-        bedrooms: updates.bedrooms || 0,
-        bathrooms: updates.bathrooms || 0,
-        sqFt: updates.sqFt || 0,
-        priceForRent: updates.priceForRent || null,
-        priceForSale: updates.priceForSale || null,
-        priceRentToOwn: updates.priceRentToOwn || null,
-        priceContractForDeed: updates.priceContractForDeed || null,
-        houseManufacturer: updates.houseManufacturer || null,
-        houseModel: updates.houseModel || null,
-        description: updates.description || null,
+        price: updates.price && updates.price !== '' ? updates.price : '0', // Legacy price field - required by database (as string for decimal)
+        bedrooms: updates.bedrooms && updates.bedrooms !== 0 ? updates.bedrooms : null,
+        bathrooms: updates.bathrooms && updates.bathrooms !== 0 ? updates.bathrooms : null,
+        sqFt: updates.sqFt && updates.sqFt !== 0 ? updates.sqFt : null,
+        priceForRent: updates.priceForRent && updates.priceForRent !== '' ? updates.priceForRent : null,
+        priceForSale: updates.priceForSale && updates.priceForSale !== '' ? updates.priceForSale : null,
+        priceRentToOwn: updates.priceRentToOwn && updates.priceRentToOwn !== '' ? updates.priceRentToOwn : null,
+        priceContractForDeed: updates.priceContractForDeed && updates.priceContractForDeed !== '' ? updates.priceContractForDeed : null,
+        lotRent: updates.lotRent && updates.lotRent !== '' ? updates.lotRent : null,
+        showingLink: updates.showingLink && updates.showingLink !== '' ? updates.showingLink : null,
+        houseManufacturer: updates.houseManufacturer && updates.houseManufacturer !== '' ? updates.houseManufacturer : null,
+        houseModel: updates.houseModel && updates.houseModel !== '' ? updates.houseModel : null,
+        description: updates.description && updates.description !== '' ? updates.description : null,
       };
+      
+      console.log('Processed updates:', processedUpdates);
+      console.log('Processed types:', Object.keys(processedUpdates).map(key => `${key}: ${typeof processedUpdates[key]}`));
       
       const response = await apiRequest("PATCH", endpoint, processedUpdates);
       return response.json();
@@ -967,7 +998,13 @@ export default function ManagerLots() {
                 Bulk Upload
               </Button>
               
-              <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+              <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+                setIsCreateModalOpen(open);
+                if (open) {
+                  resetForm();
+                  setEditingLot(null);
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button data-testid="button-create-lot">
                     <Plus className="w-4 h-4 mr-2" />
@@ -1939,7 +1976,13 @@ export default function ManagerLots() {
           )}
 
           {/* Edit Modal */}
-          <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+            setIsEditModalOpen(open);
+            if (!open) {
+              setEditingLot(null);
+              resetForm();
+            }
+          }}>
             <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <DialogHeader>
                 <DialogTitle className="text-lg sm:text-xl">Edit Lot {editingLot?.nameOrNumber}</DialogTitle>

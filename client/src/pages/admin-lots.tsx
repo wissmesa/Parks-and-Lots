@@ -33,6 +33,8 @@ interface Lot {
   priceForSale?: string | null;
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
+  lotRent?: string | null;
+  showingLink?: string | null;
   description: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
@@ -449,6 +451,15 @@ export default function AdminLots() {
         bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
         bathrooms: data.bathrooms ? parseInt(data.bathrooms) : null,
         sqFt: data.sqFt ? parseInt(data.sqFt) : null,
+        priceForRent: data.priceForRent || null,
+        priceForSale: data.priceForSale || null,
+        priceRentToOwn: data.priceRentToOwn || null,
+        priceContractForDeed: data.priceContractForDeed || null,
+        lotRent: data.lotRent || null,
+        showingLink: data.showingLink || null,
+        houseManufacturer: data.houseManufacturer || null,
+        houseModel: data.houseModel || null,
+        description: data.description || null,
       };
       console.log("Sending update payload:", payload);
       const response = await apiRequest("PATCH", `/api/lots/${editingLot?.id}`, payload);
@@ -876,7 +887,13 @@ export default function AdminLots() {
                 Bulk Upload
               </Button>
             </div>
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+              setIsCreateModalOpen(open);
+              if (open) {
+                resetForm();
+                setEditingLot(null);
+              }
+            }}>
               <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create New Lot</DialogTitle>
@@ -1875,7 +1892,12 @@ export default function AdminLots() {
         </Card>
 
         {/* Edit Dialog */}
-        <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
+        <Dialog open={!!editingLot} onOpenChange={(open) => {
+          if (!open) {
+            setEditingLot(null);
+            resetForm();
+          }
+        }}>
           <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">Edit Lot {editingLot?.nameOrNumber}</DialogTitle>
