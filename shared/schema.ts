@@ -128,6 +128,8 @@ export const lots = pgTable("lots", {
   priceForSale: decimal("price_for_sale", { precision: 10, scale: 2 }),
   priceRentToOwn: decimal("price_rent_to_own", { precision: 10, scale: 2 }),
   priceContractForDeed: decimal("price_contract_for_deed", { precision: 10, scale: 2 }),
+  lotRent: decimal("lot_rent", { precision: 10, scale: 2 }),
+  showingLink: varchar("showing_link"),
   description: text("description"),
   bedrooms: integer("bedrooms"),
   bathrooms: integer("bathrooms"),

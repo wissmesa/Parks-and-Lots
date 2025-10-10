@@ -1,6 +1,6 @@
 {
-  "id": "fe6844e4-31c4-4f72-905c-5a703e0f6c78",
-  "prevId": "95bb13a5-148c-426b-b0f0-c7cc4d7f8007",
+  "id": "new-snapshot-id-0012",
+  "prevId": "fe6844e4-31c4-4f72-905c-5a703e0f6c78",
   "version": "7",
   "dialect": "postgresql",
   "tables": {

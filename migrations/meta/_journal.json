@@ -85,6 +85,13 @@
       "when": 1759960086803,
       "tag": "0011_demonic_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1759961000000,
+      "tag": "0012_add_lot_rent_and_showing_link",
+      "breakpoints": true
     }
   ]
 }

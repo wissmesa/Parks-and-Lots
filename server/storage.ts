@@ -662,7 +662,9 @@ export class DatabaseStorage implements IStorage {
             priceForRent: null,
             priceForSale: null,
             priceRentToOwn: null,
-            priceContractForDeed: null
+            priceContractForDeed: null,
+            lotRent: null,
+            showingLink: null
           };
         } catch (fallbackError) {
           console.error('Fallback query also failed:', fallbackError);
