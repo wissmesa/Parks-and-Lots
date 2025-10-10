@@ -58,22 +58,26 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-export function requireRole(role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT') {
+export function requireRole(role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' | ('ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT')[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // Allow admins to access any role's endpoints (except tenant for privacy)
-    if (req.user.role === 'ADMIN' && role !== 'TENANT') {
+    // Handle array of roles
+    const roles = Array.isArray(role) ? role : [role];
+    
+    // Check if user has one of the allowed roles
+    if (roles.includes(req.user.role)) {
       return next();
     }
 
-    if (req.user.role !== role) {
-      return res.status(403).json({ message: 'Insufficient permissions' });
+    // Allow admins to access any role's endpoints (except tenant for privacy)
+    if (req.user.role === 'ADMIN' && !roles.includes('TENANT')) {
+      return next();
     }
 
-    next();
+    return res.status(403).json({ message: 'Insufficient permissions' });
   };
 }
 

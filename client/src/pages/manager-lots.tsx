@@ -756,6 +756,75 @@ export default function ManagerLots() {
     await deleteLotMutation.mutateAsync(id);
   };
 
+  // Handle Google Sheets export
+  const handleExportToGoogleSheets = async (lot: Lot) => {
+    try {
+      // Check if Google Sheets is connected
+      const statusResponse = await apiRequest('GET', '/api/auth/google-sheets/status');
+      const statusData = await statusResponse.json();
+      
+      if (!statusData.connected) {
+        // Open Google Sheets connection in a popup
+        const connectResponse = await apiRequest('GET', '/api/auth/google-sheets/connect');
+        const connectData = await connectResponse.json();
+        const popup = window.open(connectData.authUrl, 'google-sheets-auth', 'width=500,height=600');
+        
+        // Listen for the popup to close or send a message
+        const checkClosed = setInterval(() => {
+          if (popup?.closed) {
+            clearInterval(checkClosed);
+            // Don't retry automatically - user needs to set sheet ID first
+          }
+        }, 1000);
+
+        // Listen for success message from popup
+        const messageListener = (event: MessageEvent) => {
+          if (event.data.type === 'GOOGLE_SHEETS_CONNECTED' && event.data.success) {
+            clearInterval(checkClosed);
+            window.removeEventListener('message', messageListener);
+            popup?.close();
+            
+            toast({
+              title: "Connected!",
+              description: "Please go to your dashboard to link your Google Sheet, then try exporting again.",
+            });
+          }
+        };
+        window.addEventListener('message', messageListener);
+        return;
+      }
+
+      // Check if spreadsheet ID is set
+      if (!statusData.spreadsheetId) {
+        toast({
+          title: "Sheet Not Linked",
+          description: "Please go to your dashboard and link a Google Sheet first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Export the lot to Google Sheets
+      const response = await apiRequest('POST', `/api/lots/${lot.id}/export-to-sheets`);
+      const responseData = await response.json();
+
+      toast({
+        title: "Success!",
+        description: "Lot exported to Google Sheets successfully. Opening spreadsheet...",
+      });
+
+      // Open the Google Sheets document
+      window.open(responseData.spreadsheetUrl, '_blank');
+    } catch (error) {
+      console.error('Error exporting to Google Sheets:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export lot to Google Sheets. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const assignedParks = isCompanyManager ? (companyParks?.parks || []) : (assignments || []);
 
   // Filter and sort lots using useMemo for performance
@@ -1777,6 +1846,13 @@ export default function ManagerLots() {
                               Special Status
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => handleExportToGoogleSheets(lot)}
+                              data-testid={`button-export-sheets-lot-${lot.id}`}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              Send to Google Sheet
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleToggleActive(lot.id)}
                               disabled={toggleLotActiveMutation.isPending}
                               data-testid={`button-toggle-lot-${lot.id}`}
@@ -1944,6 +2020,10 @@ export default function ManagerLots() {
                             <DropdownMenuItem onClick={() => handleAssignSpecialStatus(lot)}>
                               <Tag className="w-4 h-4 mr-2" />
                               Special Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExportToGoogleSheets(lot)}>
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              Send to Google Sheet
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => toggleVisibility(lot.id, !lot.isActive)}>
                               {lot.isActive ? (

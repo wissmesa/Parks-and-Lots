@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { CalendarConnection } from "@/components/ui/calendar-connection";
+import { SheetsConnection } from "@/components/ui/sheets-connection";
 import { ManagedParksDisplay } from "@/components/ui/managed-parks-display";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -128,8 +129,13 @@ export default function ManagerDashboard() {
           </div>
 
           {/* Calendar Connection */}
-          <div className="mb-8">
+          <div className="mb-4">
             <CalendarConnection />
+          </div>
+
+          {/* Google Sheets Connection */}
+          <div className="mb-8">
+            <SheetsConnection />
           </div>
 
           {/* Quick Stats */}

@@ -190,6 +190,8 @@ export const oauthAccounts = pgTable("oauth_accounts", {
   refreshToken: text("refresh_token"),
   tokenExpiry: timestamp("token_expiry"),
   externalCalendarId: varchar("external_calendar_id"),
+  spreadsheetId: varchar("spreadsheet_id"), // For Google Sheets integration
+  scope: text("scope"), // Store OAuth scopes
 });
 
 // Tenants table

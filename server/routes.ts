@@ -21,6 +21,7 @@ import {
 } from "./auth";
 import { calendarService } from "./calendar";
 import { googleCalendarService } from "./google-calendar";
+import { googleSheetsService } from "./google-sheets";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -1409,6 +1410,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Google Calendar disconnect error:', error);
       res.status(500).json({ message: 'Failed to disconnect calendar' });
+    }
+  });
+
+  // Google Sheets OAuth routes
+  app.get('/api/auth/google-sheets/connect', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const state = `${user.id}:${randomBytes(16).toString('hex')}`;
+      const authUrl = googleSheetsService.generateAuthUrl(state);
+      
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Google Sheets auth URL generation error:', error);
+      res.status(500).json({ message: 'Failed to generate authorization URL' });
+    }
+  });
+
+  app.get('/api/auth/google-sheets/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        return res.status(400).send('Missing authorization code or state');
+      }
+
+      // Extract and validate user ID from state
+      const stateStr = state as string;
+      const [stateUserId, stateNonce] = stateStr.split(':');
+      
+      if (!stateUserId || !stateNonce) {
+        return res.status(400).send('Invalid state parameter format');
+      }
+      
+      // Validate that the user exists and has appropriate role
+      const user = await storage.getUser(stateUserId);
+      if (!user || !['ADMIN', 'MANAGER', 'COMPANY_MANAGER'].includes(user.role)) {
+        return res.status(403).send('Invalid user or insufficient permissions');
+      }
+
+      // Exchange code for tokens
+      const tokens = await googleSheetsService.exchangeCodeForTokens(code as string);
+      
+      // Store tokens for the user from state
+      await googleSheetsService.storeTokens(stateUserId, tokens);
+      
+      // Return success page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Google Sheets Connected</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .success { color: #059669; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="success">✅ Google Sheets Connected</div>
+          <div class="message">You can now export lot data to Google Sheets. This window will close automatically.</div>
+          <script>
+            // Notify parent window that connection was successful
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: true }, '*');
+            }
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('Google Sheets OAuth callback error:', error);
+      
+      // Return error page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .error { color: #dc2626; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="error">❌ Connection Failed</div>
+          <div class="message">Please try again or close this window.</div>
+          <script>
+            // Notify parent window that connection failed
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: false }, '*');
+            }
+            // Auto-close after 3 seconds
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
+  });
+
+  app.get('/api/auth/google-sheets/status', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const account = await storage.getOAuthAccount(user.id, 'google-sheets');
+      res.json({ 
+        connected: !!account,
+        spreadsheetId: account?.spreadsheetId || null 
+      });
+    } catch (error) {
+      console.error('Google Sheets status check error:', error);
+      res.status(500).json({ message: 'Failed to check Google Sheets connection status' });
+    }
+  });
+
+  app.post('/api/auth/google-sheets/set-spreadsheet', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const { spreadsheetId } = req.body;
+      
+      if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+        return res.status(400).json({ message: 'Spreadsheet ID is required' });
+      }
+
+      // Verify that user has Google Sheets connected first
+      const account = await storage.getOAuthAccount(user.id, 'google-sheets');
+      if (!account) {
+        return res.status(400).json({ message: 'Please connect Google Sheets first' });
+      }
+
+      await googleSheetsService.setSpreadsheetId(user.id, spreadsheetId);
+      res.json({ message: 'Spreadsheet ID saved successfully', spreadsheetId });
+    } catch (error) {
+      console.error('Set spreadsheet ID error:', error);
+      res.status(500).json({ message: 'Failed to save spreadsheet ID' });
+    }
+  });
+
+  app.post('/api/auth/google-sheets/disconnect', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      await storage.deleteOAuthAccount(user.id, 'google-sheets');
+      res.json({ message: 'Google Sheets disconnected successfully' });
+    } catch (error) {
+      console.error('Google Sheets disconnect error:', error);
+      res.status(500).json({ message: 'Failed to disconnect Google Sheets' });
+    }
+  });
+
+  // Export lot to Google Sheets
+  app.post('/api/lots/:id/export-to-sheets', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req: AuthRequest, res) => {
+    try {
+      const lotId = req.params.id;
+      const user = req.user!;
+      
+      // Get the lot data
+      const lot = await storage.getLot(lotId);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+
+      // Check if user has access to this lot
+      if (user.role === 'MANAGER') {
+        const assignments = await storage.getManagerAssignments(user.id);
+        const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'You do not have access to this lot' });
+        }
+      } else if (user.role === 'COMPANY_MANAGER') {
+        const park = await storage.getPark(lot.parkId);
+        const hasAccess = park && park.companyId === user.companyId;
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'You do not have access to this lot' });
+        }
+      }
+
+      // Get lot with park info for export
+      const lotsWithParkInfo = await storage.getLotsWithParkInfo({ includeInactive: true });
+      const lotWithPark = lotsWithParkInfo.find(l => l.id === lotId);
+      
+      if (!lotWithPark) {
+        return res.status(404).json({ message: 'Lot details not found' });
+      }
+
+      // Export to Google Sheets
+      const result = await googleSheetsService.exportLotToSheet(user.id, lotWithPark);
+      
+      res.json({
+        message: 'Lot exported to Google Sheets successfully',
+        spreadsheetId: result.spreadsheetId,
+        spreadsheetUrl: result.spreadsheetUrl
+      });
+    } catch (error) {
+      console.error('Export lot to Google Sheets error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export lot to Google Sheets';
+      res.status(500).json({ message: errorMessage });
+    }
+  });
+
+  // Export multiple lots to Google Sheets
+  app.post('/api/lots/export-to-sheets', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req: AuthRequest, res) => {
+    try {
+      const { lotIds } = req.body;
+      const user = req.user!;
+      
+      if (!lotIds || !Array.isArray(lotIds) || lotIds.length === 0) {
+        return res.status(400).json({ message: 'Lot IDs are required' });
+      }
+
+      // Get all lots with park info
+      const lotsWithParkInfo = await storage.getLotsWithParkInfo({ includeInactive: true });
+      
+      // Filter and check access
+      const lots = [];
+      for (const lotId of lotIds) {
+        const lot = await storage.getLot(lotId);
+        const lotWithPark = lotsWithParkInfo.find(l => l.id === lotId);
+        
+        if (lot && lotWithPark) {
+          // Check if user has access to this lot
+          if (user.role === 'MANAGER') {
+            const assignments = await storage.getManagerAssignments(user.id);
+            const hasAccess = assignments.some(assignment => assignment.parkId === lot.parkId);
+            if (hasAccess) {
+              lots.push(lotWithPark);
+            }
+          } else if (user.role === 'COMPANY_MANAGER') {
+            const park = await storage.getPark(lot.parkId);
+            const hasAccess = park && park.companyId === user.companyId;
+            if (hasAccess) {
+              lots.push(lotWithPark);
+            }
+          } else {
+            lots.push(lotWithPark);
+          }
+        }
+      }
+
+      if (lots.length === 0) {
+        return res.status(404).json({ message: 'No accessible lots found' });
+      }
+
+      // Export to Google Sheets
+      const result = await googleSheetsService.exportMultipleLotsToSheet(user.id, lots);
+      
+      res.json({
+        message: `${lots.length} lots exported to Google Sheets successfully`,
+        spreadsheetId: result.spreadsheetId,
+        spreadsheetUrl: result.spreadsheetUrl
+      });
+    } catch (error) {
+      console.error('Export lots to Google Sheets error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to export lots to Google Sheets';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
