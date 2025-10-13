@@ -62,6 +62,11 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
     }
   }, [selectedSlot]);
 
+  // Clear selected time when date changes to force reselection
+  useEffect(() => {
+    setSelectedTime("");
+  }, [selectedDate]);
+
   const bookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
       const response = await apiRequest("POST", `/api/lots/${lotId}/book`, bookingData);
@@ -162,13 +167,34 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   };
 
   // Generate available time slots (8am to 7pm in 30-minute intervals to match availability grid)
-  const timeSlots = [];
-  for (let hour = 8; hour <= 19; hour++) {
-    timeSlots.push(`${hour.toString().padStart(2, '0')}:00`); // Top of hour
-    if (hour < 19) { // Don't add 7:30pm, end at 7:00pm
-      timeSlots.push(`${hour.toString().padStart(2, '0')}:30`); // Half hour
+  const getAvailableTimeSlots = () => {
+    const slots = [];
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const isToday = selectedDate === today;
+    
+    for (let hour = 8; hour <= 19; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        if (hour === 19 && minute > 0) break; // Don't add past 7:00pm
+        
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        
+        // If today, only show times that are in the future
+        if (isToday) {
+          const slotTime = new Date(`${selectedDate}T${timeString}:00`);
+          if (slotTime <= now) {
+            continue; // Skip past times
+          }
+        }
+        
+        slots.push(timeString);
+      }
     }
-  }
+    
+    return slots;
+  };
+
+  const timeSlots = getAvailableTimeSlots();
 
   return (
     <Card data-testid="booking-form">
@@ -248,18 +274,31 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
             )}
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
               <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                required
-                min={new Date().toISOString().split('T')[0]}
-                data-testid="input-booking-date"
-              />
+              <Select value={selectedDate} onValueChange={setSelectedDate}>
+                <SelectTrigger data-testid="select-booking-date">
+                  <SelectValue placeholder="Select a date" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + i);
+                    const dateString = date.toISOString().split('T')[0];
+                    const displayDate = date.toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    });
+                    return (
+                      <SelectItem key={dateString} value={dateString}>
+                        {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : displayDate}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="time">Time</Label>
