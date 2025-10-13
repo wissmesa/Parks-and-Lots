@@ -21,6 +21,7 @@ interface Park {
   id: string;
   name: string;
   description: string;
+  meetingPlace?: string;
   address: string;
   city: string;
   state: string;
@@ -58,6 +59,7 @@ export default function ManagerParks() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    meetingPlace: "",
     address: "",
     city: "",
     state: "",
@@ -149,6 +151,7 @@ export default function ManagerParks() {
     setFormData({
       name: "",
       description: "",
+      meetingPlace: "",
       address: "",
       city: "",
       state: "",
@@ -171,6 +174,7 @@ export default function ManagerParks() {
     setFormData({
       name: park.name,
       description: park.description,
+      meetingPlace: park.meetingPlace || "",
       address: park.address,
       city: park.city,
       state: park.state,
@@ -556,7 +560,7 @@ export default function ManagerParks() {
 
           {/* Edit Park Dialog */}
           <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-            <DialogContent className="max-w-2xl mx-4">
+            <DialogContent className="max-w-3xl mx-4 max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Edit Park</DialogTitle>
               </DialogHeader>
@@ -578,6 +582,17 @@ export default function ManagerParks() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     data-testid="input-park-description"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="meetingPlace">Meeting Place</Label>
+                  <Textarea
+                    id="meetingPlace"
+                    value={formData.meetingPlace}
+                    onChange={(e) => setFormData({ ...formData, meetingPlace: e.target.value })}
+                    rows={2}
+                    placeholder="Describe where to meet for showings (e.g., front office, clubhouse)"
+                    data-testid="input-park-meeting-place"
                   />
                 </div>
                 <div>

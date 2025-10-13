@@ -1312,7 +1312,7 @@ export default function AdminLots() {
                             data-testid={`visibility-filter-${visibility}`}
                           />
                           <Label htmlFor={`visibility-${visibility}`} className="text-sm cursor-pointer">
-                            {visibility === "visible" ? "Visible" : "Hidden"}
+                            {visibility === "visible" ? "On Market" : "Out of Market"}
                           </Label>
                         </div>
                       ))}
@@ -1645,7 +1645,7 @@ export default function AdminLots() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={lot.isActive ? 'default' : 'secondary'}>
-                          {lot.isActive ? 'Visible' : 'Hidden'}
+                          {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -1708,7 +1708,7 @@ export default function AdminLots() {
                               data-testid={`toggle-lot-${lot.id}`}
                             >
                               {lot.isActive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                              {lot.isActive ? 'Hide Lot' : 'Show Lot'}
+                              {lot.isActive ? 'Take off Market' : 'Put on Market'}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
@@ -1746,7 +1746,7 @@ export default function AdminLots() {
                           <p className="text-sm text-muted-foreground">{lot.park?.name || 'Unknown Park'}</p>
                         </div>
                         <Badge variant={lot.isActive ? 'default' : 'destructive'} className="ml-2">
-                          {lot.isActive ? 'Visible' : 'Hidden'}
+                          {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
                       </div>
                       
@@ -1892,12 +1892,12 @@ export default function AdminLots() {
                             {lot.isActive ? (
                               <>
                                 <EyeOff className="w-4 h-4 mr-2" />
-                                Hide Lot
+                                Take off Market
                               </>
                             ) : (
                               <>
                                 <Eye className="w-4 h-4 mr-2" />
-                                Show Lot
+                                Put on Market
                               </>
                             )}
                           </DropdownMenuItem>

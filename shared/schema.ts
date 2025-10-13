@@ -79,6 +79,7 @@ export const parks = pgTable("parks", {
   state: varchar("state").notNull(),
   zip: varchar("zip").notNull(),
   description: text("description"),
+  meetingPlace: text("meeting_place"),
   amenities: text("amenities").array(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

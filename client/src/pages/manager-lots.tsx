@@ -1421,7 +1421,7 @@ export default function ManagerLots() {
                               data-testid={`manager-visibility-filter-${visibility}`}
                             />
                             <Label htmlFor={`manager-visibility-${visibility}`} className="text-sm cursor-pointer">
-                              {visibility === "visible" ? "Visible" : "Hidden"}
+                              {visibility === "visible" ? "On Market" : "Out of Market"}
                             </Label>
                           </div>
                         ))}
@@ -1670,7 +1670,7 @@ export default function ManagerLots() {
                         <p className="text-sm text-muted-foreground">{lot.park.name}</p>
                       </div>
                       <Badge variant={lot.isActive ? 'default' : 'destructive'} className="ml-2">
-                        {lot.isActive ? 'Visible' : 'Hidden'}
+                        {lot.isActive ? 'On Market' : 'Out of Market'}
                       </Badge>
                     </div>
                     
@@ -1858,7 +1858,7 @@ export default function ManagerLots() {
                               data-testid={`button-toggle-lot-${lot.id}`}
                             >
                               {lot.isActive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-                              {lot.isActive ? 'Hide Lot' : 'Show Lot'}
+                              {lot.isActive ? 'Take off Market' : 'Put on Market'}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDelete(lot.id)}
@@ -1954,7 +1954,7 @@ export default function ManagerLots() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={lot.isActive ? 'default' : 'destructive'}>
-                          {lot.isActive ? 'Visible' : 'Hidden'}
+                          {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -2029,12 +2029,12 @@ export default function ManagerLots() {
                               {lot.isActive ? (
                                 <>
                                   <EyeOff className="w-4 h-4 mr-2" />
-                                  Hide Lot
+                                  Take off Market
                                 </>
                               ) : (
                                 <>
                                   <Eye className="w-4 h-4 mr-2" />
-                                  Show Lot
+                                  Put on Market
                                 </>
                               )}
                             </DropdownMenuItem>

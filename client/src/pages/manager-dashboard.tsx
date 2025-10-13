@@ -186,7 +186,7 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Visible Lots</p>
+                    <p className="text-sm text-muted-foreground">Lots On Market</p>
                     <p className="text-2xl font-bold text-foreground" data-testid="text-visible-lots">{managerStats.availableLots}</p>
                   </div>
                   <Home className="w-8 h-8 text-accent" />
