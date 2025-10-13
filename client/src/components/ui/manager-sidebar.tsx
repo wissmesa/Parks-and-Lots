@@ -28,9 +28,9 @@ export function ManagerSidebar() {
   
   const navigationItems = [
     { href: basePath, icon: LayoutDashboard, label: "Dashboard" },
-    { href: `${basePath}/parks`, icon: TreePine, label: isCompanyManager ? "Company Parks" : "My Parks" },
-    { href: `${basePath}/lots`, icon: Home, label: isCompanyManager ? "Company Lots" : "My Lots" },
-    { href: `${basePath}/tenants`, icon: Users, label: isCompanyManager ? "Company Tenants" : "My Tenants" },
+    { href: `${basePath}/parks`, icon: TreePine, label: isCompanyManager ? "My Parks" : "My Parks" },
+    { href: `${basePath}/lots`, icon: Home, label: isCompanyManager ? "My Lots" : "My Lots" },
+    { href: `${basePath}/tenants`, icon: Users, label: isCompanyManager ? "My Tenants" : "My Tenants" },
     { href: `${basePath}/bookings`, icon: Calendar, label: "Bookings" },
     ...(isCompanyManager ? [{ href: `${basePath}/invites`, icon: UserPlus, label: "Manager Invites" }] : []),
   ];
@@ -61,7 +61,7 @@ export function ManagerSidebar() {
           const Icon = item.icon;
           const isParksOption = item.href === `${basePath}/parks`;
           
-          // For Tammie, only show Company Parks option, others show "Coming Soon"
+          // For Tammie, only show My Parks option, others show "Coming Soon"
           if (isTammie && !isParksOption) {
             return (
               <div key={item.href} className="flex items-center space-x-3 px-3 py-2 rounded-lg text-muted-foreground cursor-not-allowed">

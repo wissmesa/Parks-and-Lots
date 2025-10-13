@@ -84,7 +84,7 @@ export default function ManagerDashboard() {
     );
   }
 
-  // Special restriction for Tammie - only allow Company Parks access
+  // Special restriction for Tammie - only allow My Parks access
   if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
@@ -95,7 +95,7 @@ export default function ManagerDashboard() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
-                  <p className="text-muted-foreground">This feature is not yet available. Please use the Company Parks option from the menu.</p>
+                  <p className="text-muted-foreground">This feature is not yet available. Please use the My Parks option from the menu.</p>
                 </CardContent>
               </Card>
             </div>
@@ -121,7 +121,7 @@ export default function ManagerDashboard() {
             {/* Managed Parks Display */}
             <ManagedParksDisplay
               parks={assignedParksArray}
-              title={isCompanyManager ? "Company Parks" : "My Parks"}
+              title={isCompanyManager ? "My Parks" : "My Parks"}
               emptyMessage={isCompanyManager ? "No company parks assigned" : "No parks assigned to you yet"}
               isAssignment={!isCompanyManager}
               className="mb-6"
@@ -158,7 +158,7 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'Company Parks' : 'My Parks'}</p>
+                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'My Parks' : 'My Parks'}</p>
                     <p className="text-2xl font-bold text-foreground" data-testid="text-my-parks">
                       {isCompanyManager ? (managerStats.totalParks || 0) : managerStats.parkCount}
                     </p>
@@ -172,7 +172,7 @@ export default function ManagerDashboard() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'Company Lots' : 'My Lots'}</p>
+                    <p className="text-sm text-muted-foreground">{isCompanyManager ? 'My Lots' : 'My Lots'}</p>
                     <p className="text-2xl font-bold text-foreground" data-testid="text-my-lots">
                       {isCompanyManager ? (managerStats.activeLots || 0) : managerStats.totalLots}
                     </p>

@@ -74,7 +74,7 @@ export function Navigation() {
                       size="sm" 
                       className={isOnManagerPage ? "hidden md:inline-flex" : ""}
                     >
-                      Company Manager Panel
+                      My Manager Panel
                     </Button>
                   </Link>
                 )}

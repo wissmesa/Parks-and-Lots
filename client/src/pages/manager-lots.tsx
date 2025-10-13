@@ -1024,7 +1024,7 @@ export default function ManagerLots() {
     );
   }
 
-  // Special restriction for Tammie - only allow Company Parks access
+  // Special restriction for Tammie - only allow My Parks access
   if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
@@ -1035,7 +1035,7 @@ export default function ManagerLots() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <h2 className="text-xl font-semibold mb-2">Coming Soon</h2>
-                  <p className="text-muted-foreground">This feature is not yet available. Please use the Company Parks option from the menu.</p>
+                  <p className="text-muted-foreground">This feature is not yet available. Please use the My Parks option from the menu.</p>
                 </CardContent>
               </Card>
             </div>
