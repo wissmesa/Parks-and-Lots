@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook } from "lucide-react";
 import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
@@ -161,10 +162,39 @@ export default function ManagerParks() {
     setNewAmenity('');
   };
 
+  const availableColors = [
+    { color: '#EF4444', name: 'Red' },
+    { color: '#F97316', name: 'Orange' },
+    { color: '#F59E0B', name: 'Amber' },
+    { color: '#EAB308', name: 'Yellow' },
+    { color: '#84CC16', name: 'Lime' },
+    { color: '#22C55E', name: 'Green' },
+    { color: '#10B981', name: 'Emerald' },
+    { color: '#14B8A6', name: 'Teal' },
+    { color: '#06B6D4', name: 'Cyan' },
+    { color: '#0EA5E9', name: 'Sky' },
+    { color: '#3B82F6', name: 'Blue' },
+    { color: '#6366F1', name: 'Indigo' },
+    { color: '#8B5CF6', name: 'Violet' },
+    { color: '#A855F7', name: 'Purple' },
+    { color: '#D946EF', name: 'Fuchsia' },
+    { color: '#EC4899', name: 'Pink' },
+    { color: '#F43F5E', name: 'Rose' },
+    { color: '#64748B', name: 'Slate' },
+    { color: '#6B7280', name: 'Gray' },
+    { color: '#78716C', name: 'Stone' }
+  ];
+
+  const getFirstAvailableColor = () => {
+    const usedColors = specialStatuses.map(s => s.color);
+    const availableColor = availableColors.find(c => !usedColors.includes(c.color));
+    return availableColor ? availableColor.color : "#3B82F6";
+  };
+
   const resetStatusForm = () => {
     setStatusFormData({
       name: "",
-      color: "#3B82F6",
+      color: getFirstAvailableColor(),
       isActive: true
     });
   };
@@ -234,6 +264,13 @@ export default function ManagerParks() {
     queryKey: ["/api/parks", manageSpecialStatuses?.id, "special-statuses"],
     enabled: !!manageSpecialStatuses?.id,
   });
+
+  // Reset form with first available color when opening dialog for new status
+  useEffect(() => {
+    if (manageSpecialStatuses && !editingStatus) {
+      resetStatusForm();
+    }
+  }, [manageSpecialStatuses, specialStatuses]);
 
   const createStatusMutation = useMutation({
     mutationFn: async (data: typeof statusFormData) => {
@@ -811,23 +848,50 @@ export default function ManagerParks() {
                       
                       <div>
                         <Label htmlFor="status-color">Status Color</Label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            id="status-color"
-                            value={statusFormData.color}
-                            onChange={(e) => setStatusFormData({ ...statusFormData, color: e.target.value })}
-                            className="w-12 h-8 rounded border"
-                            data-testid="input-status-color"
-                          />
-                          <Input
-                            value={statusFormData.color}
-                            onChange={(e) => setStatusFormData({ ...statusFormData, color: e.target.value })}
-                            placeholder="#3B82F6"
-                            className="font-mono"
-                            data-testid="input-status-color-text"
-                          />
-                        </div>
+                        <Select
+                          value={statusFormData.color}
+                          onValueChange={(value) => setStatusFormData({ ...statusFormData, color: value })}
+                        >
+                          <SelectTrigger id="status-color" className="w-full" data-testid="select-status-color">
+                            <SelectValue>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="w-4 h-4 rounded border"
+                                  style={{ backgroundColor: statusFormData.color }}
+                                />
+                                <span className="font-mono">{statusFormData.color}</span>
+                              </div>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableColors.map(({ color, name }) => {
+                              const existingStatus = specialStatuses.find(
+                                s => s.color === color && s.id !== editingStatus?.id
+                              );
+                              const isDisabled = !!existingStatus;
+                              
+                              return (
+                                <SelectItem key={color} value={color} disabled={isDisabled}>
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className="w-4 h-4 rounded border"
+                                      style={{ backgroundColor: color }}
+                                    />
+                                    <span className={isDisabled ? 'text-muted-foreground' : ''}>{name}</span>
+                                    <span className={`text-xs font-mono ml-auto ${isDisabled ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                      {color}
+                                    </span>
+                                    {isDisabled && (
+                                      <span className="text-xs text-muted-foreground italic">
+                                        (Used by {existingStatus.name})
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
                       </div>
                       
                       <div className="flex items-center gap-2">
