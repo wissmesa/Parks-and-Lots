@@ -4591,22 +4591,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDt = new Date(bookingData.startDt);
       const endDt = new Date(bookingData.endDt);
 
-      // Check for overlaps with existing showings
-      const hasOverlap = await storage.checkShowingOverlap(lotId, startDt, endDt);
-      if (hasOverlap) {
-        return res.status(409).json({ message: 'Time slot is not available due to existing booking' });
-      }
-
-      // Check for manager's Google Calendar conflicts
+      // Check for manager's Google Calendar conflicts (ONLY source of truth for availability)
       try {
         if (await googleCalendarService.isCalendarConnected(managerId)) {
+          console.log(`[Booking] Checking calendar conflicts for manager ${managerId} from ${startDt.toISOString()} to ${endDt.toISOString()}`);
           const hasCalendarConflict = await googleCalendarService.checkCalendarConflicts(managerId, startDt, endDt);
           if (hasCalendarConflict) {
+            console.log(`[Booking] ❌ Calendar conflict detected - rejecting booking`);
             return res.status(409).json({ message: 'Time slot is not available - manager has a calendar conflict' });
           }
+          console.log(`[Booking] ✅ No calendar conflicts - proceeding with booking`);
+        } else {
+          console.log(`[Booking] ⚠️ Manager calendar not connected - allowing booking without calendar check`);
         }
       } catch (error) {
-        console.error('Error checking calendar conflicts:', error);
+        console.error('[Booking] Error checking calendar conflicts:', error);
         // Continue with booking if calendar check fails
       }
 

@@ -269,20 +269,50 @@ export class GoogleCalendarService {
     try {
       const calendar = await this.createCalendarClient(userId);
       
+      // Query a wider range to catch events that might overlap
+      // (events that start before our slot but end during it)
+      const queryStart = new Date(startTime.getTime() - 24 * 60 * 60 * 1000); // 1 day before
+      const queryEnd = new Date(endTime.getTime() + 24 * 60 * 60 * 1000); // 1 day after
+      
       const response = await calendar.events.list({
         calendarId: 'primary',
-        timeMin: startTime.toISOString(),
-        timeMax: endTime.toISOString(),
+        timeMin: queryStart.toISOString(),
+        timeMax: queryEnd.toISOString(),
         singleEvents: true,
         orderBy: 'startTime'
       });
 
       const events = response.data.items || [];
       
-      // Check for any events during the requested time slot
-      return events.length > 0;
+      console.log(`[GoogleCalendar] Found ${events.length} events in expanded range for conflict check`);
+      
+      // Check for REAL overlaps using STRICT logic (events that touch boundaries should NOT conflict)
+      for (const event of events) {
+        const eventStart = event.start?.dateTime ? new Date(event.start.dateTime) : null;
+        const eventEnd = event.end?.dateTime ? new Date(event.end.dateTime) : null;
+        
+        if (!eventStart || !eventEnd) continue;
+        
+        // Use STRICT overlap logic: events that touch boundaries should NOT conflict
+        const overlaps = (
+          (eventStart > startTime && eventStart < endTime) ||  // event starts during slot (not at boundary)
+          (eventEnd > startTime && eventEnd < endTime) ||      // event ends during slot (not at boundary)
+          (eventStart <= startTime && eventEnd >= endTime)     // event wraps entire slot
+        );
+        
+        if (overlaps) {
+          console.log(`[GoogleCalendar] ❌ Conflict detected with event "${event.summary}":`, {
+            requestedSlot: `${startTime.toISOString()} - ${endTime.toISOString()}`,
+            eventSlot: `${eventStart.toISOString()} - ${eventEnd.toISOString()}`
+          });
+          return true;
+        }
+      }
+      
+      console.log(`[GoogleCalendar] ✅ No conflicts found for slot ${startTime.toISOString()} - ${endTime.toISOString()}`);
+      return false;
     } catch (error) {
-      console.error('Error checking calendar conflicts:', error);
+      console.error('[GoogleCalendar] Error checking calendar conflicts:', error);
       // If calendar check fails, assume no conflicts to allow booking
       return false;
     }

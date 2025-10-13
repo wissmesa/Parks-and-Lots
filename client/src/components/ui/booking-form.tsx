@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,19 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   useEffect(() => {
     setSelectedTime("");
   }, [selectedDate]);
+
+  // Query to get manager's busy slots for the next 7 days
+  const { data: managerAvailability } = useQuery({
+    queryKey: ["/api/lots", lotId, "manager-availability"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/lots/${lotId}/manager-availability`);
+      return response.json();
+    },
+    enabled: !!lotId,
+  });
+
+  // NOTE: We no longer query existing showings from database
+  // Available time slots are calculated ONLY from manager's Google Calendar availability
 
   const bookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
@@ -166,31 +179,73 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
     bookingMutation.mutate(bookingData);
   };
 
-  // Generate available time slots (8am to 7pm in 30-minute intervals to match availability grid)
+  // Generate available time slots (8am to 7pm in 30-minute intervals, filtered by manager availability and existing showings)
   const getAvailableTimeSlots = () => {
+    if (!selectedDate) {
+      console.log('[BookingForm] No date selected, returning empty slots');
+      return [];
+    }
+    
+    console.log(`[BookingForm] Generating slots for date: ${selectedDate}`);
+    
     const slots = [];
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const isToday = selectedDate === today;
+    const busySlots = managerAvailability?.busySlots || [];
+    
+    console.log(`[BookingForm] Manager busy slots:`, busySlots.length);
+    console.log(`[BookingForm] Busy slot details:`, busySlots);
     
     for (let hour = 8; hour <= 19; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         if (hour === 19 && minute > 0) break; // Don't add past 7:00pm
         
         const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const slotStart = new Date(`${selectedDate}T${timeString}:00`);
+        const slotEnd = new Date(slotStart.getTime());
+        slotEnd.setMinutes(slotEnd.getMinutes() + SHOWING_DURATION_MINUTES);
         
-        // If today, only show times that are in the future
-        if (isToday) {
-          const slotTime = new Date(`${selectedDate}T${timeString}:00`);
-          if (slotTime <= now) {
-            continue; // Skip past times
+        // Skip past times if today
+        if (isToday && slotStart <= now) {
+          continue;
+        }
+        
+        // Check if this slot conflicts with any busy slot from manager's Google Calendar
+        // This is the ONLY source of truth for availability
+        let isAvailable = true;
+        
+        for (const busySlot of busySlots) {
+          const busyStart = new Date(busySlot.start);
+          const busyEnd = new Date(busySlot.end);
+          
+          // Use STRICT overlap logic: events that touch boundaries should NOT conflict
+          // Only detect REAL overlaps where times actually intersect, not just touch
+          const overlaps = (
+            (busyStart > slotStart && busyStart < slotEnd) ||  // busy starts during slot (not at boundary)
+            (busyEnd > slotStart && busyEnd < slotEnd) ||      // busy ends during slot (not at boundary)
+            (busyStart <= slotStart && busyEnd >= slotEnd)     // busy wraps entire slot
+          );
+          
+          if (overlaps) {
+            console.log(`[BookingForm] ❌ Slot ${timeString} blocked by calendar event:`, {
+              slotLocal: `${slotStart.toLocaleString()} - ${slotEnd.toLocaleString()}`,
+              busyLocal: `${busyStart.toLocaleString()} - ${busyEnd.toLocaleString()}`,
+              slotUTC: `${slotStart.toISOString()} - ${slotEnd.toISOString()}`,
+              busyUTC: `${busyStart.toISOString()} - ${busyEnd.toISOString()}`
+            });
+            isAvailable = false;
+            break;
           }
         }
         
-        slots.push(timeString);
+        if (isAvailable) {
+          slots.push(timeString);
+        }
       }
     }
     
+    console.log(`[BookingForm] ✅ Total available slots for ${selectedDate}: ${slots.length}`, slots);
     return slots;
   };
 

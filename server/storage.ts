@@ -808,12 +808,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async checkShowingOverlap(lotId: string, startDt: Date, endDt: Date, excludeId?: string): Promise<boolean> {
+    // Use STRICT overlap logic: events that touch boundaries (e.g., 9:30-10:00 and 10:00-10:30) should NOT conflict
+    // Only detect REAL overlaps where times actually intersect, not just touch
     const conditions = [
       eq(showings.lotId, lotId),
       or(
-        and(gte(showings.startDt, startDt), lte(showings.startDt, endDt)),
-        and(gte(showings.endDt, startDt), lte(showings.endDt, endDt)),
-        and(lte(showings.startDt, startDt), gte(showings.endDt, endDt))
+        and(sql`${showings.startDt} > ${startDt}`, sql`${showings.startDt} < ${endDt}`), // showing starts during slot (not at boundary)
+        and(sql`${showings.endDt} > ${startDt}`, sql`${showings.endDt} < ${endDt}`),     // showing ends during slot (not at boundary)
+        and(lte(showings.startDt, startDt), gte(showings.endDt, endDt))                   // showing wraps entire slot
       ),
       eq(showings.status, 'SCHEDULED')
     ];
