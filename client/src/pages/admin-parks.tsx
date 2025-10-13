@@ -440,7 +440,7 @@ export default function AdminParks() {
                   Add Park
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl mx-4">
                 <DialogHeader>
                   <DialogTitle>Create New Park</DialogTitle>
                 </DialogHeader>
@@ -756,7 +756,7 @@ export default function AdminParks() {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl mx-4">
             <DialogHeader>
               <DialogTitle>Edit Park</DialogTitle>
             </DialogHeader>

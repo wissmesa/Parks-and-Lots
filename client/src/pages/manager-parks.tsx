@@ -556,7 +556,7 @@ export default function ManagerParks() {
 
           {/* Edit Park Dialog */}
           <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl mx-4">
               <DialogHeader>
                 <DialogTitle>Edit Park</DialogTitle>
               </DialogHeader>
