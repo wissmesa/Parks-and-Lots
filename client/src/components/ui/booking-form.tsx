@@ -39,7 +39,8 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
         error = validateRequired(value, 'Full name');
         break;
       case 'clientEmail':
-        error = validateEmail(value);
+        // Email is optional - only validate if provided
+        error = value ? validateEmail(value) : '';
         break;
       case 'clientPhone':
         error = validatePhone(value);
@@ -140,12 +141,12 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate all fields
+    // Validate all fields (email is optional)
     const nameValid = validateField('clientName', clientName);
     const emailValid = validateField('clientEmail', clientEmail);
     const phoneValid = validateField('clientPhone', clientPhone);
     
-    if (!nameValid || !emailValid || !phoneValid) {
+    if (!nameValid || !phoneValid || (clientEmail && !emailValid)) {
       toast({
         title: "Validation Error",
         description: "Please fix the errors in the form before submitting.",
@@ -282,7 +283,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
           </div>
           
           <div>
-            <Label htmlFor="clientEmail">Email</Label>
+            <Label htmlFor="clientEmail">Email <span className="text-muted-foreground text-sm">(Optional)</span></Label>
             <Input
               id="clientEmail"
               type="email"
@@ -292,7 +293,6 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
                 validateField('clientEmail', e.target.value);
               }}
               onBlur={(e) => validateField('clientEmail', e.target.value)}
-              required
               placeholder="your@email.com"
               data-testid="input-client-email"
               className={validationErrors.clientEmail ? 'border-red-500' : ''}

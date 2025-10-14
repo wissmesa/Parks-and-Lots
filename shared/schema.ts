@@ -471,7 +471,7 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 
 export const bookingSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
-  clientEmail: z.string().email("Please enter a valid email address"),
+  clientEmail: z.string().email("Please enter a valid email address").optional().or(z.literal('')),
   clientPhone: z.string().regex(
     /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
     "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"

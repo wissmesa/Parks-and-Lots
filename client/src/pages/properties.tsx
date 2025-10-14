@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import { 
   Bed, 
   Bath, 
@@ -109,11 +110,11 @@ export default function Properties() {
   
   // Pagination state for lots
   const [lotsCurrentPage, setLotsCurrentPage] = useState(1);
-  const [lotsItemsPerPage] = useState(50); // Fixed at 50 per page
+  const [lotsItemsPerPage, setLotsItemsPerPage] = useState(20);
   
   // Pagination state for parks
   const [parksCurrentPage, setParksCurrentPage] = useState(1);
-  const [parksItemsPerPage] = useState(50); // Fixed at 50 per page
+  const [parksItemsPerPage, setParksItemsPerPage] = useState(20);
 
   // Parse URL parameters and set search immediately (only on initial load)
   useEffect(() => {
@@ -273,17 +274,6 @@ export default function Properties() {
     setParksCurrentPage(newPage);
   };
 
-  const clearFilters = () => {
-    setSearchInput("");
-    setSearchQuery("");
-    setSelectedState("");
-    setSelectedStatus("");
-    setPriceRange("");
-    setLotsCurrentPage(1);
-    setParksCurrentPage(1);
-    window.history.pushState(null, '', `/properties`);
-  };
-
   const isLoading = parksLoading || lotsLoading;
 
   if (isLoading) {
@@ -371,16 +361,6 @@ export default function Properties() {
                   </Select>
                 </div>
               )}
-
-              <div className="flex justify-end">
-                <Button 
-                  variant="outline" 
-                  onClick={clearFilters}
-                  data-testid="button-clear-filters"
-                >
-                  Clear Filters
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -530,9 +510,31 @@ export default function Properties() {
                 {lotsPagination && (
                   <div className="mt-8 p-6 bg-muted/50 rounded-lg">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      {/* Page info */}
-                      <div className="text-sm text-muted-foreground">
-                        Page {lotsPagination.currentPage} of {lotsPagination.totalPages} • Showing {lotsPagination.startItem}-{lotsPagination.endItem} of {lotsPagination.total} homes
+                      {/* Page info with items per page selector */}
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                          Page {lotsPagination.currentPage} of {lotsPagination.totalPages} • Showing {lotsPagination.startItem}-{lotsPagination.endItem} of {lotsPagination.total} homes
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="lotsPerPage" className="text-sm text-muted-foreground whitespace-nowrap">Items per page:</Label>
+                          <Select 
+                            value={lotsItemsPerPage.toString()} 
+                            onValueChange={(value) => {
+                              setLotsItemsPerPage(Number(value));
+                              setLotsCurrentPage(1); // Reset to first page when changing items per page
+                            }}
+                          >
+                            <SelectTrigger id="lotsPerPage" className="w-20 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       
                       {/* Pagination buttons */}
@@ -632,9 +634,31 @@ export default function Properties() {
                 {parksPagination && (
                   <div className="mt-8 p-6 bg-muted/50 rounded-lg">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      {/* Page info */}
-                      <div className="text-sm text-muted-foreground">
-                        Page {parksPagination.currentPage} of {parksPagination.totalPages} • Showing {parksPagination.startItem}-{parksPagination.endItem} of {parksPagination.total} parks
+                      {/* Page info with items per page selector */}
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                          Page {parksPagination.currentPage} of {parksPagination.totalPages} • Showing {parksPagination.startItem}-{parksPagination.endItem} of {parksPagination.total} parks
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="parksPerPage" className="text-sm text-muted-foreground whitespace-nowrap">Items per page:</Label>
+                          <Select 
+                            value={parksItemsPerPage.toString()} 
+                            onValueChange={(value) => {
+                              setParksItemsPerPage(Number(value));
+                              setParksCurrentPage(1); // Reset to first page when changing items per page
+                            }}
+                          >
+                            <SelectTrigger id="parksPerPage" className="w-20 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                       
                       {/* Pagination buttons */}
