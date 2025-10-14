@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
@@ -14,8 +14,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search } from "lucide-react";
 import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
 
 interface Park {
@@ -80,6 +82,42 @@ export default function ManagerParks() {
   // View toggle state
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
+  // Search and sort state
+  const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Filtering state
+  const [filters, setFilters] = useState({
+    city: [] as string[],
+    state: [] as string[],
+  });
+
+  // Filter helper functions
+  const toggleFilter = (category: keyof typeof filters, value: string) => {
+    if (Array.isArray(filters[category])) {
+      const currentValues = filters[category] as string[];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter(v => v !== value)
+        : [...currentValues, value];
+      setFilters(prev => ({ ...prev, [category]: newValues }));
+    }
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      city: [],
+      state: [],
+    });
+    setSearchText("");
+  };
+
+  const hasActiveFilters = () => {
+    return filters.city.length > 0 ||
+           filters.state.length > 0 ||
+           searchText.trim() !== "";
+  };
+
   // Facebook post dialog state
   const [facebookPostDialog, setFacebookPostDialog] = useState<{
     isOpen: boolean;
@@ -123,6 +161,84 @@ export default function ManagerParks() {
   const isLoading = isCompanyManager 
     ? companyParksLoading 
     : (assignmentsLoading || parksLoading);
+
+  // Filter parks to only show assigned ones
+  const parks = allParks?.filter(park => parkIds.includes(park.id)) || [];
+
+  // Get unique values for filters
+  const uniqueCities = useMemo(() => {
+    const cities = new Set(parks.map(park => park.city).filter(Boolean));
+    return Array.from(cities).sort();
+  }, [parks]);
+
+  const uniqueStates = useMemo(() => {
+    const states = new Set(parks.map(park => park.state).filter(Boolean));
+    return Array.from(states).sort();
+  }, [parks]);
+
+  // Apply filtering and sorting
+  const filteredAndSortedParks = useMemo(() => {
+    if (!parks) return [];
+
+    // Apply filters
+    let filtered = parks.filter((park) => {
+      // Search text filter
+      if (searchText.trim()) {
+        const search = searchText.toLowerCase();
+        const matchesName = park.name?.toLowerCase().includes(search);
+        const matchesCity = park.city?.toLowerCase().includes(search);
+        const matchesState = park.state?.toLowerCase().includes(search);
+        const matchesAddress = park.address?.toLowerCase().includes(search);
+        const matchesDescription = park.description?.toLowerCase().includes(search);
+        
+        if (!matchesName && !matchesCity && !matchesState && !matchesAddress && !matchesDescription) {
+          return false;
+        }
+      }
+
+      // City filter
+      if (filters.city.length > 0 && !filters.city.includes(park.city)) {
+        return false;
+      }
+
+      // State filter
+      if (filters.state.length > 0 && !filters.state.includes(park.state)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortBy) {
+        case "name":
+          aValue = a.name?.toLowerCase() || "";
+          bValue = b.name?.toLowerCase() || "";
+          break;
+        case "city":
+          aValue = a.city?.toLowerCase() || "";
+          bValue = b.city?.toLowerCase() || "";
+          break;
+        case "state":
+          aValue = a.state?.toLowerCase() || "";
+          bValue = b.state?.toLowerCase() || "";
+          break;
+        default:
+          aValue = a.name?.toLowerCase() || "";
+          bValue = b.name?.toLowerCase() || "";
+      }
+
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [parks, searchText, filters, sortBy, sortOrder]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -255,9 +371,6 @@ export default function ManagerParks() {
   const handleDeleteStatus = (statusId: string) => {
     deleteStatusMutation.mutate(statusId);
   };
-
-  // Filter parks to only show assigned ones
-  const parks = allParks?.filter(park => parkIds.includes(park.id)) || [];
 
   // Special status queries and mutations
   const { data: specialStatuses = [], isLoading: statusesLoading } = useQuery<SpecialStatus[]>({
@@ -412,7 +525,7 @@ export default function ManagerParks() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <TreePine className="w-5 h-5" />
-                    Parks ({parks.length})
+                    Parks ({filteredAndSortedParks.length}{parks.length !== filteredAndSortedParks.length ? ` of ${parks.length}` : ''})
                   </CardTitle>
                   
                   {/* View Toggle */}
@@ -435,6 +548,128 @@ export default function ManagerParks() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Search and Filter Controls */}
+                <div className="mt-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        placeholder="Search parks..."
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    {/* Sort Controls */}
+                    <div className="flex items-center gap-2">
+                      <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name">Name</SelectItem>
+                          <SelectItem value="city">City</SelectItem>
+                          <SelectItem value="state">State</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                        className="flex items-center gap-1"
+                      >
+                        {sortOrder === "asc" ? (
+                          <ArrowUp className="w-4 h-4" />
+                        ) : (
+                          <ArrowDown className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Filter Popover */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Filter className="w-4 h-4" />
+                          Filter
+                          {hasActiveFilters() && (
+                            <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                              {(filters.city.length + filters.state.length) || ''}
+                            </Badge>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="end">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold text-sm">Filters</h4>
+                            {hasActiveFilters() && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearAllFilters}
+                                className="h-auto p-0 text-xs"
+                              >
+                                Clear all
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* City Filter */}
+                          {uniqueCities.length > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">City</Label>
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {uniqueCities.map((city) => (
+                                  <div key={city} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`city-${city}`}
+                                      checked={filters.city.includes(city)}
+                                      onCheckedChange={() => toggleFilter("city", city)}
+                                    />
+                                    <label
+                                      htmlFor={`city-${city}`}
+                                      className="text-sm cursor-pointer flex-1"
+                                    >
+                                      {city}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* State Filter */}
+                          {uniqueStates.length > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">State</Label>
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {uniqueStates.map((state) => (
+                                  <div key={state} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`state-${state}`}
+                                      checked={filters.state.includes(state)}
+                                      onCheckedChange={() => toggleFilter("state", state)}
+                                    />
+                                    <label
+                                      htmlFor={`state-${state}`}
+                                      className="text-sm cursor-pointer flex-1"
+                                    >
+                                      {state}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {viewMode === 'list' ? (
@@ -448,7 +683,7 @@ export default function ManagerParks() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parks.map((park) => (
+                    {filteredAndSortedParks.map((park) => (
                       <TableRow key={park?.id || Math.random()}>
                         <TableCell>
                           <div>
@@ -523,7 +758,7 @@ export default function ManagerParks() {
                 ) : (
                   // Card View
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {parks.map((park) => (
+                    {filteredAndSortedParks.map((park) => (
                       <Card key={park?.id || Math.random()} className="transition-all hover:shadow-md">
                         <CardHeader className="pb-4">
                           <div className="flex items-start justify-between mb-3">
