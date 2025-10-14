@@ -23,6 +23,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const [clientPhone, setClientPhone] = useState("");
   const [selectedDate, setSelectedDate] = useState(selectedSlot?.date || "");
   const [selectedTime, setSelectedTime] = useState(selectedSlot?.time || "");
+  const [reminderPreference, setReminderPreference] = useState<"SMS" | "EMAIL" | "BOTH">("SMS");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -173,6 +174,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
       clientName,
       clientEmail,
       clientPhone,
+      reminderPreference,
       startDt: startDt.toISOString(),
       endDt: endDt.toISOString(),
     };
@@ -327,6 +329,36 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
                 {validationErrors.clientPhone}
               </p>
             )}
+          </div>
+          
+          <div>
+            <Label>Reminder Preference</Label>
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <Button
+                type="button"
+                variant={reminderPreference === "SMS" ? "default" : "outline"}
+                onClick={() => setReminderPreference("SMS")}
+                className="w-full"
+              >
+                SMS
+              </Button>
+              <Button
+                type="button"
+                variant={reminderPreference === "EMAIL" ? "default" : "outline"}
+                onClick={() => setReminderPreference("EMAIL")}
+                className="w-full"
+              >
+                Email
+              </Button>
+              <Button
+                type="button"
+                variant={reminderPreference === "BOTH" ? "default" : "outline"}
+                onClick={() => setReminderPreference("BOTH")}
+                className="w-full"
+              >
+                Both
+              </Button>
+            </div>
           </div>
           
           <div className="space-y-3">
