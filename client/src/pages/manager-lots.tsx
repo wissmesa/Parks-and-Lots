@@ -6,6 +6,7 @@ import { LotCalculator } from "@/components/ui/lot-calculator";
 import { LotHistoryDialog } from "@/components/ui/lot-history-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
+import { SheetsConnection } from "@/components/ui/sheets-connection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -786,7 +787,7 @@ export default function ManagerLots() {
             
             toast({
               title: "Connected!",
-              description: "Please go to your dashboard to link your Google Sheet, then try exporting again.",
+              description: "Please link your Google Sheet, then try exporting again.",
             });
           }
         };
@@ -798,7 +799,7 @@ export default function ManagerLots() {
       if (!statusData.spreadsheetId) {
         toast({
           title: "Sheet Not Linked",
-          description: "Please go to your dashboard and link a Google Sheet first.",
+          description: "Please link a Google Sheet first.",
           variant: "destructive",
         });
         return;
@@ -1295,6 +1296,11 @@ export default function ManagerLots() {
               </DialogContent>
             </Dialog>
             </div>
+          </div>
+
+          {/* Google Sheets Export */}
+          <div className="mb-6">
+            <SheetsConnection />
           </div>
 
           {/* Filter and Sort Controls */}

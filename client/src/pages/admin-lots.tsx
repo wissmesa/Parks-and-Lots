@@ -6,6 +6,7 @@ import { LotCalculator } from "@/components/ui/lot-calculator";
 import { LotHistoryDialog } from "@/components/ui/lot-history-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
+import { SheetsConnection } from "@/components/ui/sheets-connection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1172,6 +1173,11 @@ export default function AdminLots() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        {/* Google Sheets Export */}
+        <div className="mb-6">
+          <SheetsConnection />
         </div>
 
         <Card>

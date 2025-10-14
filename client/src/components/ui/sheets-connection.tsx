@@ -23,8 +23,8 @@ export function SheetsConnection() {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [showSpreadsheetInput, setShowSpreadsheetInput] = useState(false);
 
-  // Only show for managers and company managers
-  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
+  // Only show for managers, company managers, and admins
+  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER' && user?.role !== 'ADMIN') {
     return null;
   }
 

@@ -136,6 +136,7 @@ export interface IStorage {
   // OAuth operations
   getOAuthAccount(userId: string, provider: string): Promise<OAuthAccount | undefined>;
   createOrUpdateOAuthAccount(userId: string, data: Partial<OAuthAccount>): Promise<OAuthAccount>;
+  deleteOAuthAccount(userId: string, provider: string): Promise<void>;
   
   // Google Calendar token operations
   getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined>;
@@ -1053,6 +1054,11 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return account;
     }
+  }
+
+  async deleteOAuthAccount(userId: string, provider: string): Promise<void> {
+    await db.delete(oauthAccounts)
+      .where(and(eq(oauthAccounts.userId, userId), eq(oauthAccounts.provider, provider)));
   }
 
   async getGoogleCalendarToken(userId: string): Promise<GoogleCalendarToken | undefined> {
