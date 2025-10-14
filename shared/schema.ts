@@ -138,6 +138,7 @@ export const lots = pgTable("lots", {
   houseManufacturer: varchar("house_manufacturer"),
   houseModel: varchar("house_model"),
   specialStatusId: varchar("special_status_id").references(() => specialStatuses.id),
+  facebookPostId: varchar("facebook_post_id"),
   isActive: boolean("is_active").default(true).notNull(),
 });
 

@@ -317,7 +317,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
-      res.status(400).json({ message: 'Invalid lot data' });
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Request body:', JSON.stringify(req.body, null, 2));
+      }
+      res.status(400).json({ message: 'Invalid lot data', error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -1021,7 +1025,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
-      res.status(400).json({ message: 'Invalid lot data' });
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        console.error('Request body:', JSON.stringify(req.body, null, 2));
+      }
+      res.status(400).json({ message: 'Invalid lot data', error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 

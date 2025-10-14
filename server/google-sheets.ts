@@ -234,15 +234,20 @@ export class GoogleSheetsService {
         throw new Error('No spreadsheet linked. Please provide a Google Sheet ID first.');
       }
 
-      // Fetch Facebook post ID for this lot
-      console.log(`[Export] Searching for Facebook post for lot: ${lot.nameOrNumber}, park: ${lot.park?.name}`);
-      let facebookPostId = '';
-      if (lot.park?.name && lot.nameOrNumber) {
+      // Use stored Facebook post ID from lot, or fallback to searching
+      console.log(`[Export] Processing Facebook post ID for lot: ${lot.nameOrNumber}, park: ${lot.park?.name}`);
+      let facebookPostId = lot.facebookPostId || '';
+      
+      // If no stored ID, try to find it (backward compatibility)
+      if (!facebookPostId && lot.park?.name && lot.nameOrNumber) {
+        console.log(`[Export] No stored Facebook post ID, searching...`);
         const postId = await findFacebookPostIdForLot(lot.park.name, lot.nameOrNumber);
         facebookPostId = postId || '';
         if (postId) {
-          console.log(`[Export] Found Facebook post ID: ${postId}`);
+          console.log(`[Export] Found Facebook post ID via search: ${postId}`);
         }
+      } else if (facebookPostId) {
+        console.log(`[Export] Using stored Facebook post ID: ${facebookPostId}`);
       }
 
       // Check if headers exist in the sheet

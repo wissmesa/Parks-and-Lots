@@ -9,9 +9,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Facebook, CheckCircle, XCircle, Copy, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Facebook, CheckCircle, XCircle, Copy, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { sendFacebookPostRequest } from '@/lib/facebook-service';
 import { useToast } from '@/hooks/use-toast';
+import { CreateLotFromFacebookDialog } from '@/components/ui/create-lot-from-facebook-dialog';
 
 interface FacebookPostDialogProps {
   isOpen: boolean;
@@ -36,6 +37,11 @@ export function FacebookPostDialog({
     webhookData?: any;
   } | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [createLotDialog, setCreateLotDialog] = useState<{
+    isOpen: boolean;
+    postMessage: string;
+    postId: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -112,7 +118,7 @@ export function FacebookPostDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+      <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Facebook className="h-5 w-5 text-blue-600" />
@@ -123,7 +129,7 @@ export function FacebookPostDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto overflow-x-hidden flex-1">
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -158,7 +164,7 @@ export function FacebookPostDialog({
                       {Array.isArray(result.webhookData) ? (
                         <div className="space-y-3">
                           <p className="text-sm font-medium text-gray-700">Webhook Response ({result.webhookData.length} items):</p>
-                          <div className="max-h-96 overflow-y-auto space-y-2 pr-2">
+                          <div className="max-h-96 overflow-y-auto overflow-x-hidden space-y-2 pr-2">
                             {result.webhookData.map((item: any, index: number) => {
                               const isExpanded = expandedItems.has(index);
                               const isLatest = index === 0;
@@ -208,6 +214,22 @@ export function FacebookPostDialog({
                                         >
                                           <Copy className="h-3 w-3 mr-1" />
                                           Copy
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCreateLotDialog({
+                                              isOpen: true,
+                                              postMessage: item.message || '',
+                                              postId: item.id || ''
+                                            });
+                                          }}
+                                          className="flex-shrink-0"
+                                        >
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Create
                                         </Button>
                                         {isExpanded ? (
                                           <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -296,12 +318,24 @@ export function FacebookPostDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {createLotDialog && (
+        <CreateLotFromFacebookDialog
+          isOpen={createLotDialog.isOpen}
+          onClose={() => setCreateLotDialog(null)}
+          parkId={parkId}
+          parkName={parkName}
+          prefilledDescription={createLotDialog.postMessage}
+          facebookPostId={createLotDialog.postId}
+          userId={userId}
+        />
+      )}
     </Dialog>
   );
 }

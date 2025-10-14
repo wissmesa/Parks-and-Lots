@@ -501,6 +501,7 @@ export class DatabaseStorage implements IStorage {
       sqFt: lots.sqFt,
       houseManufacturer: lots.houseManufacturer,
       houseModel: lots.houseModel,
+      facebookPostId: lots.facebookPostId,
       isActive: lots.isActive,
       parkId: lots.parkId,
       specialStatusId: lots.specialStatusId,
@@ -647,7 +648,8 @@ export class DatabaseStorage implements IStorage {
             isActive: lots.isActive,
             specialStatusId: lots.specialStatusId,
             lotRent: lots.lotRent,
-            showingLink: lots.showingLink
+            showingLink: lots.showingLink,
+            facebookPostId: lots.facebookPostId
           })
           .from(lots)
           .innerJoin(parks, eq(lots.parkId, parks.id))
@@ -668,7 +670,8 @@ export class DatabaseStorage implements IStorage {
             priceForRent: null,
             priceForSale: null,
             priceRentToOwn: null,
-            priceContractForDeed: null
+            priceContractForDeed: null,
+            facebookPostId: result.facebookPostId
           };
         } catch (fallbackError) {
           console.error('Fallback query also failed:', fallbackError);
@@ -1472,6 +1475,7 @@ export class DatabaseStorage implements IStorage {
   async getLotsByCompany(companyId: string): Promise<any[]> {
     const lotsWithInfo = await db.select({
       id: lots.id,
+      parkId: lots.parkId,
       nameOrNumber: lots.nameOrNumber,
       status: lots.status,
       price: lots.price,
@@ -1487,6 +1491,8 @@ export class DatabaseStorage implements IStorage {
       sqFt: lots.sqFt,
       houseManufacturer: lots.houseManufacturer,
       houseModel: lots.houseModel,
+      specialStatusId: lots.specialStatusId,
+      facebookPostId: lots.facebookPostId,
       isActive: lots.isActive,
       park: {
         id: parks.id,
