@@ -19,6 +19,7 @@ import { z } from "zod";
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'COMPANY_MANAGER', 'TENANT']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
+export const reminderPreferenceEnum = pgEnum('reminder_preference', ['SMS', 'EMAIL', 'BOTH']);
 export const entityTypeEnum = pgEnum('entity_type', ['COMPANY', 'PARK', 'LOT']);
 export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'BLOCKED']);
 export const tenantStatusEnum = pgEnum('tenant_status', ['ACTIVE', 'INACTIVE', 'PENDING', 'TERMINATED']);
@@ -160,8 +161,9 @@ export const showings = pgTable("showings", {
   startDt: timestamp("start_dt").notNull(),
   endDt: timestamp("end_dt").notNull(),
   clientName: varchar("client_name").notNull(),
-  clientEmail: varchar("client_email").notNull(),
+  clientEmail: varchar("client_email"),
   clientPhone: varchar("client_phone").notNull(),
+  reminderPreference: reminderPreferenceEnum("reminder_preference").default('SMS').notNull(),
   status: showingStatusEnum("status").default('SCHEDULED').notNull(),
   calendarEventId: varchar("calendar_event_id"),
   calendarHtmlLink: varchar("calendar_html_link"),
@@ -477,6 +479,7 @@ export const bookingSchema = z.object({
     /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
     "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
   ),
+  reminderPreference: z.enum(["SMS", "EMAIL", "BOTH"]),
   startDt: z.string().datetime(),
   endDt: z.string().datetime(),
 });

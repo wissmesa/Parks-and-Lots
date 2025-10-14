@@ -4626,6 +4626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientName: bookingData.clientName,
         clientEmail: bookingData.clientEmail,
         clientPhone: bookingData.clientPhone,
+        reminderPreference: bookingData.reminderPreference,
         status: 'SCHEDULED'
       });
 
@@ -4637,9 +4638,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Check if manager has Google Calendar connected
         if (await googleCalendarService.isCalendarConnected(managerId)) {
-          const event = {
+          const event: any = {
             summary: `Property Showing - ${bookingData.clientName}`,
-            description: `Property showing for ${lot.park.name} - Lot ${lot.nameOrNumber}\n\nClient: ${bookingData.clientName}\nEmail: ${bookingData.clientEmail}\nPhone: ${bookingData.clientPhone || 'N/A'}`,
+            description: `Property showing for ${lot.park.name} - Lot ${lot.nameOrNumber}\n\nClient: ${bookingData.clientName}\nEmail: ${bookingData.clientEmail || 'N/A'}\nPhone: ${bookingData.clientPhone || 'N/A'}\nReminder Preference: ${bookingData.reminderPreference}`,
             start: {
               dateTime: startDt.toISOString(),
               timeZone: 'UTC',
@@ -4647,11 +4648,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             end: {
               dateTime: endDt.toISOString(),
               timeZone: 'UTC',
-            },
-            attendees: [
-              { email: bookingData.clientEmail, displayName: bookingData.clientName }
-            ]
+            }
           };
+          
+          // Only add attendees if email is provided
+          if (bookingData.clientEmail && bookingData.clientEmail.trim() !== '') {
+            event.attendees = [
+              { email: bookingData.clientEmail, displayName: bookingData.clientName }
+            ];
+          }
 
           const calendarEvent = await googleCalendarService.createCalendarEvent(managerId, event);
           calendarEventId = calendarEvent.id || null;
