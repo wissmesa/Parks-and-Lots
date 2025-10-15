@@ -134,7 +134,7 @@ export default function ManagerTenants() {
     },
   });
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isCompanyManager = user?.role === 'ADMIN';
 
   // Fetch lots for Tenant creation (only manager's assigned parks or company lots)
   const { data: lots } = useQuery({
@@ -314,7 +314,7 @@ export default function ManagerTenants() {
   const filteredTenants = tenants || [];
 
   // Special restriction for Tammie - only allow My Parks access
-  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+  if (user?.role === 'ADMIN' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
         <div className="flex">

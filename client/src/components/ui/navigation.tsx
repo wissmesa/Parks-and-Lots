@@ -45,14 +45,14 @@ export function Navigation() {
                 <span className="text-sm text-muted-foreground hidden sm:block">
                   Welcome, {user?.fullName}
                 </span>
-                {user?.role === 'ADMIN' && (
+                {user?.role === 'MHP_LORD' && (
                   <Link href="/admin">
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className={isOnAdminPage ? "hidden md:inline-flex" : ""}
                     >
-                      Admin Panel
+                      MHP Lord Panel
                     </Button>
                   </Link>
                 )}
@@ -67,14 +67,14 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
-                {user?.role === 'COMPANY_MANAGER' && (
+                {user?.role === 'ADMIN' && (
                   <Link href="/manager">
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className={isOnManagerPage ? "hidden md:inline-flex" : ""}
                     >
-                      My Manager Panel
+                      Admin Panel
                     </Button>
                   </Link>
                 )}

@@ -16,7 +16,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MANAGER', 'COMPANY_MANAGER', 'TENANT']);
+export const userRoleEnum = pgEnum('user_role', ['MHP_LORD', 'MANAGER', 'ADMIN', 'TENANT']);
 export const lotStatusEnum = pgEnum('lot_status', ['FOR_RENT', 'FOR_SALE', 'RENT_SALE', 'RENT_TO_OWN', 'CONTRACT_FOR_DEED']);
 export const showingStatusEnum = pgEnum('showing_status', ['SCHEDULED', 'CANCELED', 'COMPLETED']);
 export const reminderPreferenceEnum = pgEnum('reminder_preference', ['SMS', 'EMAIL', 'BOTH']);
@@ -34,7 +34,7 @@ export const users = pgTable("users", {
   fullName: varchar("full_name").notNull(),
   role: userRoleEnum("role").notNull(),
   tenantId: varchar("tenant_id").references(() => tenants.id),
-  companyId: varchar("company_id").references(() => companies.id), // For COMPANY_MANAGER role
+  companyId: varchar("company_id").references(() => companies.id), // For ADMIN role
   isActive: boolean("is_active").default(true).notNull(),
   resetToken: varchar("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
@@ -46,7 +46,7 @@ export const invites = pgTable("invites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").notNull(),
   role: userRoleEnum("role").notNull(),
-  companyId: varchar("company_id").references(() => companies.id), // For COMPANY_MANAGER role
+  companyId: varchar("company_id").references(() => companies.id), // For ADMIN role
   parkId: varchar("park_id").references(() => parks.id), // For MANAGER role
   expiresAt: timestamp("expires_at").notNull(),
   token: varchar("token").notNull().unique(),
@@ -388,7 +388,25 @@ export const insertCompanySchema = createInsertSchema(companies, {
   createdAt: true,
 });
 
-export const insertParkSchema = createInsertSchema(parks).omit({
+export const insertParkSchema = createInsertSchema(parks, {
+  amenities: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({ name: z.string(), icon: z.string().optional() })
+      ])
+    )
+    .optional()
+    .transform((amenities) => {
+      if (!amenities) return amenities;
+      return amenities.map((amenity) => {
+        if (typeof amenity === 'object' && amenity !== null) {
+          return JSON.stringify(amenity);
+        }
+        return amenity;
+      });
+    })
+}).omit({
   id: true,
   createdAt: true,
 });

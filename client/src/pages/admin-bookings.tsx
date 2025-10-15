@@ -37,7 +37,7 @@ export default function AdminBookings() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Redirect if not admin
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
@@ -53,7 +53,7 @@ export default function AdminBookings() {
       const response = await apiRequest("GET", url);
       return response.json();
     },
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const updateBookingStatusMutation = useMutation({

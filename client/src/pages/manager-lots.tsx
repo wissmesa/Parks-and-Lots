@@ -245,12 +245,12 @@ export default function ManagerLots() {
 
   // Redirect if not manager or company manager
   useEffect(() => {
-    if (user && user.role !== 'MANAGER' && user.role !== 'COMPANY_MANAGER') {
+    if (user && user.role !== 'MANAGER' && user.role !== 'ADMIN') {
       window.location.href = '/';
     }
   }, [user]);
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isCompanyManager = user?.role === 'ADMIN';
 
   // Fetch manager assignments (parks)
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<{
@@ -275,13 +275,13 @@ export default function ManagerLots() {
     }[];
   }>({
     queryKey: ["/api/company-manager/parks"],
-    enabled: user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'ADMIN',
   });
 
   // Fetch lots for assigned parks or company lots
   const { data: lots, isLoading } = useQuery<Lot[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   // Special statuses query for the selected park
@@ -1012,7 +1012,7 @@ export default function ManagerLots() {
     return sorted;
   }, [lots, sortBy, sortOrder, filters]);
   
-  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>
@@ -1026,7 +1026,7 @@ export default function ManagerLots() {
   }
 
   // Special restriction for Tammie - only allow My Parks access
-  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+  if (user?.role === 'ADMIN' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
         <div className="flex">

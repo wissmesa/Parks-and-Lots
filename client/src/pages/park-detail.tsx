@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { 
   ChevronRight, 
   Home, 
- 
   MapPin, 
   Bed, 
   Bath, 
@@ -27,7 +26,26 @@ import {
   Plus,
   X,
   Save,
-  Check
+  Check,
+  Wifi,
+  PawPrint,
+  Bike,
+  Bus,
+  Flower2,
+  Flame,
+  Droplet,
+  Recycle,
+  Baby,
+  Heart,
+  ShoppingCart,
+  Coffee,
+  Utensils,
+  Wind,
+  Sun,
+  Moon,
+  Sparkles,
+  Star,
+  CircleParking
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -87,15 +105,43 @@ interface Lot {
   sqFt?: number;
 }
 
-// Icon mapping for common amenities
-const amenityIcons: Record<string, any> = {
-  'Swimming Pool': Waves,
-  'Fitness Center': Dumbbell,
-  'Walking Trails': TreePine,
-  'Playground': Home,
-  'Parking': Car,
-  'Security': Shield,
+// Available amenity icons pool (20+ icons for users to choose from)
+export const AMENITY_ICON_OPTIONS = [
+  { value: 'waves', label: 'Pool/Water', icon: Waves },
+  { value: 'dumbbell', label: 'Fitness', icon: Dumbbell },
+  { value: 'treePine', label: 'Nature/Trees', icon: TreePine },
+  { value: 'car', label: 'Parking', icon: Car },
+  { value: 'circleParking', label: 'Parking Lot', icon: CircleParking },
+  { value: 'shield', label: 'Security', icon: Shield },
+  { value: 'wifi', label: 'WiFi', icon: Wifi },
+  { value: 'pawPrint', label: 'Pet Friendly', icon: PawPrint },
+  { value: 'bike', label: 'Biking', icon: Bike },
+  { value: 'bus', label: 'Public Transit', icon: Bus },
+  { value: 'flower2', label: 'Garden', icon: Flower2 },
+  { value: 'flame', label: 'Heating', icon: Flame },
+  { value: 'droplet', label: 'Water', icon: Droplet },
+  { value: 'recycle', label: 'Recycling', icon: Recycle },
+  { value: 'baby', label: 'Playground', icon: Baby },
+  { value: 'heart', label: 'Healthcare', icon: Heart },
+  { value: 'shoppingCart', label: 'Shopping', icon: ShoppingCart },
+  { value: 'coffee', label: 'Cafe', icon: Coffee },
+  { value: 'utensils', label: 'Dining', icon: Utensils },
+  { value: 'wind', label: 'AC/Ventilation', icon: Wind },
+  { value: 'sun', label: 'Solar Power', icon: Sun },
+  { value: 'moon', label: 'Night Security', icon: Moon },
+  { value: 'sparkles', label: 'Premium', icon: Sparkles },
+  { value: 'star', label: 'Featured', icon: Star },
+  { value: 'check', label: 'Default', icon: Check },
+] as const;
+
+// Helper to get icon component by value
+export const getAmenityIcon = (iconValue?: string) => {
+  const iconOption = AMENITY_ICON_OPTIONS.find(opt => opt.value === iconValue);
+  return iconOption?.icon || Check; // Default icon if not found
 };
+
+// Type for amenity (supports both old string format and new object format)
+export type AmenityType = string | { name: string; icon?: string };
 
 function AvailableLotsCard({ totalLots, isLoading }: { totalLots: number; isLoading: boolean }) {
   return (
@@ -146,12 +192,18 @@ function AmenitiesCard({ park }: { park: Park | undefined }) {
         </div>
         
         <div className="grid grid-cols-2 gap-3">
-          {park.amenities && park.amenities.length > 0 ? park.amenities.map((amenity, index) => {
-            const IconComponent = amenityIcons[amenity] || Check;
+          {park.amenities && park.amenities.length > 0 ? park.amenities.map((amenity: any, index) => {
+            // Support both old format (string) and new format (object with icon)
+            const amenityName = typeof amenity === 'string' ? amenity : amenity.name;
+            const amenityIcon = typeof amenity === 'object' && amenity.icon ? amenity.icon : undefined;
+            
+            // Get the icon component (uses selected icon or default)
+            const IconComponent = getAmenityIcon(amenityIcon);
+            
             return (
               <div key={index} className="flex items-center text-sm" data-testid={`amenity-${index}`}>
-                <IconComponent className="w-4 h-4 mr-2 text-primary" />
-                {amenity}
+                <IconComponent className="w-4 h-4 mr-2 text-primary flex-shrink-0" />
+                <span className="truncate">{amenityName}</span>
               </div>
             );
           }) : (

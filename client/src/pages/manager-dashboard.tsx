@@ -25,26 +25,26 @@ export default function ManagerDashboard() {
 
   // Redirect if not manager or company manager
   useEffect(() => {
-    if (user && user.role !== 'MANAGER' && user.role !== 'COMPANY_MANAGER') {
+    if (user && user.role !== 'MANAGER' && user.role !== 'ADMIN') {
       window.location.href = '/';
     }
   }, [user]);
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isCompanyManager = user?.role === 'ADMIN';
 
   const { data: assignments } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/parks"] : ["/api/manager/assignments"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   const { data: todayShowings } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/showings/today"] : ["/api/manager/showings/today"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   const { data: stats } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
 
@@ -71,7 +71,7 @@ export default function ManagerDashboard() {
   const showingsArray = Array.isArray(todayShowings) ? todayShowings : [];
 
 
-  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>
@@ -85,7 +85,7 @@ export default function ManagerDashboard() {
   }
 
   // Special restriction for Tammie - only allow My Parks access
-  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+  if (user?.role === 'ADMIN' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
         <div className="flex">

@@ -2,7 +2,7 @@ export interface User {
   id: string;
   email: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT';
+  role: 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT';
   companyId?: string;
 }
 
@@ -51,7 +51,7 @@ export class AuthManager {
 
   static isAdmin(): boolean {
     const user = this.getUser();
-    return user?.role === 'ADMIN';
+    return user?.role === 'MHP_LORD';
   }
 
   static isManager(): boolean {

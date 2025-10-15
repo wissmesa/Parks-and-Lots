@@ -64,13 +64,13 @@ export default function ManagerBookings() {
   const queryClient = useQueryClient();
 
   // Redirect if not manager or company manager
-  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
     window.location.href = '/';
     return null;
   }
 
   // Special restriction for Tammie - only allow My Parks access
-  if (user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie') {
+  if (user?.role === 'ADMIN' && user?.fullName === 'Tammie') {
     return (
       <div className="min-h-screen bg-muted/30">
         <div className="flex">
@@ -90,7 +90,7 @@ export default function ManagerBookings() {
     );
   }
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isCompanyManager = user?.role === 'ADMIN';
 
   const { data: assignments } = useQuery<Assignment[]>({
     queryKey: ["/api/manager/assignments"],
@@ -99,22 +99,22 @@ export default function ManagerBookings() {
 
   const { data: todayShowings } = useQuery<Showing[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/showings/today"] : ["/api/manager/showings/today"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   const { data: thisWeekShowings } = useQuery<Showing[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/showings/this-week"] : ["/api/manager/showings/this-week"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   const { data: thisMonthShowings } = useQuery<Showing[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/showings/this-month"] : ["/api/manager/showings/this-month"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   const { data: stats } = useQuery<ManagerStats>({
     queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
   // Mutation to cancel a showing - cancels directly in Google Calendar

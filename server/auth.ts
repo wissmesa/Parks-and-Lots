@@ -58,7 +58,7 @@ export async function authenticateToken(req: AuthRequest, res: Response, next: N
   }
 }
 
-export function requireRole(role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' | ('ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT')[]) {
+export function requireRole(role: 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT' | ('MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT')[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -72,8 +72,8 @@ export function requireRole(role: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TEN
       return next();
     }
 
-    // Allow admins to access any role's endpoints (except tenant for privacy)
-    if (req.user.role === 'ADMIN' && !roles.includes('TENANT')) {
+    // Allow MHP Lords to access any role's endpoints (except tenant for privacy)
+    if (req.user.role === 'MHP_LORD' && !roles.includes('TENANT')) {
       return next();
     }
 
@@ -86,7 +86,7 @@ export async function requireParkAccess(req: AuthRequest, res: Response, next: N
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  if (req.user.role === 'ADMIN') {
+  if (req.user.role === 'MHP_LORD') {
     return next();
   }
 
@@ -95,10 +95,10 @@ export async function requireParkAccess(req: AuthRequest, res: Response, next: N
     return res.status(400).json({ message: 'Park ID required' });
   }
 
-  // For COMPANY_MANAGER, check if the park belongs to their company
-  if (req.user.role === 'COMPANY_MANAGER') {
+  // For ADMIN, check if the park belongs to their company
+  if (req.user.role === 'ADMIN') {
     if (!req.user.companyId) {
-      return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+      return res.status(403).json({ message: 'Admin must be assigned to a company' });
     }
     
     const park = await storage.getPark(parkId);
@@ -123,7 +123,7 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  if (req.user.role === 'ADMIN') {
+  if (req.user.role === 'MHP_LORD') {
     return next();
   }
 
@@ -138,10 +138,10 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
     return res.status(404).json({ message: 'Lot not found' });
   }
 
-  // For COMPANY_MANAGER, check if the lot's park belongs to their company
-  if (req.user.role === 'COMPANY_MANAGER') {
+  // For ADMIN, check if the lot's park belongs to their company
+  if (req.user.role === 'ADMIN') {
     if (!req.user.companyId) {
-      return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+      return res.status(403).json({ message: 'Admin must be assigned to a company' });
     }
     
     const park = await storage.getPark(lot.parkId);

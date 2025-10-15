@@ -34,7 +34,7 @@ export default function AdminInvites() {
   const queryClient = useQueryClient();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
+  const [inviteRole, setInviteRole] = useState<"MANAGER" | "ADMIN">("MANAGER");
   const [inviteCompanyId, setInviteCompanyId] = useState("");
   const [inviteParkId, setInviteParkId] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -58,25 +58,25 @@ export default function AdminInvites() {
   };
 
   // Redirect if not admin
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
 
   const { data: invites, isLoading } = useQuery({
     queryKey: ["/api/auth/invites"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: companies, isLoading: companiesLoading, error: companiesError } = useQuery({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
 
   const { data: parks } = useQuery({
     queryKey: ["/api/parks"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const createInviteMutation = useMutation({
@@ -155,8 +155,8 @@ export default function AdminInvites() {
       return;
     }
 
-    // Validate company selection for COMPANY_MANAGER role
-    if (inviteRole === 'COMPANY_MANAGER' && !inviteCompanyId) {
+    // Validate company selection for ADMIN role
+    if (inviteRole === 'ADMIN' && !inviteCompanyId) {
       toast({
         title: "Error",
         description: "Please select a company for Company Manager role",
@@ -171,7 +171,7 @@ export default function AdminInvites() {
       createInviteMutation.mutate({ 
         email: inviteEmail.trim(), 
         role: inviteRole,
-        companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined,
+        companyId: inviteRole === 'ADMIN' ? inviteCompanyId : undefined,
         parkId: inviteRole === 'MANAGER' ? (inviteParkId && inviteParkId !== 'no-assignment' ? inviteParkId : undefined) : undefined
       });
     }
@@ -241,12 +241,12 @@ export default function AdminInvites() {
                   
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => {
+                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "ADMIN") => {
                       setInviteRole(value);
                       if (value === "MANAGER") {
                         setInviteCompanyId(""); // Clear company selection for regular managers
                         setInviteParkId(""); // Reset park selection
-                      } else if (value === "COMPANY_MANAGER") {
+                      } else if (value === "ADMIN") {
                         setInviteParkId(""); // Clear park selection for company managers
                         setInviteCompanyId(""); // Reset company selection
                       }
@@ -256,12 +256,12 @@ export default function AdminInvites() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MANAGER">Manager</SelectItem>
-                        <SelectItem value="COMPANY_MANAGER">Company Manager</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {inviteRole === "COMPANY_MANAGER" && (
+                  {inviteRole === "ADMIN" && (
                     <div>
                       <Label htmlFor="company">Company</Label>
                       <Select value={inviteCompanyId} onValueChange={setInviteCompanyId}>

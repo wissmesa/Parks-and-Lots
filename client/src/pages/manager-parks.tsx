@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
 import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search } from "lucide-react";
 import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
+import { AMENITY_ICON_OPTIONS, getAmenityIcon, type AmenityType } from "@/pages/park-detail";
 
 interface Park {
   id: string;
@@ -31,7 +32,7 @@ interface Park {
   zip: string;
   companyId: string;
   createdAt: string;
-  amenities?: string[];
+  amenities?: AmenityType[];
   company?: {
     name: string;
   };
@@ -67,9 +68,9 @@ export default function ManagerParks() {
     city: "",
     state: "",
     zip: "",
-    amenities: [] as string[]
+    amenities: [] as AmenityType[]
   });
-  const [newAmenity, setNewAmenity] = useState('');
+  const [newAmenity, setNewAmenity] = useState({ name: '', icon: 'check' });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
   const [editingStatus, setEditingStatus] = useState<SpecialStatus | null>(null);
@@ -128,12 +129,12 @@ export default function ManagerParks() {
   });
 
   // Redirect if not manager
-  if (user?.role !== 'MANAGER' && user?.role !== 'COMPANY_MANAGER') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
     window.location.href = '/';
     return null;
   }
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
+  const isCompanyManager = user?.role === 'ADMIN';
 
   const { data: assignments, isLoading: assignmentsLoading, error } = useQuery<Assignment[]>({
     queryKey: ["/api/manager/assignments"],
@@ -142,7 +143,7 @@ export default function ManagerParks() {
 
   const { data: companyParksResponse, isLoading: companyParksLoading } = useQuery<{parks: Park[]}>({
     queryKey: ["/api/company-manager/parks"],
-    enabled: user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'ADMIN',
   });
 
   // Get park IDs from assignments or company parks
@@ -317,6 +318,21 @@ export default function ManagerParks() {
 
   const handleEdit = (park: Park) => {
     setEditingPark(park);
+    // Convert old string format amenities to new object format
+    const convertedAmenities = (park.amenities || []).map(amenity => {
+      if (typeof amenity === 'string') {
+        return { name: amenity, icon: 'check' };
+      }
+      // If it's already an object, ensure it has name and icon properties
+      if (typeof amenity === 'object' && amenity !== null) {
+        return {
+          name: amenity.name || '',
+          icon: amenity.icon || 'check'
+        };
+      }
+      // Fallback for unexpected types
+      return { name: '', icon: 'check' };
+    });
     setFormData({
       name: park.name,
       description: park.description,
@@ -325,9 +341,9 @@ export default function ManagerParks() {
       city: park.city,
       state: park.state,
       zip: park.zip,
-      amenities: park.amenities || []
+      amenities: convertedAmenities
     });
-    setNewAmenity('');
+    setNewAmenity({ name: '', icon: 'check' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -335,14 +351,14 @@ export default function ManagerParks() {
     
     // Auto-add any pending amenity before saving
     let finalFormData = { ...formData };
-    if (newAmenity.trim()) {
+    if (newAmenity?.name?.trim()) {
       finalFormData = {
         ...formData,
-        amenities: [...formData.amenities, newAmenity.trim()]
+        amenities: [...formData.amenities, { name: newAmenity.name.trim(), icon: newAmenity.icon }]
       };
       // Update the form state to include the new amenity
       setFormData(finalFormData);
-      setNewAmenity(''); // Clear the input
+      setNewAmenity({ name: '', icon: 'check' }); // Clear the input
     }
     
     if (editingPark) {
@@ -915,47 +931,107 @@ export default function ManagerParks() {
                   <Label>Amenities</Label>
                   <div className="space-y-3 mt-2">
                     <div className="grid grid-cols-1 gap-2">
-                      {formData.amenities.map((amenity, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <Input 
-                            value={amenity}
-                            onChange={(e) => {
-                              const newAmenities = [...formData.amenities];
-                              newAmenities[index] = e.target.value;
-                              setFormData({ ...formData, amenities: newAmenities });
-                            }}
-                            data-testid={`input-amenity-${index}`}
-                          />
-                          <Button 
-                            type="button"
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => {
-                              const newAmenities = formData.amenities.filter((_, i) => i !== index);
-                              setFormData({ ...formData, amenities: newAmenities });
-                            }}
-                            data-testid={`button-remove-amenity-${index}`}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      {formData.amenities.map((amenity, index) => {
+                        const amenityName = typeof amenity === 'string' ? amenity : (amenity?.name || '');
+                        const amenityIcon = typeof amenity === 'object' && amenity?.icon ? amenity.icon : 'check';
+                        const IconComponent = getAmenityIcon(amenityIcon);
+                        
+                        return (
+                          <div key={index} className="flex items-center gap-2">
+                            <Select
+                              value={amenityIcon}
+                              onValueChange={(value) => {
+                                const newAmenities = [...formData.amenities];
+                                newAmenities[index] = typeof newAmenities[index] === 'string' 
+                                  ? { name: newAmenities[index] as string, icon: value }
+                                  : { ...(newAmenities[index] as any), icon: value };
+                                setFormData({ ...formData, amenities: newAmenities });
+                              }}
+                            >
+                              <SelectTrigger className="w-[50px] px-2">
+                                <IconComponent className="w-4 h-4 mx-auto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {AMENITY_ICON_OPTIONS.map((option) => {
+                                  const OptionIcon = option.icon;
+                                  return (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      <div className="flex items-center gap-2">
+                                        <OptionIcon className="w-4 h-4" />
+                                        <span>{option.label}</span>
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <Input 
+                              value={amenityName}
+                              onChange={(e) => {
+                                const newAmenities = [...formData.amenities];
+                                newAmenities[index] = typeof newAmenities[index] === 'string'
+                                  ? { name: e.target.value, icon: 'check' }
+                                  : { ...(newAmenities[index] as any), name: e.target.value };
+                                setFormData({ ...formData, amenities: newAmenities });
+                              }}
+                              placeholder="Amenity name"
+                              data-testid={`input-amenity-${index}`}
+                            />
+                            <Button 
+                              type="button"
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => {
+                                const newAmenities = formData.amenities.filter((_, i) => i !== index);
+                                setFormData({ ...formData, amenities: newAmenities });
+                              }}
+                              data-testid={`button-remove-amenity-${index}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
                     </div>
                     
                     <div className="flex gap-2">
+                      <Select
+                        value={newAmenity.icon}
+                        onValueChange={(value) => setNewAmenity({ ...newAmenity, icon: value })}
+                      >
+                        <SelectTrigger className="w-[50px] px-2">
+                          {(() => {
+                            const IconComponent = getAmenityIcon(newAmenity.icon);
+                            return <IconComponent className="w-4 h-4 mx-auto" />;
+                          })()}
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AMENITY_ICON_OPTIONS.map((option) => {
+                            const OptionIcon = option.icon;
+                            return (
+                              <SelectItem key={option.value} value={option.value}>
+                                <div className="flex items-center gap-2">
+                                  <OptionIcon className="w-4 h-4" />
+                                  <span>{option.label}</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
                       <Input 
                         placeholder="Add new amenity..."
-                        value={newAmenity}
-                        onChange={(e) => setNewAmenity(e.target.value)}
+                        value={newAmenity.name}
+                        onChange={(e) => setNewAmenity({ ...newAmenity, name: e.target.value })}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            if (newAmenity.trim()) {
+                            if (newAmenity?.name?.trim()) {
                               setFormData({ 
                                 ...formData, 
-                                amenities: [...formData.amenities, newAmenity.trim()] 
+                                amenities: [...formData.amenities, { name: newAmenity.name.trim(), icon: newAmenity.icon }] 
                               });
-                              setNewAmenity('');
+                              setNewAmenity({ name: '', icon: 'check' });
                             }
                           }
                         }}
@@ -966,15 +1042,15 @@ export default function ManagerParks() {
                         variant="outline" 
                         size="sm" 
                         onClick={() => {
-                          if (newAmenity.trim()) {
+                          if (newAmenity?.name?.trim()) {
                             setFormData({ 
                               ...formData, 
-                              amenities: [...formData.amenities, newAmenity.trim()] 
+                              amenities: [...formData.amenities, { name: newAmenity.name.trim(), icon: newAmenity.icon }] 
                             });
-                            setNewAmenity('');
+                            setNewAmenity({ name: '', icon: 'check' });
                           }
                         }}
-                        disabled={!newAmenity.trim()}
+                        disabled={!newAmenity?.name?.trim()}
                         data-testid="button-add-amenity"
                       >
                         <Plus className="w-4 h-4" />

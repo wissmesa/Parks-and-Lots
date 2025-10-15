@@ -29,41 +29,41 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
+  const [inviteRole, setInviteRole] = useState<"MANAGER" | "ADMIN">("MANAGER");
   const [inviteCompanyId, setInviteCompanyId] = useState("");
   const [selectedParkForInvite, setSelectedParkForInvite] = useState("");
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   // Redirect if not admin
   useEffect(() => {
-    if (user && user.role !== 'ADMIN') {
+    if (user && user.role !== 'MHP_LORD') {
       window.location.href = '/';
     }
   }, [user]);
 
   const { data: stats } = useQuery({
     queryKey: ["/api/admin/stats"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: parksData } = useQuery({
     queryKey: ["/api/parks"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: companies } = useQuery({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: recentBookings } = useQuery({
     queryKey: ["/api/admin/recent-bookings"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: managers } = useQuery({
     queryKey: ["/api/admin/managers"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const inviteMutation = useMutation({
@@ -103,8 +103,8 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
     
-    // Validate company selection for COMPANY_MANAGER role
-    if (inviteRole === 'COMPANY_MANAGER' && !inviteCompanyId) {
+    // Validate company selection for ADMIN role
+    if (inviteRole === 'ADMIN' && !inviteCompanyId) {
       toast({
         title: "Error",
         description: "Please select a company for Company Manager role",
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
     await inviteMutation.mutateAsync({
       email: inviteEmail,
       role: inviteRole,
-      companyId: inviteRole === 'COMPANY_MANAGER' ? inviteCompanyId : undefined,
+      companyId: inviteRole === 'ADMIN' ? inviteCompanyId : undefined,
       parkId: inviteRole === 'MANAGER' ? (selectedParkForInvite && selectedParkForInvite !== "none" ? selectedParkForInvite : undefined) : undefined
     });
   };
@@ -184,12 +184,12 @@ export default function AdminDashboard() {
                   
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => {
+                    <Select value={inviteRole} onValueChange={(value: "MANAGER" | "ADMIN") => {
                       setInviteRole(value);
                       if (value === "MANAGER") {
                         setInviteCompanyId(""); // Clear company selection for regular managers
                         setSelectedParkForInvite(""); // Reset park selection
-                      } else if (value === "COMPANY_MANAGER") {
+                      } else if (value === "ADMIN") {
                         setSelectedParkForInvite(""); // Clear park selection for company managers
                         setInviteCompanyId(""); // Reset company selection
                       }
@@ -199,12 +199,12 @@ export default function AdminDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MANAGER">Manager</SelectItem>
-                        <SelectItem value="COMPANY_MANAGER">Company Manager</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {inviteRole === "COMPANY_MANAGER" && (
+                  {inviteRole === "ADMIN" && (
                     <div>
                       <Label htmlFor="company">Company</Label>
                       <Select value={inviteCompanyId} onValueChange={setInviteCompanyId}>

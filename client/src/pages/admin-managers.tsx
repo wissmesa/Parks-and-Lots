@@ -50,17 +50,17 @@ export default function AdminManagers() {
 
   const { data: managers, isLoading: managersLoading } = useQuery({
     queryKey: ["/api/admin/managers"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: parks } = useQuery({
     queryKey: ["/api/parks"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: assignments } = useQuery({
     queryKey: ["/api/admin/manager-assignments"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const assignParksMutation = useMutation({

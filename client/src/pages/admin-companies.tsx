@@ -93,19 +93,19 @@ export default function AdminCompanies() {
   };
 
   // Redirect if not admin
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
 
   const { data: companies, isLoading } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: parks } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
 

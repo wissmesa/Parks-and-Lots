@@ -21,7 +21,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
 
   // Auto-redirect authenticated users to their respective panels
-  if (user?.role === 'ADMIN') {
+  if (user?.role === 'MHP_LORD') {
     window.location.href = '/admin';
     return null;
   }

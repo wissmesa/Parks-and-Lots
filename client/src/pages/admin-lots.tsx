@@ -375,7 +375,7 @@ export default function AdminLots() {
   };
 
   // Redirect if not admin
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
@@ -397,17 +397,17 @@ export default function AdminLots() {
       const data = await response.json();
       return data.lots || data; // Handle both formats
     },
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: parks } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'ADMIN',
+    enabled: user?.role === 'MHP_LORD',
   });
 
   // Special statuses query for the selected park

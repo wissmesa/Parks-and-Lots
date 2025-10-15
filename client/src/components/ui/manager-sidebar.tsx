@@ -22,8 +22,8 @@ export function ManagerSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
 
-  const isCompanyManager = user?.role === 'COMPANY_MANAGER';
-  const isTammie = user?.role === 'COMPANY_MANAGER' && user?.fullName === 'Tammie';
+  const isCompanyManager = user?.role === 'ADMIN';
+  const isTammie = user?.role === 'ADMIN' && user?.fullName === 'Tammie';
   const basePath = '/manager';
   
   const navigationItems = [
@@ -51,7 +51,7 @@ export function ManagerSidebar() {
           <UserCog className="text-primary-foreground w-4 h-4" />
         </div>
         <span className="font-bold text-foreground">
-          {isCompanyManager ? "Company Manager Panel" : "Manager Panel"}
+          {isCompanyManager ? "Admin Panel" : "Manager Panel"}
         </span>
       </div>
       

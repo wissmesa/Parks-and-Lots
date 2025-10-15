@@ -40,29 +40,29 @@ export default function ManagerInvites() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteFullName, setInviteFullName] = useState("");
-  const [inviteRole, setInviteRole] = useState<"MANAGER" | "COMPANY_MANAGER">("MANAGER");
+  const [inviteRole, setInviteRole] = useState<"MANAGER" | "ADMIN">("MANAGER");
   const [selectedParkId, setSelectedParkId] = useState("");
 
   // Redirect if not company manager
-  if (user?.role !== 'COMPANY_MANAGER') {
+  if (user?.role !== 'ADMIN') {
     window.location.href = '/';
     return null;
   }
 
   const { data: invites, isLoading: invitesLoading } = useQuery<Invite[]>({
     queryKey: ["/api/company-manager/invites"],
-    enabled: user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'ADMIN',
     refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 
   const { data: companyParks } = useQuery<{parks: Park[]}>({
     queryKey: ["/api/company-manager/parks"],
-    enabled: user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'ADMIN',
   });
 
   const { data: companyManagers, isLoading: managersLoading } = useQuery<{managers: any[]}>({
     queryKey: ["/api/company-manager/managers"],
-    enabled: user?.role === 'COMPANY_MANAGER',
+    enabled: user?.role === 'ADMIN',
     refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 
@@ -71,7 +71,7 @@ export default function ManagerInvites() {
     mutationFn: async ({ email, fullName, role, parkId }: { 
       email: string; 
       fullName: string; 
-      role: "MANAGER" | "COMPANY_MANAGER";
+      role: "MANAGER" | "ADMIN";
       parkId?: string;
     }) => {
       return apiRequest("POST", "/api/company-manager/invites", {
@@ -250,7 +250,7 @@ export default function ManagerInvites() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
-                      <Select value={inviteRole} onValueChange={(value: "MANAGER" | "COMPANY_MANAGER") => {
+                      <Select value={inviteRole} onValueChange={(value: "MANAGER" | "ADMIN") => {
                         setInviteRole(value);
                         setSelectedParkId(""); // Reset park selection when role changes
                       }}>
@@ -259,7 +259,7 @@ export default function ManagerInvites() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="MANAGER">Manager</SelectItem>
-                          <SelectItem value="COMPANY_MANAGER">Company Manager</SelectItem>
+                          <SelectItem value="ADMIN">Admin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -367,12 +367,12 @@ export default function ManagerInvites() {
                           <TableCell className="font-medium">{manager.fullName}</TableCell>
                           <TableCell>{manager.email}</TableCell>
                           <TableCell>
-                            <Badge variant={manager.role === "COMPANY_MANAGER" ? "default" : "secondary"}>
-                              {manager.role === "COMPANY_MANAGER" ? "Company Manager" : "Manager"}
+                            <Badge variant={manager.role === "ADMIN" ? "default" : "secondary"}>
+                              {manager.role === "ADMIN" ? "Admin" : "Manager"}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {manager.role === "COMPANY_MANAGER" 
+                            {manager.role === "ADMIN" 
                               ? "Company Access" 
                               : manager.assignedParks?.length > 0 
                                 ? (
@@ -454,12 +454,12 @@ export default function ManagerInvites() {
                             <TableCell className="font-medium">{invite.email}</TableCell>
                             <TableCell>{invite.createdByUserName || "Unknown"}</TableCell>
                             <TableCell>
-                              <Badge variant={invite.role === "COMPANY_MANAGER" ? "default" : "secondary"}>
-                                {invite.role === "COMPANY_MANAGER" ? "Company Manager" : "Manager"}
+                              <Badge variant={invite.role === "ADMIN" ? "default" : "secondary"}>
+                                {invite.role === "ADMIN" ? "Admin" : "Manager"}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {invite.role === "COMPANY_MANAGER" 
+                              {invite.role === "ADMIN" 
                                 ? "Company Access" 
                                 : parkName || "No Park Assigned"
                               }

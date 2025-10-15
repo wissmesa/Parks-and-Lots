@@ -139,7 +139,7 @@ export function CreateLotFromFacebookDialog({
       let endpoint = '/api/lots';
       if (user?.role === 'MANAGER') {
         endpoint = '/api/manager/lots';
-      } else if (user?.role === 'COMPANY_MANAGER') {
+      } else if (user?.role === 'ADMIN') {
         endpoint = '/api/company-manager/lots';
       }
       

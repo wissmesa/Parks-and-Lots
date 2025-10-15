@@ -91,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Admin Stats Endpoint
-  app.get('/api/admin/stats', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/admin/stats', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const totalParks = await storage.getParks();
       const allLots = await storage.getLots();
@@ -121,7 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Recent Bookings Endpoint
-  app.get('/api/admin/recent-bookings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/admin/recent-bookings', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const showings = await storage.getShowings();
       
@@ -144,10 +144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Managers List Endpoint
-  app.get('/api/admin/managers', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/admin/managers', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const managers = await storage.getUsers({ role: 'MANAGER' });
-      const companyManagers = await storage.getUsers({ role: 'COMPANY_MANAGER' });
+      const companyManagers = await storage.getUsers({ role: 'ADMIN' });
       const allManagers = [...managers, ...companyManagers];
       res.json(allManagers);
     } catch (error) {
@@ -157,10 +157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manager enable/disable
-  app.patch('/api/admin/managers/:id/toggle-active', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.patch('/api/admin/managers/:id/toggle-active', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const manager = await storage.getUser(req.params.id);
-      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'COMPANY_MANAGER')) {
+      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'ADMIN')) {
         return res.status(404).json({ message: 'Manager not found' });
       }
       const updatedManager = await storage.updateUser(req.params.id, {
@@ -174,10 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update manager details
-  app.patch('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.patch('/api/admin/managers/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const manager = await storage.getUser(req.params.id);
-      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'COMPANY_MANAGER')) {
+      if (!manager || (manager.role !== 'MANAGER' && manager.role !== 'ADMIN')) {
         return res.status(404).json({ message: 'Manager not found' });
       }
       
@@ -191,8 +191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName: fullName.trim()
       };
       
-      // Only update companyId if provided and user is COMPANY_MANAGER
-      if (companyId && manager.role === 'COMPANY_MANAGER') {
+      // Only update companyId if provided and user is ADMIN
+      if (companyId && manager.role === 'ADMIN') {
         updateData.companyId = companyId;
       }
       
@@ -216,29 +216,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company Manager API Endpoints
-  app.get('/api/company-manager/parks', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/parks', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
       }
       
-      const parks = await storage.getParksByCompany(req.user!.companyId);
-      res.json(parks);
+      const { parks } = await storage.getParksByCompany(req.user!.companyId);
+      
+      // Parse amenities from JSON strings back to objects
+      parks.forEach((park: any) => {
+        if (park.amenities && Array.isArray(park.amenities)) {
+          park.amenities = park.amenities.map((amenity: any) => {
+            if (!amenity) return amenity;
+            try {
+              if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+                return JSON.parse(amenity);
+              }
+              return amenity;
+            } catch (e) {
+              console.error('Failed to parse amenity:', amenity, e);
+              return amenity;
+            }
+          });
+        }
+      });
+      
+      res.json({ parks });
     } catch (error) {
       console.error('Company manager parks error:', error);
       res.status(500).json({ message: 'Failed to fetch parks' });
     }
   });
 
-  app.get('/api/company-manager/managers', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/managers', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
       }
       
-      // Get all managers (both MANAGER and COMPANY_MANAGER) for this company
+      // Get all managers (both MANAGER and ADMIN) for this company
       const managers = await storage.getUsers({ role: 'MANAGER' });
-      const companyManagers = await storage.getUsers({ role: 'COMPANY_MANAGER' });
+      const companyManagers = await storage.getUsers({ role: 'ADMIN' });
       
       // Filter managers by company (for MANAGER role, check their park assignments)
       const companyManagersList = companyManagers.filter(manager => manager.companyId === req.user!.companyId);
@@ -275,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...companyManagersList.map(manager => ({
           ...manager,
           assignedParks: [],
-          role: 'COMPANY_MANAGER'
+          role: 'ADMIN'
         }))
       ];
       
@@ -286,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/lots', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/lots', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -300,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/company-manager/lots', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.post('/api/company-manager/lots', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -325,7 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/company-manager/lots/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.patch('/api/company-manager/lots/:id', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -380,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/company-manager/lots/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.delete('/api/company-manager/lots/:id', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -405,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/company-manager/lots/bulk', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.post('/api/company-manager/lots/bulk', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -490,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/showings/today', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/showings/today', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -504,7 +523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/showings/this-week', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/showings/this-week', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -518,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/showings/this-month', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/showings/this-month', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -532,7 +551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/stats', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/stats', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -1422,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Google Sheets OAuth routes
-  app.get('/api/auth/google-sheets/connect', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+  app.get('/api/auth/google-sheets/connect', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
       const state = `${user.id}:${randomBytes(16).toString('hex')}`;
@@ -1453,7 +1472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate that the user exists and has appropriate role
       const user = await storage.getUser(stateUserId);
-      if (!user || !['ADMIN', 'MANAGER', 'COMPANY_MANAGER'].includes(user.role)) {
+      if (!user || !['MHP_LORD', 'MANAGER', 'ADMIN'].includes(user.role)) {
         return res.status(403).send('Invalid user or insufficient permissions');
       }
 
@@ -1521,7 +1540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/auth/google-sheets/status', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+  app.get('/api/auth/google-sheets/status', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
       const account = await storage.getOAuthAccount(user.id, 'google-sheets');
@@ -1535,7 +1554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/google-sheets/set-spreadsheet', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+  app.post('/api/auth/google-sheets/set-spreadsheet', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
       const { spreadsheetId } = req.body;
@@ -1558,7 +1577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/google-sheets/disconnect', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req, res) => {
+  app.post('/api/auth/google-sheets/disconnect', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
       await storage.deleteOAuthAccount(user.id, 'google-sheets');
@@ -1570,7 +1589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export lot to Google Sheets
-  app.post('/api/lots/:id/export-to-sheets', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req: AuthRequest, res) => {
+  app.post('/api/lots/:id/export-to-sheets', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req: AuthRequest, res) => {
     try {
       const lotId = req.params.id;
       const user = req.user!;
@@ -1588,7 +1607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!hasAccess) {
           return res.status(403).json({ message: 'You do not have access to this lot' });
         }
-      } else if (user.role === 'COMPANY_MANAGER') {
+      } else if (user.role === 'ADMIN') {
         const park = await storage.getPark(lot.parkId);
         const hasAccess = park && park.companyId === user.companyId;
         if (!hasAccess) {
@@ -1620,7 +1639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Export multiple lots to Google Sheets
-  app.post('/api/lots/export-to-sheets', authenticateToken, requireRole(['ADMIN', 'MANAGER', 'COMPANY_MANAGER']), async (req: AuthRequest, res) => {
+  app.post('/api/lots/export-to-sheets', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req: AuthRequest, res) => {
     try {
       const { lotIds } = req.body;
       const user = req.user!;
@@ -1646,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (hasAccess) {
               lots.push(lotWithPark);
             }
-          } else if (user.role === 'COMPANY_MANAGER') {
+          } else if (user.role === 'ADMIN') {
             const park = await storage.getPark(lot.parkId);
             const hasAccess = park && park.companyId === user.companyId;
             if (hasAccess) {
@@ -1678,7 +1697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar sync endpoint - Admin only 
-  app.post('/api/admin/sync-calendar', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.post('/api/admin/sync-calendar', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const dryRun = req.query.dryRun === 'true';
       console.log(`[Calendar Sync API] Starting ${dryRun ? 'DRY RUN' : 'LIVE'} sync triggered by admin user ${req.user?.id}`);
@@ -1809,7 +1828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/users/:userId/link-tenant/:tenantId', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.post('/api/users/:userId/link-tenant/:tenantId', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { userId, tenantId } = req.params;
       
@@ -1859,7 +1878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/users/:userId/unlink-tenant', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.delete('/api/users/:userId/unlink-tenant', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { userId } = req.params;
       
@@ -1896,7 +1915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all tenant users with their association status
-  app.get('/api/admin/tenant-users', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.get('/api/admin/tenant-users', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       // Get all users with TENANT role
       const tenantUsers = await storage.getUsers({ role: 'TENANT' as any });
@@ -1980,7 +1999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/invites', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.post('/api/auth/invites', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const parsed = insertInviteSchema.parse({
         ...req.body,
@@ -2029,7 +2048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Company Manager Invite Management
   // Fix existing invites that don't have companyId set
-  app.post('/api/company-manager/fix-invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.post('/api/company-manager/fix-invites', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -2058,7 +2077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/company-manager/invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.get('/api/company-manager/invites', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -2067,9 +2086,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all invites for the company (both sent by this manager and other managers in the same company)
       const allInvites = await storage.getInvitesByCompany(req.user!.companyId);
       
-      // Filter to only show MANAGER and COMPANY_MANAGER invites (exclude TENANT invites)
+      // Filter to only show MANAGER and ADMIN invites (exclude TENANT invites)
       const managerInvites = allInvites.filter(invite => 
-        invite.role === 'MANAGER' || invite.role === 'COMPANY_MANAGER'
+        invite.role === 'MANAGER' || invite.role === 'ADMIN'
       );
       
       // Get creator information for each invite
@@ -2089,7 +2108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/company-manager/invites', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.post('/api/company-manager/invites', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       if (!req.user!.companyId) {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
@@ -2102,8 +2121,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate role
-      if (!['MANAGER', 'COMPANY_MANAGER'].includes(role)) {
-        return res.status(400).json({ message: 'Invalid role. Must be MANAGER or COMPANY_MANAGER' });
+      if (!['MANAGER', 'ADMIN'].includes(role)) {
+        return res.status(400).json({ message: 'Invalid role. Must be MANAGER or ADMIN' });
       }
 
       // Validate park selection for MANAGER role
@@ -2147,7 +2166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invite = await storage.createInvite({
         email,
         role,
-        companyId: req.user!.companyId, // Both MANAGER and COMPANY_MANAGER belong to the same company
+        companyId: req.user!.companyId, // Both MANAGER and ADMIN belong to the same company
         parkId: role === 'MANAGER' ? parkId : undefined,
         createdByUserId: req.user!.id,
         token,
@@ -2182,7 +2201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/company-manager/invites/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
+  app.delete('/api/company-manager/invites/:id', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
     try {
       console.log('[DELETE INVITE] Request from user:', req.user?.id, 'Company:', req.user?.companyId, 'Invite ID:', req.params.id);
       
@@ -2206,10 +2225,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdByUserId: invite.createdByUserId
       });
 
-      // Validate that this is a MANAGER or COMPANY_MANAGER invite
-      if (invite.role !== 'MANAGER' && invite.role !== 'COMPANY_MANAGER') {
+      // Validate that this is a MANAGER or ADMIN invite
+      if (invite.role !== 'MANAGER' && invite.role !== 'ADMIN') {
         console.log('[DELETE INVITE] Invalid role for company manager invites:', invite.role);
-        return res.status(400).json({ message: 'This endpoint only handles MANAGER and COMPANY_MANAGER invites' });
+        return res.status(400).json({ message: 'This endpoint only handles MANAGER and ADMIN invites' });
       }
 
       // Check if the invite belongs to the same company
@@ -2219,7 +2238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let hasAccess = false;
       
       if (invite.companyId) {
-        // Invite has companyId set (both MANAGER and COMPANY_MANAGER)
+        // Invite has companyId set (both MANAGER and ADMIN)
         hasAccess = invite.companyId === req.user!.companyId;
         console.log('[DELETE INVITE] CompanyId check:', {
           inviteCompanyId: invite.companyId,
@@ -2335,7 +2354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           passwordHash,
           fullName: finalFullName,
           role: invite.role,
-          companyId: invite.companyId, // Set companyId for COMPANY_MANAGER
+          companyId: invite.companyId, // Set companyId for ADMIN
           isActive: true
         });
       }
@@ -2367,14 +2386,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // If this is a COMPANY_MANAGER, automatically assign all company parks
-      if (invite.role === 'COMPANY_MANAGER' && invite.companyId) {
+      // If this is an ADMIN, automatically assign all company parks
+      if (invite.role === 'ADMIN' && invite.companyId) {
         try {
           const companyParks = await storage.getParks({ companyId: invite.companyId });
           for (const park of companyParks.parks) {
             await storage.assignManagerToPark(user.id, park.id);
           }
-          console.log(`Auto-assigned ${companyParks.parks.length} parks to COMPANY_MANAGER ${user.email}`);
+          console.log(`Auto-assigned ${companyParks.parks.length} parks to ADMIN ${user.email}`);
         } catch (parkError) {
           console.error('Failed to auto-assign company parks:', parkError);
           // Don't fail the entire request if park assignment fails
@@ -2399,7 +2418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company routes
-  app.get('/api/companies', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/companies', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const { includeInactive } = req.query;
       const companies = await storage.getCompanies(includeInactive === 'true');
@@ -2410,7 +2429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.post('/api/companies', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const parsed = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(parsed);
@@ -2421,7 +2440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/companies/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/companies/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const company = await storage.getCompany(req.params.id);
       if (!company) {
@@ -2434,7 +2453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/companies/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.patch('/api/companies/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const updates = insertCompanySchema.partial().parse(req.body);
       const company = await storage.updateCompany(req.params.id, updates);
@@ -2445,7 +2464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/companies/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/companies/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.deleteCompany(req.params.id);
       res.status(204).send();
@@ -2466,7 +2485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:id/photos', authenticateToken, requireRole('ADMIN'), upload.fields([
+  app.post('/api/companies/:id/photos', authenticateToken, requireRole('MHP_LORD'), upload.fields([
     { name: 'photos', maxCount: 10 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
@@ -2530,7 +2549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company enable/disable
-  app.patch('/api/companies/:id/toggle-active', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.patch('/api/companies/:id/toggle-active', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const company = await storage.getCompanyAny(req.params.id);
       if (!company) {
@@ -2552,7 +2571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { companyId, city, state, q, status, price, page = '1', limit = '20', includeInactive } = req.query;
       
       // Only admins can see inactive entities
-      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'MHP_LORD';
       
       // Parse price range if provided
       let minPrice: number | undefined;
@@ -2585,6 +2604,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await storage.getParks(filters);
       const parksArray = result.parks;
+      
+      // Parse amenities from JSON strings back to objects
+      parksArray.forEach((park: any) => {
+        if (park.amenities && Array.isArray(park.amenities)) {
+          park.amenities = park.amenities.map((amenity: any) => {
+            if (!amenity) return amenity;
+            try {
+              if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+                return JSON.parse(amenity);
+              }
+              return amenity;
+            } catch (e) {
+              console.error('Failed to parse amenity:', amenity, e);
+              return amenity;
+            }
+          });
+        }
+      });
       
       // Pagination logic
       const pageNum = parseInt(page as string);
@@ -2633,6 +2670,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!park) {
         return res.status(404).json({ message: 'Park not found' });
       }
+      
+      // Parse amenities from JSON strings back to objects
+      if (park.amenities && Array.isArray(park.amenities)) {
+        park.amenities = park.amenities.map((amenity: any) => {
+          if (!amenity) return amenity;
+          try {
+            if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+              return JSON.parse(amenity);
+            }
+            return amenity;
+          } catch (e) {
+            console.error('Failed to parse amenity:', amenity, e);
+            return amenity;
+          }
+        });
+      }
+      
       res.json(park);
     } catch (error) {
       console.error('Get park error:', error);
@@ -2640,10 +2694,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/parks', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.post('/api/parks', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const parsed = insertParkSchema.parse(req.body);
+      // Schema already transforms amenity objects to JSON strings
       const park = await storage.createPark(parsed);
+      
+      // Parse amenities back to objects for response
+      if (park.amenities && Array.isArray(park.amenities)) {
+        park.amenities = park.amenities.map((amenity: any) => {
+          if (!amenity) return amenity;
+          try {
+            if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+              return JSON.parse(amenity);
+            }
+            return amenity;
+          } catch (e) {
+            console.error('Failed to parse amenity:', amenity, e);
+            return amenity;
+          }
+        });
+      }
+      
       res.status(201).json(park);
     } catch (error) {
       console.error('Create park error:', error);
@@ -2654,7 +2726,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/parks/:id', authenticateToken, requireParkAccess, async (req, res) => {
     try {
       const updates = insertParkSchema.partial().parse(req.body);
+      // Schema already transforms amenity objects to JSON strings
       const park = await storage.updatePark(req.params.id, updates);
+      
+      // Parse amenities back to objects for response
+      if (park.amenities && Array.isArray(park.amenities)) {
+        park.amenities = park.amenities.map((amenity: any) => {
+          if (!amenity) return amenity;
+          try {
+            if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+              return JSON.parse(amenity);
+            }
+            return amenity;
+          } catch (e) {
+            console.error('Failed to parse amenity:', amenity, e);
+            return amenity;
+          }
+        });
+      }
+      
       res.json(park);
     } catch (error) {
       console.error('Update park error:', error);
@@ -2662,7 +2752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/parks/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/parks/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.deletePark(req.params.id);
       res.status(204).send();
@@ -2747,7 +2837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manager assignments
-  app.post('/api/parks/:parkId/managers/:userId', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.post('/api/parks/:parkId/managers/:userId', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.assignManagerToPark(req.params.userId, req.params.parkId);
       res.status(204).send();
@@ -2779,7 +2869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/parks/:parkId/special-statuses', authenticateToken, requireParkAccess, async (req: AuthRequest, res) => {
     try {
       const { includeInactive } = req.query;
-      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'MHP_LORD';
       
       const specialStatuses = await storage.getSpecialStatuses(
         req.params.parkId, 
@@ -2825,12 +2915,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This uses the same park access logic as other endpoints
       let hasAccess: boolean = false;
       
-      if (req.user?.role === 'ADMIN') {
+      if (req.user?.role === 'MHP_LORD') {
         hasAccess = true;
       } else if (req.user?.role === 'MANAGER') {
         const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
         hasAccess = managerAssignments.length > 0;
-      } else if (req.user?.role === 'COMPANY_MANAGER') {
+      } else if (req.user?.role === 'MHP_LORD') {
         if (!req.user.companyId) {
           return res.status(403).json({ message: 'Company manager must be assigned to a company' });
         }
@@ -2868,12 +2958,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user has access to the park this special status belongs to
       let hasAccess: boolean = false;
       
-      if (req.user?.role === 'ADMIN') {
+      if (req.user?.role === 'MHP_LORD') {
         hasAccess = true;
       } else if (req.user?.role === 'MANAGER') {
         const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
         hasAccess = managerAssignments.length > 0;
-      } else if (req.user?.role === 'COMPANY_MANAGER') {
+      } else if (req.user?.role === 'MHP_LORD') {
         if (!req.user.companyId) {
           return res.status(403).json({ message: 'Company manager must be assigned to a company' });
         }
@@ -2925,7 +3015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk upload lots (admin only)
-  app.post('/api/admin/lots/bulk', authenticateToken, requireRole('ADMIN'), async (req: AuthRequest, res) => {
+  app.post('/api/admin/lots/bulk', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { lots } = req.body;
       
@@ -3369,7 +3459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { parkId, status, minPrice, maxPrice, bedrooms, bathrooms, state, q, price, page = '1', limit = '20', includeInactive } = req.query;
       
       // Only admins can see inactive entities
-      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'ADMIN';
+      const shouldIncludeInactive = includeInactive === 'true' && req.user?.role === 'MHP_LORD';
       
       // Handle price range parameter (e.g. "100000-200000", "300000+", "0-100000")
       let parsedMinPrice, parsedMaxPrice;
@@ -3400,7 +3490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const pageNum = parseInt(page as string);
       // Allow higher limits for admins, but cap at reasonable number for others
-      const maxLimit = req.user?.role === 'ADMIN' ? 10000 : 100;
+      const maxLimit = req.user?.role === 'MHP_LORD' ? 10000 : 100;
       const limitNum = Math.min(parseInt(limit as string), maxLimit);
       const startIndex = (pageNum - 1) * limitNum;
       const endIndex = startIndex + limitNum;
@@ -3531,7 +3621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const results = [];
-      const isAdmin = req.user!.role === 'ADMIN';
+      const isAdmin = req.user!.role === 'MHP_LORD';
       let managerParkIds: string[] = [];
       
       // Get manager assignments if user is a manager
@@ -3821,7 +3911,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             Tenant.lot && parkIds.includes(Tenant.lot.parkId)
           );
           return res.json({ tenants: filteredTenants });
-        } else if (req.user!.role === 'COMPANY_MANAGER') {
+        } else if (req.user!.role === 'MHP_LORD') {
           if (!req.user!.companyId) {
             return res.status(400).json({ message: 'Company manager must be assigned to a company' });
           }
@@ -3889,7 +3979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-      } else if (req.user!.role === 'COMPANY_MANAGER') {
+      } else if (req.user!.role === 'MHP_LORD') {
         console.log(`Company manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
         
         if (!req.user!.companyId) {
@@ -4015,7 +4105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For company managers, verify they have access to the specified lot
-      if (req.user!.role === 'COMPANY_MANAGER') {
+      if (req.user!.role === 'MHP_LORD') {
         const lot = await storage.getLot(tenantData.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Lot not found' });
@@ -4230,7 +4320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For company managers, check if they have access to this Tenant's lot
-      if (req.user!.role === 'COMPANY_MANAGER') {
+      if (req.user!.role === 'MHP_LORD') {
         try {
           const lot = await storage.getLotAny(existingTenant.lotId);
           if (lot) {
@@ -4326,7 +4416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For company managers, check if they have access to this Tenant's lot
-      if (req.user!.role === 'COMPANY_MANAGER') {
+      if (req.user!.role === 'MHP_LORD') {
         const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
@@ -4392,7 +4482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payments = allPayments.filter(payment => 
           payment.park && parkIds.includes(payment.park.id)
         );
-      } else if (req.user!.role === 'COMPANY_MANAGER') {
+      } else if (req.user!.role === 'MHP_LORD') {
         if (!req.user!.companyId) {
           return res.status(400).json({ message: 'Company manager must be assigned to a company' });
         }
@@ -4452,7 +4542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For company managers, check if they have access to this Tenant's lot
-      if (req.user!.role === 'COMPANY_MANAGER') {
+      if (req.user!.role === 'MHP_LORD') {
         const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
@@ -4500,7 +4590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this Tenant' });
         }
-      } else if (req.user!.role === 'COMPANY_MANAGER') {
+      } else if (req.user!.role === 'MHP_LORD') {
         const lot = await storage.getLotAny(Tenant.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
@@ -4550,7 +4640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!hasAccess) {
           return res.status(403).json({ message: 'Access denied to this payment' });
         }
-      } else if (req.user!.role === 'COMPANY_MANAGER') {
+      } else if (req.user!.role === 'MHP_LORD') {
         const lot = await storage.getLot(existingPayment.lotId);
         if (!lot) {
           return res.status(404).json({ message: 'Associated lot not found' });
@@ -4575,7 +4665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/payments/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/payments/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const paymentId = req.params.id;
       
@@ -4962,7 +5052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Additional admin endpoints
   
   // Get all bookings for admin
-  app.get('/api/admin/bookings', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/admin/bookings', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const { status } = req.query;
       const showings = await storage.getShowings();
@@ -4980,7 +5070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update booking status
-  app.put('/api/admin/bookings/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.put('/api/admin/bookings/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const { status } = req.body;
       const showing = await storage.updateShowing(req.params.id, { status });
@@ -4992,7 +5082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get manager assignments for admin
-  app.get('/api/admin/manager-assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/admin/manager-assignments', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const assignments = await storage.getAllManagerAssignments();
       res.json(assignments);
@@ -5003,7 +5093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create manager assignment
-  app.post('/api/admin/manager-assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.post('/api/admin/manager-assignments', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const { userId, parkId } = req.body;
       await storage.assignManagerToPark(userId, parkId);
@@ -5015,7 +5105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove all assignments for a manager
-  app.delete('/api/admin/managers/:id/assignments', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/admin/managers/:id/assignments', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.removeManagerAssignments(req.params.id);
       res.status(204).send();
@@ -5027,7 +5117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Delete/remove manager
-  app.delete('/api/admin/managers/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/admin/managers/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.deleteUser(req.params.id);
       res.status(204).send();
@@ -5038,7 +5128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all invites
-  app.get('/api/auth/invites', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.get('/api/auth/invites', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       const invites = await storage.getInvites();
       res.json({ invites });
@@ -5049,7 +5139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete invite
-  app.delete('/api/auth/invites/:id', authenticateToken, requireRole('ADMIN'), async (req, res) => {
+  app.delete('/api/auth/invites/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
       await storage.deleteInvite(req.params.id);
       res.status(204).send();
@@ -5082,7 +5172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
         // For lots, allow admins, managers, and company managers with lot access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can delete any lot photo
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this lot
@@ -5096,7 +5186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
-        } else if (req.user?.role === 'COMPANY_MANAGER') {
+        } else if (req.user?.role === 'MHP_LORD') {
           // Check if company manager has access to this lot
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5116,7 +5206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (photo.entityType === 'PARK') {
         // For park photos, allow admins, managers, and company managers with park access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can delete any park photo
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this park
@@ -5125,7 +5215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
           }
-        } else if (req.user?.role === 'COMPANY_MANAGER') {
+        } else if (req.user?.role === 'MHP_LORD') {
           // Check if company manager has access to this park
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5194,7 +5284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
         // For lots, allow admins, managers, and company managers with lot access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can update any lot photo
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this lot
@@ -5208,7 +5298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
-        } else if (req.user?.role === 'COMPANY_MANAGER') {
+        } else if (req.user?.role === 'MHP_LORD') {
           // Check if company manager has access to this lot
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5228,7 +5318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (photo.entityType === 'PARK') {
         // For park photos, allow admins, managers, and company managers with park access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can update any park photo
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this park
@@ -5237,7 +5327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
-        } else if (req.user?.role === 'COMPANY_MANAGER') {
+        } else if (req.user?.role === 'MHP_LORD') {
           // Check if company manager has access to this park
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5284,7 +5374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check permissions based on entity type
       if (entityType === 'LOT') {
         // For lots, allow both admins and managers with lot access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can reorder any lot photos
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this lot
@@ -5303,7 +5393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (entityType === 'PARK') {
         // For park photos, allow admins and managers with park access
-        if (req.user?.role === 'ADMIN') {
+        if (req.user?.role === 'MHP_LORD') {
           // Admin can reorder any park photos
         } else if (req.user?.role === 'MANAGER') {
           // Check if manager has access to this park

@@ -47,7 +47,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
-  getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' }): Promise<User[]>;
+  getUsers(filters?: { role?: 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT' }): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   getUserWithTenant(id: string): Promise<any | undefined>;
@@ -240,7 +240,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getUsers(filters?: { role?: 'ADMIN' | 'MANAGER' | 'COMPANY_MANAGER' | 'TENANT' }): Promise<User[]> {
+  async getUsers(filters?: { role?: 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT' }): Promise<User[]> {
     let query = db.select().from(users);
     const conditions = [];
 

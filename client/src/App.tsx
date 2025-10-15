@@ -73,24 +73,24 @@ function Router() {
           <RequireRole role="ADMIN"><AdminInvites /></RequireRole>
         )} />
         
-        {/* Protected manager routes - accessible by both MANAGER and COMPANY_MANAGER */}
+        {/* Protected manager routes - accessible by both MANAGER and ADMIN */}
         <Route path="/manager" component={() => (
-          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerDashboard /></RequireRole>
+          <RequireRole role={['MANAGER', 'ADMIN']}><ManagerDashboard /></RequireRole>
         )} />
         <Route path="/manager/parks" component={() => (
-          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerParks /></RequireRole>
+          <RequireRole role={['MANAGER', 'ADMIN']}><ManagerParks /></RequireRole>
         )} />
         <Route path="/manager/lots" component={() => (
-          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerLots /></RequireRole>
+          <RequireRole role={['MANAGER', 'ADMIN']}><ManagerLots /></RequireRole>
         )} />
         <Route path="/manager/tenants" component={() => (
-          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerTenants /></RequireRole>
+          <RequireRole role={['MANAGER', 'ADMIN']}><ManagerTenants /></RequireRole>
         )} />
         <Route path="/manager/bookings" component={() => (
-          <RequireRole role={['MANAGER', 'COMPANY_MANAGER']}><ManagerBookings /></RequireRole>
+          <RequireRole role={['MANAGER', 'ADMIN']}><ManagerBookings /></RequireRole>
         )} />
         <Route path="/manager/invites" component={() => (
-          <RequireRole role="COMPANY_MANAGER"><ManagerInvites /></RequireRole>
+          <RequireRole role="ADMIN"><ManagerInvites /></RequireRole>
         )} />
         
         
