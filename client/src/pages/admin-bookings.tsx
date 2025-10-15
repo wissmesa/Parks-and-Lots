@@ -1,23 +1,22 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Calendar, Eye, CheckCircle, XCircle } from "lucide-react";
+import { Calendar } from "lucide-react";
 
 interface Booking {
   id: string;
   startDt: string;
   endDt: string;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+  status: 'SCHEDULED' | 'CANCELED' | 'COMPLETED';
   customerName: string;
   customerEmail: string;
-  notes: string | null;
+  customerPhone?: string;
+  notes?: string | null;
   createdAt: string;
   lot?: {
     nameOrNumber: string;
@@ -26,14 +25,13 @@ interface Booking {
     };
   };
   manager?: {
+    id: string;
     fullName: string;
-  };
+  } | null;
 }
 
 export default function AdminBookings() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Redirect if not admin
@@ -54,55 +52,22 @@ export default function AdminBookings() {
       return response.json();
     },
     enabled: user?.role === 'MHP_LORD',
-  });
-
-  const updateBookingStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return apiRequest("PUT", `/api/admin/bookings/${id}`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
-      toast({
-        title: "Success",
-        description: "Booking status updated successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update booking status",
-        variant: "destructive",
-      });
-    },
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
   });
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'PENDING':
-        return 'secondary';
-      case 'CONFIRMED':
+      case 'SCHEDULED':
         return 'default';
       case 'COMPLETED':
         return 'outline';
-      case 'CANCELLED':
+      case 'CANCELED':
         return 'destructive';
       default:
         return 'secondary';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'text-yellow-600';
-      case 'CONFIRMED':
-        return 'text-blue-600';
-      case 'COMPLETED':
-        return 'text-green-600';
-      case 'CANCELLED':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
     }
   };
 
@@ -130,10 +95,9 @@ export default function AdminBookings() {
                 className="px-3 py-2 border rounded-md bg-background"
               >
                 <option value="all">All Status</option>
-                <option value="PENDING">Pending</option>
-                <option value="CONFIRMED">Confirmed</option>
+                <option value="SCHEDULED">Scheduled</option>
                 <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                <option value="CANCELED">Canceled</option>
               </select>
             </div>
           </div>
@@ -168,7 +132,6 @@ export default function AdminBookings() {
                     <TableHead>Manager</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,52 +177,6 @@ export default function AdminBookings() {
                         <Badge variant="outline">
                           {new Date(booking.createdAt).toLocaleDateString()}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          {booking.status === 'PENDING' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  updateBookingStatusMutation.mutate({
-                                    id: booking.id,
-                                    status: 'CONFIRMED'
-                                  })
-                                }
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() =>
-                                  updateBookingStatusMutation.mutate({
-                                    id: booking.id,
-                                    status: 'CANCELLED'
-                                  })
-                                }
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                          {booking.status === 'CONFIRMED' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                updateBookingStatusMutation.mutate({
-                                  id: booking.id,
-                                  status: 'COMPLETED'
-                                })
-                              }
-                            >
-                              Complete
-                            </Button>
-                          )}
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

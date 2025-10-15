@@ -740,9 +740,12 @@ export class DatabaseStorage implements IStorage {
       lotNameOrNumber: lots.nameOrNumber,
       parkId: parks.id,
       parkName: parks.name,
+      managerId: users.id,
+      managerName: users.fullName,
     }).from(showings)
       .leftJoin(lots, eq(showings.lotId, lots.id))
-      .leftJoin(parks, eq(lots.parkId, parks.id));
+      .leftJoin(parks, eq(lots.parkId, parks.id))
+      .leftJoin(users, eq(showings.managerId, users.id));
       
     const conditions = [];
 
@@ -763,9 +766,9 @@ export class DatabaseStorage implements IStorage {
         startDt: row.startDt,
         endDt: row.endDt,
         status: row.status,
-        clientName: row.clientName,
-        clientEmail: row.clientEmail,
-        clientPhone: row.clientPhone,
+        customerName: row.clientName,
+        customerEmail: row.clientEmail,
+        customerPhone: row.clientPhone,
         createdAt: row.createdAt,
         calendarEventId: row.calendarEventId,
         lot: {
@@ -776,6 +779,10 @@ export class DatabaseStorage implements IStorage {
             name: row.parkName,
           },
         },
+        manager: row.managerId ? {
+          id: row.managerId,
+          fullName: row.managerName,
+        } : null,
       }));
     }
 
@@ -785,9 +792,9 @@ export class DatabaseStorage implements IStorage {
       startDt: row.startDt,
       endDt: row.endDt,
       status: row.status,
-      clientName: row.clientName,
-      clientEmail: row.clientEmail,
-      clientPhone: row.clientPhone,
+      customerName: row.clientName,
+      customerEmail: row.clientEmail,
+      customerPhone: row.clientPhone,
       createdAt: row.createdAt,
       calendarEventId: row.calendarEventId,
       lot: {
@@ -798,6 +805,10 @@ export class DatabaseStorage implements IStorage {
           name: row.parkName,
         },
       },
+      manager: row.managerId ? {
+        id: row.managerId,
+        fullName: row.managerName,
+      } : null,
     }));
   }
 
