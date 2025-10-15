@@ -11,7 +11,8 @@ import {
   Shield,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -31,6 +32,7 @@ export function AdminSidebar() {
     { href: "/admin/managers", icon: Shield, label: "Managers" },
     { href: "/admin/bookings", icon: Calendar, label: "Bookings" },
     { href: "/admin/invites", icon: UserPlus, label: "Invites" },
+    { href: "/admin/login-activity", icon: Activity, label: "Login Activity" },
   ];
 
   const handleLogout = async () => {

@@ -22,6 +22,7 @@ import AdminTenants from "@/pages/admin-tenants";
 import AdminManagers from "@/pages/admin-managers";
 import AdminBookings from "@/pages/admin-bookings";
 import AdminInvites from "@/pages/admin-invites";
+import AdminLoginActivity from "@/pages/admin-login-activity";
 import ManagerDashboard from "@/pages/manager-dashboard";
 import ManagerParks from "@/pages/manager-parks";
 import ManagerLots from "@/pages/manager-lots";
@@ -71,6 +72,9 @@ function Router() {
         )} />
         <Route path="/admin/invites" component={() => (
           <RequireRole role="MHP_LORD"><AdminInvites /></RequireRole>
+        )} />
+        <Route path="/admin/login-activity" component={() => (
+          <RequireRole role="MHP_LORD"><AdminLoginActivity /></RequireRole>
         )} />
         
         {/* Protected manager routes - accessible by MANAGER, ADMIN (company admin), and MHP_LORD */}

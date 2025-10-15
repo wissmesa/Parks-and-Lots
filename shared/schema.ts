@@ -239,6 +239,24 @@ export const payments = pgTable("payments", {
   lotPaymentIdx: index("lot_payment_idx").on(table.lotId, table.dueDate),
 }));
 
+// Login logs table - tracks all login attempts
+export const loginLogs = pgTable("login_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
+  email: varchar("email").notNull(),
+  success: boolean("success").notNull(),
+  ipAddress: varchar("ip_address"),
+  locationCity: varchar("location_city"),
+  locationRegion: varchar("location_region"),
+  locationCountry: varchar("location_country"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  createdAtIdx: index("login_logs_created_at_idx").on(table.createdAt),
+  userIdIdx: index("login_logs_user_id_idx").on(table.userId),
+  emailIdx: index("login_logs_email_idx").on(table.email),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   tenant: one(tenants, {
@@ -490,6 +508,11 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   updatedAt: true,
 });
 
+export const insertLoginLogSchema = createInsertSchema(loginLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const bookingSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   clientEmail: z.string().email("Please enter a valid email address").optional().or(z.literal('')),
@@ -527,5 +550,7 @@ export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type LoginLog = typeof loginLogs.$inferSelect;
+export type InsertLoginLog = z.infer<typeof insertLoginLogSchema>;
 export type BookingRequest = z.infer<typeof bookingSchema>;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;

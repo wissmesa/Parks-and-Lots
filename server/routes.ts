@@ -22,6 +22,7 @@ import {
 import { calendarService } from "./calendar";
 import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
+import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -81,6 +82,13 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Clean up old login logs on server startup
+  try {
+    await storage.cleanOldLoginLogs();
+  } catch (error) {
+    console.error('[Server] Failed to clean old login logs on startup:', error);
+  }
+
   // Serve static files
   app.use('/static', express.static(path.join(process.cwd(), 'static')));
 
@@ -1149,21 +1157,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth routes
   app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+    const ipAddress = extractIPFromRequest(req);
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+    
     try {
-      const { email, password } = req.body;
-      
       if (!email || !password) {
         return res.status(400).json({ message: 'Email and password required' });
       }
 
       const user = await storage.getUserByEmail(email);
       if (!user || !user.isActive) {
+        // Log failed login attempt
+        try {
+          const location = await getLocationFromIP(ipAddress);
+          await storage.createLoginLog({
+            userId: null,
+            email: email,
+            success: false,
+            ipAddress: ipAddress,
+            locationCity: location.city,
+            locationRegion: location.region,
+            locationCountry: location.country,
+            userAgent: userAgent,
+          });
+        } catch (logError) {
+          console.error('[Login] Failed to log failed login attempt:', logError);
+        }
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
       const isValidPassword = await comparePassword(password, user.passwordHash);
       if (!isValidPassword) {
+        // Log failed login attempt
+        try {
+          const location = await getLocationFromIP(ipAddress);
+          await storage.createLoginLog({
+            userId: user.id,
+            email: email,
+            success: false,
+            ipAddress: ipAddress,
+            locationCity: location.city,
+            locationRegion: location.region,
+            locationCountry: location.country,
+            userAgent: userAgent,
+          });
+        } catch (logError) {
+          console.error('[Login] Failed to log failed login attempt:', logError);
+        }
         return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      // Log successful login
+      try {
+        const location = await getLocationFromIP(ipAddress);
+        await storage.createLoginLog({
+          userId: user.id,
+          email: email,
+          success: true,
+          ipAddress: ipAddress,
+          locationCity: location.city,
+          locationRegion: location.region,
+          locationCountry: location.country,
+          userAgent: userAgent,
+        });
+      } catch (logError) {
+        console.error('[Login] Failed to log successful login:', logError);
+        // Continue with login even if logging fails
       }
 
       const tokens = generateTokens(user);
@@ -5138,6 +5198,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Delete manager error:', error);
       res.status(500).json({ message: 'Failed to delete manager' });
+    }
+  });
+
+  // Get login logs (MHP_LORD only)
+  app.get('/api/admin/login-logs', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+    try {
+      const { userId, days, success } = req.query;
+      
+      const filters: any = {};
+      
+      if (userId && typeof userId === 'string') {
+        filters.userId = userId;
+      }
+      
+      if (days && typeof days === 'string') {
+        filters.days = parseInt(days, 10);
+      }
+      
+      if (success !== undefined && success !== 'all') {
+        filters.success = success === 'true';
+      }
+      
+      const logs = await storage.getLoginLogs(filters);
+      res.json({ logs });
+    } catch (error) {
+      console.error('Get login logs error:', error);
+      res.status(500).json({ message: 'Failed to fetch login logs' });
     }
   });
 

@@ -13,6 +13,7 @@ import {
   specialStatuses,
   tenants,
   payments,
+  loginLogs,
   type User, 
   type InsertUser,
   type Company,
@@ -37,6 +38,8 @@ import {
   type InsertTenant,
   type Payment,
   type InsertPayment,
+  type LoginLog,
+  type InsertLoginLog,
   type OAuthAccount
 } from "@shared/schema";
 import { db } from "./db";
@@ -165,6 +168,11 @@ export interface IStorage {
   getLotsByCompany(companyId: string): Promise<any[]>;
   getShowingsByCompany(companyId: string, period: 'today' | 'this-week' | 'this-month'): Promise<any[]>;
   getCompanyManagerStats(companyId: string): Promise<any>;
+  
+  // Login log operations
+  createLoginLog(log: InsertLoginLog): Promise<LoginLog>;
+  getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean }): Promise<any[]>;
+  cleanOldLoginLogs(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1656,6 +1664,63 @@ export class DatabaseStorage implements IStorage {
       monthlyBookings: monthlyShowings.length,
       todayBookings: todayShowings.length
     };
+  }
+
+  // Login log operations
+  async createLoginLog(log: InsertLoginLog): Promise<LoginLog> {
+    const [result] = await db.insert(loginLogs).values(log).returning();
+    return result;
+  }
+
+  async getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean }): Promise<any[]> {
+    const days = filters?.days || 90;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const conditions = [
+      gte(loginLogs.createdAt, cutoffDate)
+    ];
+
+    if (filters?.userId) {
+      conditions.push(eq(loginLogs.userId, filters.userId));
+    }
+
+    if (filters?.success !== undefined) {
+      conditions.push(eq(loginLogs.success, filters.success));
+    }
+
+    const results = await db.select({
+      id: loginLogs.id,
+      userId: loginLogs.userId,
+      email: loginLogs.email,
+      success: loginLogs.success,
+      ipAddress: loginLogs.ipAddress,
+      locationCity: loginLogs.locationCity,
+      locationRegion: loginLogs.locationRegion,
+      locationCountry: loginLogs.locationCountry,
+      userAgent: loginLogs.userAgent,
+      createdAt: loginLogs.createdAt,
+      user: {
+        id: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        role: users.role,
+      }
+    })
+    .from(loginLogs)
+    .leftJoin(users, eq(loginLogs.userId, users.id))
+    .where(and(...conditions))
+    .orderBy(desc(loginLogs.createdAt));
+
+    return results;
+  }
+
+  async cleanOldLoginLogs(): Promise<void> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    
+    await db.delete(loginLogs).where(lte(loginLogs.createdAt, cutoffDate));
+    console.log(`[Storage] Cleaned login logs older than 90 days (before ${cutoffDate.toISOString()})`);
   }
 }
 
