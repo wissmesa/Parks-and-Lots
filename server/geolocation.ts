@@ -1,6 +1,6 @@
 /**
  * Geolocation service for IP-based location lookup
- * Uses ip-api.com free API (no API key required, 45 requests/minute)
+ * Uses IPinfo.io free API (no API key required for basic usage, 50k requests/month)
  */
 
 export interface LocationData {
@@ -10,7 +10,7 @@ export interface LocationData {
 }
 
 /**
- * Get location data from IP address using ip-api.com
+ * Get location data from IP address using IPinfo.io
  * @param ip - IP address to lookup
  * @returns Location data (city, region, country) or null values if lookup fails
  */
@@ -29,36 +29,38 @@ export async function getLocationFromIP(ip: string): Promise<LocationData> {
   }
 
   try {
-    // Use ip-api.com free API (no key required)
-    // Format: http://ip-api.com/json/{ip}?fields=status,message,country,regionName,city
+    // Use IPinfo.io free API (no key required for basic usage)
+    // Format: https://ipinfo.io/{ip}/json
     const response = await fetch(
-      `http://ip-api.com/json/${ip}?fields=status,message,country,regionName,city`,
+      `https://ipinfo.io/${ip}/json`,
       {
         method: 'GET',
         headers: {
+          'Accept': 'application/json',
           'User-Agent': 'Parks-and-Lots-Login-Tracker',
         },
-        signal: AbortSignal.timeout(3000), // 3 second timeout
+        signal: AbortSignal.timeout(5000), // 5 second timeout
       }
     );
 
     if (!response.ok) {
-      console.error('[Geolocation] API response not OK:', response.status, response.statusText);
+      console.error('[Geolocation] IPinfo API response not OK:', response.status, response.statusText);
       return defaultLocation;
     }
 
     const data = await response.json();
 
-    // Check if the API returned an error
-    if (data.status === 'fail') {
-      console.error('[Geolocation] API returned fail status:', data.message);
+    // Check if the API returned an error (IPinfo returns error in "error" field)
+    if (data.error) {
+      console.error('[Geolocation] IPinfo API returned error:', data.error);
       return defaultLocation;
     }
 
     // Extract location data
+    // IPinfo returns: { ip, city, region, country, loc, org, postal, timezone }
     return {
       city: data.city || null,
-      region: data.regionName || null,
+      region: data.region || null,
       country: data.country || null,
     };
   } catch (error) {
