@@ -148,7 +148,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const managers = await storage.getUsers({ role: 'MANAGER' });
       const companyManagers = await storage.getUsers({ role: 'ADMIN' });
-      const allManagers = [...managers, ...companyManagers];
+      // Combine and re-sort alphabetically by fullName
+      const allManagers = [...managers, ...companyManagers].sort((a, b) => 
+        (a.fullName || '').localeCompare(b.fullName || '')
+      );
       res.json(allManagers);
     } catch (error) {
       console.error('Managers list error:', error);
@@ -3898,20 +3901,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           q: q as string
         });
         
-        // For managers and company managers, filter by their assigned parks
+        // MHP_LORD (super admin) sees all tenants
+        if (req.user!.role === 'MHP_LORD') {
+          return res.json({ tenants });
+        }
+        
+        // For regular managers, filter by their assigned parks
         if (req.user!.role === 'MANAGER') {
           const assignments = await storage.getManagerAssignments(req.user!.id);
           const parkIds = assignments.map(a => a.parkId);
           
-          if (parkIds.length === 0) {
-            return res.json({ tenants: [] });
-          }
-          
+          // Show tenants that either don't have a lot assigned, OR have a lot in manager's parks
+          // If manager has no park assignments, show only tenants without lot assignments
           const filteredTenants = tenants.filter(Tenant => 
-            Tenant.lot && parkIds.includes(Tenant.lot.parkId)
+            !Tenant.lot || (parkIds.length > 0 && parkIds.includes(Tenant.lot.parkId))
           );
           return res.json({ tenants: filteredTenants });
-        } else if (req.user!.role === 'MHP_LORD') {
+        } 
+        
+        // For company managers (ADMIN role), filter by their company's parks
+        if (req.user!.role === 'ADMIN') {
           if (!req.user!.companyId) {
             return res.status(400).json({ message: 'Company manager must be assigned to a company' });
           }
@@ -3919,16 +3928,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const companyParks = await storage.getParksByCompany(req.user!.companyId);
           const parkIds = companyParks.parks.map(p => p.id);
           
-          if (parkIds.length === 0) {
-            return res.json({ tenants: [] });
-          }
-          
+          // Show tenants that either don't have a lot assigned, OR have a lot in company's parks
+          // If company has no parks, show only tenants without lot assignments
           const filteredTenants = tenants.filter(Tenant => 
-            Tenant.lot && parkIds.includes(Tenant.lot.parkId)
+            !Tenant.lot || (parkIds.length > 0 && parkIds.includes(Tenant.lot.parkId))
           );
           return res.json({ tenants: filteredTenants });
         }
         
+        // Default: show all tenants
         res.json({ tenants });
       } catch (dbError) {
         console.log('Database not ready for tenants, returning empty array:', dbError);
@@ -3952,8 +3960,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Tenant not found' });
       }
 
-      // For managers and company managers, check if they have access to this tenant's lot
-      if (req.user!.role === 'MANAGER') {
+      // MHP_LORD (super admin) has access to all tenants
+      if (req.user!.role === 'MHP_LORD') {
+        console.log(`✅ MHP_LORD has access to all tenants`);
+      } 
+      // For regular managers, check if they have access to this tenant's lot
+      else if (req.user!.role === 'MANAGER') {
         console.log(`Manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
         
         // If tenant has no lot assigned, allow access (tenant might not be assigned to a lot yet)
@@ -3979,7 +3991,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-      } else if (req.user!.role === 'MHP_LORD') {
+      } 
+      // For company managers (ADMIN role), check if tenant's lot is in their company
+      else if (req.user!.role === 'ADMIN') {
         console.log(`Company manager checking access for tenant ${tenantId}, lot: ${tenant.lotId}`);
         
         if (!req.user!.companyId) {

@@ -1,8 +1,10 @@
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 
+type UserRole = 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT';
+
 interface RequireRoleProps {
-  role: 'MHP_LORD' | 'MANAGER' | 'ADMIN' | 'TENANT' | ('MANAGER' | 'ADMIN')[];
+  role: UserRole | UserRole[];
   children: React.ReactNode;
 }
 

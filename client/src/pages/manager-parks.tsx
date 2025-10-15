@@ -129,7 +129,7 @@ export default function ManagerParks() {
   });
 
   // Redirect if not manager
-  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN' && user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }

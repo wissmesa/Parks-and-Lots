@@ -28,7 +28,9 @@ export default function Login() {
       const userData = response.user || response;
       if (userData.role === 'MHP_LORD') {
         window.location.href = "/admin";
-      } else if (userData.role === 'MANAGER' || userData.role === 'ADMIN') {
+      } else if (userData.role === 'ADMIN') {
+        window.location.href = "/manager";
+      } else if (userData.role === 'MANAGER') {
         window.location.href = "/manager";
       } else if (userData.role === 'TENANT') {
         window.location.href = "/tenant";

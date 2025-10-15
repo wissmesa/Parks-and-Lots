@@ -918,7 +918,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvites(): Promise<Invite[]> {
-    return await db.select().from(invites).orderBy(desc(invites.createdAt));
+    return await db.select().from(invites).orderBy(asc(invites.email));
   }
 
   async getInviteByToken(token: string): Promise<Invite | undefined> {
@@ -950,7 +950,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersByCompany(companyId: string): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.companyId, companyId));
+    return await db.select().from(users).where(eq(users.companyId, companyId)).orderBy(asc(users.fullName));
   }
 
   async getInvitesByCompany(companyId: string): Promise<Invite[]> {
@@ -977,7 +977,8 @@ export class DatabaseStorage implements IStorage {
       index === self.findIndex(i => i.id === invite.id)
     );
     
-    return uniqueInvites;
+    // Sort alphabetically by email
+    return uniqueInvites.sort((a, b) => a.email.toLowerCase().localeCompare(b.email.toLowerCase()));
   }
 
   async getManagerAssignments(userId?: string, parkId?: string): Promise<any[]> {
@@ -1001,10 +1002,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      return await query.where(and(...conditions));
+      return await query.where(and(...conditions)).orderBy(asc(parks.name), asc(users.fullName));
     }
 
-    return await query;
+    return await query.orderBy(asc(parks.name), asc(users.fullName));
   }
 
   async assignManagerToPark(userId: string, parkId: string): Promise<void> {
@@ -1183,10 +1184,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      return db.select().from(tenants).where(and(...conditions)).orderBy(desc(tenants.createdAt));
+      return db.select().from(tenants).where(and(...conditions)).orderBy(asc(tenants.lastName), asc(tenants.firstName));
     }
 
-    return db.select().from(tenants).orderBy(desc(tenants.createdAt));
+    return db.select().from(tenants).orderBy(asc(tenants.lastName), asc(tenants.firstName));
   }
 
   async getTenant(id: string): Promise<Tenant | undefined> {
@@ -1312,10 +1313,10 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      return baseQuery.where(and(...conditions)).orderBy(desc(tenants.createdAt));
+      return baseQuery.where(and(...conditions)).orderBy(asc(tenants.lastName), asc(tenants.firstName));
     }
 
-    return baseQuery.orderBy(desc(tenants.createdAt));
+    return baseQuery.orderBy(asc(tenants.lastName), asc(tenants.firstName));
   }
 
   // Payment operations
@@ -1448,7 +1449,8 @@ export class DatabaseStorage implements IStorage {
     const results = await db.select()
       .from(parks)
       .innerJoin(companies, eq(parks.companyId, companies.id))
-      .where(eq(parks.companyId, companyId));
+      .where(eq(parks.companyId, companyId))
+      .orderBy(asc(parks.name));
     
     // Extract park data and include company information from the joined result
     const parksResult = results.map(row => ({

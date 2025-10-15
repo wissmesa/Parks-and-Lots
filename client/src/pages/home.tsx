@@ -26,6 +26,11 @@ export default function Home() {
     return null;
   }
   
+  if (user?.role === 'ADMIN') {
+    window.location.href = '/manager';
+    return null;
+  }
+  
   if (user?.role === 'MANAGER') {
     window.location.href = '/manager';
     return null;

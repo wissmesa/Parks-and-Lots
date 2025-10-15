@@ -44,7 +44,7 @@ export default function ManagerInvites() {
   const [selectedParkId, setSelectedParkId] = useState("");
 
   // Redirect if not company manager
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'ADMIN' && user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }

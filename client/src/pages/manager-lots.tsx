@@ -1012,7 +1012,7 @@ export default function ManagerLots() {
     return sorted;
   }, [lots, sortBy, sortOrder, filters]);
   
-  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN' && user?.role !== 'MHP_LORD') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>

@@ -23,9 +23,9 @@ export default function ManagerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Redirect if not manager or company manager
+  // Redirect if not manager, company manager (admin), or MHP Lord
   useEffect(() => {
-    if (user && user.role !== 'MANAGER' && user.role !== 'ADMIN') {
+    if (user && user.role !== 'MANAGER' && user.role !== 'ADMIN' && user.role !== 'MHP_LORD') {
       window.location.href = '/';
     }
   }, [user]);
@@ -34,17 +34,17 @@ export default function ManagerDashboard() {
 
   const { data: assignments } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/parks"] : ["/api/manager/assignments"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.role === 'MHP_LORD',
   });
 
   const { data: todayShowings } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/showings/today"] : ["/api/manager/showings/today"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.role === 'MHP_LORD',
   });
 
   const { data: stats } = useQuery({
     queryKey: isCompanyManager ? ["/api/company-manager/stats"] : ["/api/manager/stats"],
-    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
+    enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.role === 'MHP_LORD',
   });
 
 
@@ -71,7 +71,7 @@ export default function ManagerDashboard() {
   const showingsArray = Array.isArray(todayShowings) ? todayShowings : [];
 
 
-  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN' && user?.role !== 'MHP_LORD') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>

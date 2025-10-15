@@ -129,7 +129,7 @@ export default function AdminDashboard() {
     activeManagers: stats?.activeManagers ?? 0
   };
 
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'MHP_LORD') {
     return (
       <div className="flex items-center justify-center py-16">
         <Card>

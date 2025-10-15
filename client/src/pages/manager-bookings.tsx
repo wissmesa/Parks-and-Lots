@@ -64,7 +64,7 @@ export default function ManagerBookings() {
   const queryClient = useQueryClient();
 
   // Redirect if not manager or company manager
-  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN') {
+  if (user?.role !== 'MANAGER' && user?.role !== 'ADMIN' && user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
