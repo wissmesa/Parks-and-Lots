@@ -109,6 +109,7 @@ export default function ManagerInvites() {
       return apiRequest("DELETE", `/api/company-manager/invites/${id}`);
     },
     onSuccess: () => {
+      // Real-time update: immediately invalidate queries to refetch data
       queryClient.invalidateQueries({ queryKey: ["/api/company-manager/invites"] });
       queryClient.invalidateQueries({ queryKey: ["/api/company-manager/managers"] });
       toast({
@@ -116,10 +117,11 @@ export default function ManagerInvites() {
         description: "Invite cancelled successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Delete invite error:', error);
       toast({
         title: "Error",
-        description: "Failed to cancel invite",
+        description: error?.message || "Failed to cancel invite",
         variant: "destructive",
       });
     },

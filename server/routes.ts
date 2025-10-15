@@ -2065,10 +2065,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all invites for the company (both sent by this manager and other managers in the same company)
-      const invites = await storage.getInvitesByCompany(req.user!.companyId);
+      const allInvites = await storage.getInvitesByCompany(req.user!.companyId);
+      
+      // Filter to only show MANAGER and COMPANY_MANAGER invites (exclude TENANT invites)
+      const managerInvites = allInvites.filter(invite => 
+        invite.role === 'MANAGER' || invite.role === 'COMPANY_MANAGER'
+      );
       
       // Get creator information for each invite
-      const invitesWithDetails = await Promise.all(invites.map(async (invite) => {
+      const invitesWithDetails = await Promise.all(managerInvites.map(async (invite) => {
         const creator = await storage.getUser(invite.createdByUserId);
         return {
           ...invite,
@@ -2179,24 +2184,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/company-manager/invites/:id', authenticateToken, requireRole('COMPANY_MANAGER'), async (req: AuthRequest, res) => {
     try {
+      console.log('[DELETE INVITE] Request from user:', req.user?.id, 'Company:', req.user?.companyId, 'Invite ID:', req.params.id);
+      
       if (!req.user!.companyId) {
+        console.log('[DELETE INVITE] User has no companyId');
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
       }
 
       const invite = await storage.getInvite(req.params.id);
       if (!invite) {
+        console.log('[DELETE INVITE] Invite not found:', req.params.id);
         return res.status(404).json({ message: 'Invite not found' });
       }
 
+      console.log('[DELETE INVITE] Invite details:', {
+        inviteId: invite.id,
+        inviteRole: invite.role,
+        inviteCompanyId: invite.companyId,
+        inviteParkId: invite.parkId,
+        inviteEmail: invite.email,
+        createdByUserId: invite.createdByUserId
+      });
+
+      // Validate that this is a MANAGER or COMPANY_MANAGER invite
+      if (invite.role !== 'MANAGER' && invite.role !== 'COMPANY_MANAGER') {
+        console.log('[DELETE INVITE] Invalid role for company manager invites:', invite.role);
+        return res.status(400).json({ message: 'This endpoint only handles MANAGER and COMPANY_MANAGER invites' });
+      }
+
       // Check if the invite belongs to the same company
-      if (invite.companyId !== req.user!.companyId) {
+      // Method 1: Invite has companyId set and it matches user's company
+      // Method 2: Invite was created by a user from the same company (for backward compatibility)
+      // Method 3: For legacy MANAGER invites, check if park belongs to user's company
+      let hasAccess = false;
+      
+      if (invite.companyId) {
+        // Invite has companyId set (both MANAGER and COMPANY_MANAGER)
+        hasAccess = invite.companyId === req.user!.companyId;
+        console.log('[DELETE INVITE] CompanyId check:', {
+          inviteCompanyId: invite.companyId,
+          userCompanyId: req.user!.companyId,
+          match: hasAccess
+        });
+      } else {
+        // For invites without companyId, check if creator is from the same company
+        const creator = await storage.getUser(invite.createdByUserId);
+        console.log('[DELETE INVITE] Creator check:', {
+          creatorId: invite.createdByUserId,
+          creatorFound: !!creator,
+          creatorCompanyId: creator?.companyId,
+          userCompanyId: req.user!.companyId
+        });
+        
+        if (creator && creator.companyId === req.user!.companyId) {
+          hasAccess = true;
+          console.log('[DELETE INVITE] Access granted via creator company match');
+        } else if (invite.parkId) {
+          // Fallback: check if park belongs to user's company
+          const park = await storage.getParkAny(invite.parkId);
+          hasAccess = park?.companyId === req.user!.companyId;
+          console.log('[DELETE INVITE] ParkId fallback check:', {
+            inviteParkId: invite.parkId,
+            parkFound: !!park,
+            parkCompanyId: park?.companyId,
+            userCompanyId: req.user!.companyId,
+            match: hasAccess
+          });
+        }
+      }
+
+      if (!hasAccess) {
+        console.log('[DELETE INVITE] Access denied - hasAccess:', hasAccess);
         return res.status(403).json({ message: 'Access denied to this invite' });
       }
 
+      console.log('[DELETE INVITE] Access granted, deleting invite:', req.params.id);
       await storage.deleteInvite(req.params.id);
+      
+      console.log('[DELETE INVITE] Successfully deleted invite:', req.params.id);
       res.json({ message: 'Invite cancelled successfully' });
     } catch (error) {
-      console.error('Delete company manager invite error:', error);
+      console.error('[DELETE INVITE] Error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });
