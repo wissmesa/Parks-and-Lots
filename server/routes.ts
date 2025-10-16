@@ -5204,7 +5204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get login logs (MHP_LORD only)
   app.get('/api/admin/login-logs', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
-      const { userId, days, success } = req.query;
+      const { userId, days, success, page, limit } = req.query;
       
       const filters: any = {};
       
@@ -5220,8 +5220,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters.success = success === 'true';
       }
       
-      const logs = await storage.getLoginLogs(filters);
-      res.json({ logs });
+      if (page && typeof page === 'string') {
+        filters.page = parseInt(page, 10);
+      }
+      
+      if (limit && typeof limit === 'string') {
+        filters.limit = parseInt(limit, 10);
+      }
+      
+      const result = await storage.getLoginLogs(filters);
+      res.json({ logs: result.logs, totalCount: result.totalCount });
     } catch (error) {
       console.error('Get login logs error:', error);
       res.status(500).json({ message: 'Failed to fetch login logs' });

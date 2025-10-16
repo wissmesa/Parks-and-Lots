@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { AdminSidebar } from "@/components/ui/admin-sidebar";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { apiRequest } from "@/lib/queryClient";
 import { Activity, Search } from "lucide-react";
 import { format } from "date-fns";
@@ -35,12 +36,19 @@ export default function AdminLoginActivity() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [daysFilter, setDaysFilter] = useState<string>("90");
   const [userFilter, setUserFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   // Redirect if not MHP_LORD
   if (user?.role !== 'MHP_LORD') {
     window.location.href = '/';
     return null;
   }
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [userFilter, daysFilter, statusFilter]);
 
   // Fetch all users for the filter dropdown
   const { data: usersData } = useQuery({
@@ -54,7 +62,7 @@ export default function AdminLoginActivity() {
 
   // Fetch login logs with real-time updates
   const { data: logsData, isLoading } = useQuery({
-    queryKey: ["/api/admin/login-logs", userFilter, daysFilter, statusFilter],
+    queryKey: ["/api/admin/login-logs", userFilter, daysFilter, statusFilter, page],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (userFilter !== "all") {
@@ -66,7 +74,9 @@ export default function AdminLoginActivity() {
       if (statusFilter !== "all") {
         params.set("success", statusFilter);
       }
-      const url = `/api/admin/login-logs${params.toString() ? `?${params.toString()}` : ''}`;
+      params.set("page", page.toString());
+      params.set("limit", pageSize.toString());
+      const url = `/api/admin/login-logs?${params.toString()}`;
       const response = await apiRequest("GET", url);
       return response.json();
     },
@@ -78,6 +88,8 @@ export default function AdminLoginActivity() {
   });
 
   const logs: LoginLog[] = logsData?.logs || [];
+  const totalCount = logsData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   // Filter logs by search term
   const filteredLogs = logs.filter((log) => {
@@ -96,6 +108,10 @@ export default function AdminLoginActivity() {
   const successfulLogins = filteredLogs.filter(l => l.success).length;
   const failedLogins = filteredLogs.filter(l => !l.success).length;
   const uniqueUsers = new Set(filteredLogs.filter(l => l.userId).map(l => l.userId)).size;
+  
+  // Calculate current page range
+  const startIndex = (page - 1) * pageSize + 1;
+  const endIndex = Math.min(page * pageSize, totalCount);
 
   const parseUserAgent = (userAgent: string | null): string => {
     if (!userAgent) return "Unknown";
@@ -285,6 +301,46 @@ export default function AdminLoginActivity() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+            
+            {/* Pagination */}
+            {!isLoading && filteredLogs.length > 0 && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {startIndex}-{endIndex} of {totalCount} entries
+                </div>
+                {totalPages > 1 && (
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setPage(Math.max(1, page - 1))}
+                          className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => setPage(pageNum)}
+                            isActive={pageNum === page}
+                            className="cursor-pointer"
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                      
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => setPage(Math.min(totalPages, page + 1))}
+                          className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                )}
               </div>
             )}
           </CardContent>

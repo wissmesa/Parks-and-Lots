@@ -171,7 +171,7 @@ export interface IStorage {
   
   // Login log operations
   createLoginLog(log: InsertLoginLog): Promise<LoginLog>;
-  getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean }): Promise<any[]>;
+  getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }>;
   cleanOldLoginLogs(): Promise<void>;
 }
 
@@ -1672,7 +1672,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean }): Promise<any[]> {
+  async getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }> {
     const days = filters?.days || 90;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -1689,6 +1689,18 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(loginLogs.success, filters.success));
     }
 
+    // Get total count with same conditions
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(loginLogs)
+      .where(and(...conditions));
+
+    // Calculate pagination
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 25;
+    const offset = (page - 1) * limit;
+
+    // Get paginated results
     const results = await db.select({
       id: loginLogs.id,
       userId: loginLogs.userId,
@@ -1710,9 +1722,14 @@ export class DatabaseStorage implements IStorage {
     .from(loginLogs)
     .leftJoin(users, eq(loginLogs.userId, users.id))
     .where(and(...conditions))
-    .orderBy(desc(loginLogs.createdAt));
+    .orderBy(desc(loginLogs.createdAt))
+    .limit(limit)
+    .offset(offset);
 
-    return results;
+    return {
+      logs: results,
+      totalCount: Number(count)
+    };
   }
 
   async cleanOldLoginLogs(): Promise<void> {
