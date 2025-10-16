@@ -35,7 +35,7 @@ export default function AdminLoginActivity() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [daysFilter, setDaysFilter] = useState<string>("90");
-  const [userFilter, setUserFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
@@ -48,25 +48,15 @@ export default function AdminLoginActivity() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [userFilter, daysFilter, statusFilter]);
-
-  // Fetch all users for the filter dropdown
-  const { data: usersData } = useQuery({
-    queryKey: ["/api/users"],
-    queryFn: async () => {
-      const response = await apiRequest("GET", "/api/users");
-      return response.json();
-    },
-    refetchOnMount: true,
-  });
+  }, [roleFilter, daysFilter, statusFilter]);
 
   // Fetch login logs with real-time updates
   const { data: logsData, isLoading } = useQuery({
-    queryKey: ["/api/admin/login-logs", userFilter, daysFilter, statusFilter, page],
+    queryKey: ["/api/admin/login-logs", roleFilter, daysFilter, statusFilter, page],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (userFilter !== "all") {
-        params.set("userId", userFilter);
+      if (roleFilter !== "all") {
+        params.set("role", roleFilter);
       }
       if (daysFilter !== "90") {
         params.set("days", daysFilter);
@@ -192,16 +182,15 @@ export default function AdminLoginActivity() {
               />
             </div>
             <select
-              value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
               className="px-3 py-2 border rounded-md bg-background"
             >
-              <option value="all">All Users</option>
-              {usersData?.users?.map((u: any) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.role})
-                </option>
-              ))}
+              <option value="all">User Type</option>
+              <option value="MHP_LORD">MHP Lord</option>
+              <option value="MANAGER">Manager</option>
+              <option value="ADMIN">Admin</option>
+              <option value="TENANT">Tenant</option>
             </select>
             <select
               value={statusFilter}

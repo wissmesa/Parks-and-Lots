@@ -171,7 +171,7 @@ export interface IStorage {
   
   // Login log operations
   createLoginLog(log: InsertLoginLog): Promise<LoginLog>;
-  getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }>;
+  getLoginLogs(filters?: { userId?: string; role?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }>;
   cleanOldLoginLogs(): Promise<void>;
 }
 
@@ -1672,7 +1672,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getLoginLogs(filters?: { userId?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }> {
+  async getLoginLogs(filters?: { userId?: string; role?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }> {
     const days = filters?.days || 90;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -1685,6 +1685,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(loginLogs.userId, filters.userId));
     }
 
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role));
+    }
+
     if (filters?.success !== undefined) {
       conditions.push(eq(loginLogs.success, filters.success));
     }
@@ -1693,6 +1697,7 @@ export class DatabaseStorage implements IStorage {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
       .from(loginLogs)
+      .leftJoin(users, eq(loginLogs.userId, users.id))
       .where(and(...conditions));
 
     // Calculate pagination

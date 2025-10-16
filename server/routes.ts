@@ -5204,12 +5204,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get login logs (MHP_LORD only)
   app.get('/api/admin/login-logs', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
-      const { userId, days, success, page, limit } = req.query;
+      const { userId, role, days, success, page, limit } = req.query;
       
       const filters: any = {};
       
       if (userId && typeof userId === 'string') {
         filters.userId = userId;
+      }
+      
+      if (role && typeof role === 'string' && role !== 'all') {
+        filters.role = role;
       }
       
       if (days && typeof days === 'string') {
