@@ -318,46 +318,6 @@ export class GoogleSheetsService {
             values: [headers]
           }
         });
-
-        // Format the header row
-        try {
-          await sheets.spreadsheets.batchUpdate({
-            spreadsheetId,
-            requestBody: {
-              requests: [
-                {
-                  repeatCell: {
-                    range: {
-                      sheetId: 0,
-                      startRowIndex: 0,
-                      endRowIndex: 1
-                    },
-                    cell: {
-                      userEnteredFormat: {
-                        backgroundColor: {
-                          red: 0.2,
-                          green: 0.4,
-                          blue: 0.8
-                        },
-                        textFormat: {
-                          foregroundColor: {
-                            red: 1,
-                            green: 1,
-                            blue: 1
-                          },
-                          bold: true
-                        }
-                      }
-                    },
-                    fields: 'userEnteredFormat(backgroundColor,textFormat)'
-                  }
-                }
-              ]
-            }
-          });
-        } catch (formatError) {
-          console.log('Header formatting failed (non-critical):', formatError);
-        }
       }
 
       // Append the lot data
@@ -474,46 +434,6 @@ export class GoogleSheetsService {
             values: [headers]
           }
         });
-
-        // Format the header row
-        try {
-          await sheets.spreadsheets.batchUpdate({
-            spreadsheetId,
-            requestBody: {
-              requests: [
-                {
-                  repeatCell: {
-                    range: {
-                      sheetId: 0,
-                      startRowIndex: 0,
-                      endRowIndex: 1
-                    },
-                    cell: {
-                      userEnteredFormat: {
-                        backgroundColor: {
-                          red: 0.2,
-                          green: 0.4,
-                          blue: 0.8
-                        },
-                        textFormat: {
-                          foregroundColor: {
-                            red: 1,
-                            green: 1,
-                            blue: 1
-                          },
-                          bold: true
-                        }
-                      }
-                    },
-                    fields: 'userEnteredFormat(backgroundColor,textFormat)'
-                  }
-                }
-              ]
-            }
-          });
-        } catch (formatError) {
-          console.log('Header formatting failed (non-critical):', formatError);
-        }
       }
 
       // Append all lot data
