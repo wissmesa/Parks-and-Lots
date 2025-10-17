@@ -50,6 +50,7 @@ export function CreateLotFromFacebookDialog({
   const [step, setStep] = useState<'create' | 'export'>('create');
   const [createdLotId, setCreatedLotId] = useState<string | null>(null);
   const [createdLotName, setCreatedLotName] = useState<string>('');
+  const [showPromotionalPrice, setShowPromotionalPrice] = useState(false);
   const [formData, setFormData] = useState({
     nameOrNumber: '',
     status: [] as ('FOR_RENT' | 'FOR_SALE' | 'RENT_TO_OWN' | 'CONTRACT_FOR_DEED')[],
@@ -427,92 +428,191 @@ export function CreateLotFromFacebookDialog({
                 />
               </div>
 
-              {/* Status Checkboxes */}
+              {/* Lot Rent */}
               <div>
-                <Label className="text-base font-medium">Status (Select at least one)</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                  {[
-                    { value: 'FOR_RENT', label: 'For Rent' },
-                    { value: 'FOR_SALE', label: 'For Sale' },
-                    { value: 'RENT_TO_OWN', label: 'Rent to Own' },
-                    { value: 'CONTRACT_FOR_DEED', label: 'Contract for Deed' }
-                  ].map((status) => (
-                    <div key={status.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`status-${status.value}`}
-                        checked={formData.status.includes(status.value as any)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setFormData(prev => ({ ...prev, status: [...prev.status, status.value as any] }));
-                          } else {
-                            setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== status.value) }));
-                          }
-                        }}
+                <Label htmlFor="lotRent">Lot Rent</Label>
+                <MoneyInput
+                  id="lotRent"
+                  step="0.01"
+                  value={formData.lotRent}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
+                  placeholder="Monthly lot rent amount"
+                />
+              </div>
+
+              {/* Status & Pricing - Inline */}
+              <div className="space-y-3">
+                <Label className="text-base font-medium">Status & Pricing</Label>
+                
+                {/* For Rent */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="status-FOR_RENT"
+                      checked={formData.status.includes('FOR_RENT')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData(prev => ({ ...prev, status: [...prev.status, 'FOR_RENT'] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== 'FOR_RENT') }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="status-FOR_RENT" className="text-sm cursor-pointer font-medium">
+                      For Rent
+                    </Label>
+                  </div>
+                  {formData.status.includes('FOR_RENT') && (
+                    <div className="ml-6">
+                      <Label htmlFor="priceForRent" className="text-sm">Price ($/month)</Label>
+                      <MoneyInput
+                        id="priceForRent"
+                        step="0.01"
+                        value={formData.priceForRent}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                        placeholder="Monthly rent amount"
+                        className="mt-1"
                       />
-                      <Label htmlFor={`status-${status.value}`} className="text-sm cursor-pointer">
-                        {status.label}
-                      </Label>
                     </div>
-                  ))}
+                  )}
+                </div>
+
+                {/* For Sale */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="status-FOR_SALE"
+                      checked={formData.status.includes('FOR_SALE')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData(prev => ({ ...prev, status: [...prev.status, 'FOR_SALE'] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== 'FOR_SALE') }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="status-FOR_SALE" className="text-sm cursor-pointer font-medium">
+                      For Sale
+                    </Label>
+                  </div>
+                  {formData.status.includes('FOR_SALE') && (
+                    <div className="ml-6">
+                      <Label htmlFor="priceForSale" className="text-sm">Sale Price</Label>
+                      <MoneyInput
+                        id="priceForSale"
+                        step="0.01"
+                        value={formData.priceForSale}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                        placeholder="Sale price"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Rent to Own */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="status-RENT_TO_OWN"
+                      checked={formData.status.includes('RENT_TO_OWN')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData(prev => ({ ...prev, status: [...prev.status, 'RENT_TO_OWN'] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== 'RENT_TO_OWN') }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="status-RENT_TO_OWN" className="text-sm cursor-pointer font-medium">
+                      Rent to Own
+                    </Label>
+                  </div>
+                  {formData.status.includes('RENT_TO_OWN') && (
+                    <div className="ml-6">
+                      <Label htmlFor="priceRentToOwn" className="text-sm">Price ($/month)</Label>
+                      <MoneyInput
+                        id="priceRentToOwn"
+                        step="0.01"
+                        value={formData.priceRentToOwn}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                        placeholder="Monthly rent-to-own amount"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Contract for Deed */}
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="status-CONTRACT_FOR_DEED"
+                      checked={formData.status.includes('CONTRACT_FOR_DEED')}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData(prev => ({ ...prev, status: [...prev.status, 'CONTRACT_FOR_DEED'] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, status: prev.status.filter(s => s !== 'CONTRACT_FOR_DEED') }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor="status-CONTRACT_FOR_DEED" className="text-sm cursor-pointer font-medium">
+                      Contract for Deed
+                    </Label>
+                  </div>
+                  {formData.status.includes('CONTRACT_FOR_DEED') && (
+                    <div className="ml-6">
+                      <Label htmlFor="priceContractForDeed" className="text-sm">Price ($/month)</Label>
+                      <MoneyInput
+                        id="priceContractForDeed"
+                        step="0.01"
+                        value={formData.priceContractForDeed}
+                        onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                        placeholder="Monthly contract payment"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Price Fields */}
-              <div className="space-y-3">
-                <Label className="text-base font-medium">Prices by Status</Label>
-                <div className="grid grid-cols-1 gap-3">
+              {/* Promotional Price Toggle */}
+              <div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setShowPromotionalPrice(!showPromotionalPrice)}
+                  className="w-full"
+                >
+                  {showPromotionalPrice ? 'Hide' : 'Add'} Promotional Price
+                </Button>
+              </div>
+
+              {showPromotionalPrice && (
+                <div className="space-y-3 p-4 border rounded-lg">
                   <div>
-                    <Label htmlFor="priceForRent">For Rent ($/month)</Label>
+                    <Label htmlFor="promotionalPrice">Promotional Price</Label>
                     <MoneyInput
-                      id="priceForRent"
+                      id="promotionalPrice"
                       step="0.01"
-                      value={formData.priceForRent}
-                      onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                      placeholder="Monthly rent amount"
+                      value={formData.promotionalPrice}
+                      onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                      placeholder="Special promotional price"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="priceForSale">For Sale</Label>
-                    <MoneyInput
-                      id="priceForSale"
-                      step="0.01"
-                      value={formData.priceForSale}
-                      onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                      placeholder="Sale price"
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="promotionalPriceActive"
+                      checked={formData.promotionalPriceActive}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
                     />
-                  </div>
-                  <div>
-                    <Label htmlFor="priceRentToOwn">Rent to Own ($/month)</Label>
-                    <MoneyInput
-                      id="priceRentToOwn"
-                      step="0.01"
-                      value={formData.priceRentToOwn}
-                      onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                      placeholder="Monthly rent-to-own amount"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="priceContractForDeed">Contract for Deed ($/month)</Label>
-                    <MoneyInput
-                      id="priceContractForDeed"
-                      step="0.01"
-                      value={formData.priceContractForDeed}
-                      onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                      placeholder="Monthly contract payment"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lotRent">Lot Rent ($/month)</Label>
-                    <MoneyInput
-                      id="lotRent"
-                      step="0.01"
-                      value={formData.lotRent}
-                      onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
-                      placeholder="Monthly lot rent amount"
-                    />
+                    <Label htmlFor="promotionalPriceActive" className="text-sm cursor-pointer">
+                      Promotional Price Active
+                    </Label>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Property Details */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -601,51 +701,26 @@ export function CreateLotFromFacebookDialog({
                 </div>
               </div>
 
-              {/* Additional Pricing */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="promotionalPrice">Promotional Price</Label>
-                  <MoneyInput
-                    id="promotionalPrice"
-                    step="0.01"
-                    value={formData.promotionalPrice}
-                    onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
-                    placeholder="Special promotional price"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="estimatedPayment">Estimated Payment</Label>
-                  <MoneyInput
-                    id="estimatedPayment"
-                    step="0.01"
-                    value={formData.estimatedPayment}
-                    onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
-                    placeholder="Estimated monthly payment"
-                  />
-                </div>
+              {/* Additional Fields */}
+              <div>
+                <Label htmlFor="estimatedPayment">Estimated Payment</Label>
+                <MoneyInput
+                  id="estimatedPayment"
+                  step="0.01"
+                  value={formData.estimatedPayment}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                  placeholder="Estimated monthly payment"
+                />
               </div>
 
-              {/* Additional Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2 pt-8">
-                  <Checkbox
-                    id="promotionalPriceActive"
-                    checked={formData.promotionalPriceActive}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
-                  />
-                  <Label htmlFor="promotionalPriceActive" className="text-sm cursor-pointer">
-                    Promotional Price Active
-                  </Label>
-                </div>
-                <div>
-                  <Label htmlFor="availableDate">Available Date</Label>
-                  <Input
-                    id="availableDate"
-                    type="date"
-                    value={formData.availableDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
-                  />
-                </div>
+              <div>
+                <Label htmlFor="availableDate">Available Date</Label>
+                <Input
+                  id="availableDate"
+                  type="date"
+                  value={formData.availableDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
+                />
               </div>
 
               {/* Description */}
