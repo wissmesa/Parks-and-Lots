@@ -234,6 +234,19 @@ export class GoogleSheetsService {
         throw new Error('No spreadsheet linked. Please provide a Google Sheet ID first.');
       }
 
+      // Get the first sheet's name dynamically
+      let sheetName = 'Sheet1';
+      try {
+        const spreadsheet = await sheets.spreadsheets.get({
+          spreadsheetId,
+        });
+        if (spreadsheet.data.sheets && spreadsheet.data.sheets.length > 0) {
+          sheetName = spreadsheet.data.sheets[0].properties?.title || 'Sheet1';
+        }
+      } catch (error) {
+        console.log('Error getting sheet name, using default Sheet1:', error);
+      }
+
       // Use stored Facebook post ID from lot, or fallback to searching
       console.log(`[Export] Processing Facebook post ID for lot: ${lot.nameOrNumber}, park: ${lot.park?.name}`);
       let facebookPostId = lot.facebookPostId || '';
@@ -255,7 +268,7 @@ export class GoogleSheetsService {
       try {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: 'Sheet1!A1:P1',
+          range: `${sheetName}!A1:P1`,
         });
         hasHeaders = !!(response.data.values && response.data.values.length > 0);
       } catch (error) {
@@ -263,22 +276,22 @@ export class GoogleSheetsService {
       }
 
       const headers = [
-        'Lot Number',
-        'Park Name',
-        'Bedrooms',
-        'Bathrooms',
-        'Square Feet',
-        'Lot Rent',
-        'Price (Rent)',
-        'Price (Sale)',
-        'Status',
-        'Is Active',
-        'Description',
-        'Showing Link',
-        'House Manufacturer',
-        'House Model',
         'Facebook Post ID',
-        'Export Date'
+        'Park Name',
+        'Address',
+        'Lot Number',
+        'Lot Rent',
+        'Sale Price',
+        'Promotional Price',
+        'Rent Price',
+        'Estimated Payment',
+        'Available Date',
+        'Status',
+        'Mobile Home Year',
+        'Mobile Home Size',
+        'Mobile Home SqFt',
+        'Bedrooms',
+        'Bathrooms'
       ];
 
       // Format status array to string
@@ -289,30 +302,37 @@ export class GoogleSheetsService {
         statusStr = lot.status;
       }
 
+      // Format available date
+      let availableDateStr = '';
+      if (lot.availableDate) {
+        const date = new Date(lot.availableDate);
+        availableDateStr = date.toLocaleDateString();
+      }
+
       const lotRow = [
-        lot.nameOrNumber || '',
-        lot.park?.name || '',
-        lot.bedrooms?.toString() || '',
-        lot.bathrooms?.toString() || '',
-        lot.sqFt?.toString() || '',
-        lot.lotRent || '',
-        lot.priceForRent || lot.price || '',
-        lot.priceForSale || '',
-        statusStr,
-        lot.isActive ? 'Yes' : 'No',
-        lot.description || '',
-        lot.showingLink || '',
-        lot.houseManufacturer || '',
-        lot.houseModel || '',
         facebookPostId,
-        new Date().toLocaleString()
+        lot.park?.name || '',
+        lot.park?.address || '',
+        lot.nameOrNumber || '',
+        lot.lotRent || '',
+        lot.priceForSale || '',
+        lot.promotionalPrice || '',
+        lot.priceForRent || '',
+        lot.estimatedPayment || '',
+        availableDateStr,
+        statusStr,
+        lot.mobileHomeYear?.toString() || '',
+        lot.mobileHomeSize || '',
+        lot.sqFt?.toString() || '',
+        lot.bedrooms?.toString() || '',
+        lot.bathrooms?.toString() || ''
       ];
 
       // If no headers, add them first
       if (!hasHeaders) {
-        await sheets.spreadsheets.values.append({
+        await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: 'Sheet1!A1',
+          range: `${sheetName}!A1:P1`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [headers]
@@ -323,7 +343,7 @@ export class GoogleSheetsService {
       // Append the lot data
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'Sheet1!A:P',
+        range: `${sheetName}!A:P`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
@@ -355,12 +375,25 @@ export class GoogleSheetsService {
         throw new Error('No spreadsheet linked. Please provide a Google Sheet ID first.');
       }
 
+      // Get the first sheet's name dynamically
+      let sheetName = 'Sheet1';
+      try {
+        const spreadsheet = await sheets.spreadsheets.get({
+          spreadsheetId,
+        });
+        if (spreadsheet.data.sheets && spreadsheet.data.sheets.length > 0) {
+          sheetName = spreadsheet.data.sheets[0].properties?.title || 'Sheet1';
+        }
+      } catch (error) {
+        console.log('Error getting sheet name, using default Sheet1:', error);
+      }
+
       // Check if headers exist in the sheet
       let hasHeaders = false;
       try {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: 'Sheet1!A1:P1',
+          range: `${sheetName}!A1:P1`,
         });
         hasHeaders = !!(response.data.values && response.data.values.length > 0);
       } catch (error) {
@@ -368,22 +401,22 @@ export class GoogleSheetsService {
       }
 
       const headers = [
-        'Lot Number',
-        'Park Name',
-        'Bedrooms',
-        'Bathrooms',
-        'Square Feet',
-        'Lot Rent',
-        'Price (Rent)',
-        'Price (Sale)',
-        'Status',
-        'Is Active',
-        'Description',
-        'Showing Link',
-        'House Manufacturer',
-        'House Model',
         'Facebook Post ID',
-        'Export Date'
+        'Park Name',
+        'Address',
+        'Lot Number',
+        'Lot Rent',
+        'Sale Price',
+        'Promotional Price',
+        'Rent Price',
+        'Estimated Payment',
+        'Available Date',
+        'Status',
+        'Mobile Home Year',
+        'Mobile Home Size',
+        'Mobile Home SqFt',
+        'Bedrooms',
+        'Bathrooms'
       ];
 
       // Fetch Facebook post IDs for all lots (with park name grouping for efficiency)
@@ -404,31 +437,38 @@ export class GoogleSheetsService {
           facebookPostId = postId || '';
         }
 
+        // Format available date
+        let availableDateStr = '';
+        if (lot.availableDate) {
+          const date = new Date(lot.availableDate);
+          availableDateStr = date.toLocaleDateString();
+        }
+
         return [
-          lot.nameOrNumber || '',
-          lot.park?.name || '',
-          lot.bedrooms?.toString() || '',
-          lot.bathrooms?.toString() || '',
-          lot.sqFt?.toString() || '',
-          lot.lotRent || '',
-          lot.priceForRent || lot.price || '',
-          lot.priceForSale || '',
-          statusStr,
-          lot.isActive ? 'Yes' : 'No',
-          lot.description || '',
-          lot.showingLink || '',
-          lot.houseManufacturer || '',
-          lot.houseModel || '',
           facebookPostId,
-          new Date().toLocaleString()
+          lot.park?.name || '',
+          lot.park?.address || '',
+          lot.nameOrNumber || '',
+          lot.lotRent || '',
+          lot.priceForSale || '',
+          lot.promotionalPrice || '',
+          lot.priceForRent || '',
+          lot.estimatedPayment || '',
+          availableDateStr,
+          statusStr,
+          lot.mobileHomeYear?.toString() || '',
+          lot.mobileHomeSize || '',
+          lot.sqFt?.toString() || '',
+          lot.bedrooms?.toString() || '',
+          lot.bathrooms?.toString() || ''
         ];
       }));
 
       // If no headers, add them first
       if (!hasHeaders) {
-        await sheets.spreadsheets.values.append({
+        await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: 'Sheet1!A1',
+          range: `${sheetName}!A1:P1`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [headers]
@@ -439,7 +479,7 @@ export class GoogleSheetsService {
       // Append all lot data
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'Sheet1!A:P',
+        range: `${sheetName}!A:P`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
