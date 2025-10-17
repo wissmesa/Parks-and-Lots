@@ -515,7 +515,6 @@ export default function LotDetail() {
                     
                     return prices.map((price, index) => (
                       <div key={index} className="text-center p-3 bg-muted rounded-lg">
-                        <DollarSign className="w-6 h-6 text-primary mb-2 mx-auto" />
                         <div className="text-sm text-muted-foreground">{price.label}</div>
                         <div className="font-semibold">
                           ${parseFloat(price.value).toLocaleString()}{price.suffix}

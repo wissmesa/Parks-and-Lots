@@ -477,8 +477,7 @@ export default function ParkDetail() {
                                 {/* Price - prominent display */}
                                 <div className="mb-4">
                                   <div className="flex items-center text-2xl font-bold text-primary">
-                                    <DollarSign className="w-6 h-6 mr-1" />
-                                    <span>{parseFloat(lot.price).toLocaleString()}</span>
+                                    <span>${parseFloat(lot.price).toLocaleString()}</span>
                                     {(() => {
                                       const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
                                       return statusArray.includes('FOR_RENT') ? <span className="text-lg ml-1">/mo</span> : null;

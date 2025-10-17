@@ -812,13 +812,6 @@ export default function ManagerParks() {
                                 <Tag className="w-4 h-4 mr-2" />
                                 Manage Special Statuses
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => park && setFacebookPostDialog({ isOpen: true, park })}
-                                data-testid={`facebook-post-${park?.id || 'unknown'}`}
-                              >
-                                <Facebook className="w-4 h-4 mr-2" />
-                                Get Facebook Post
-                              </DropdownMenuItem>
                               {isCompanyManager && (
                                 <DropdownMenuItem
                                   onClick={() => {
@@ -899,10 +892,6 @@ export default function ManagerParks() {
                               <DropdownMenuItem onClick={() => park && setManageSpecialStatuses(park)}>
                                 <Tag className="w-4 h-4 mr-2" />
                                 Special Statuses
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => park && setFacebookPostDialog({ isOpen: true, park })}>
-                                <Facebook className="w-4 h-4 mr-2" />
-                                Get Facebook Post
                               </DropdownMenuItem>
                               {isCompanyManager && (
                                 <DropdownMenuItem

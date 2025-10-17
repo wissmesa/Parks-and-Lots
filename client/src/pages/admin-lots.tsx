@@ -1801,8 +1801,7 @@ export default function AdminLots() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <DollarSign className="w-3 h-3" />
-                          <span>{parseInt(lot.price).toLocaleString()}</span>
+                          <span>${parseInt(lot.price).toLocaleString()}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1852,6 +1851,13 @@ export default function AdminLots() {
                             >
                               <Tag className="w-4 h-4 mr-2" />
                               Assign Special Status
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleExportToGoogleSheets(lot)}
+                              data-testid={`button-export-sheets-lot-${lot.id}`}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              Send to Google Sheet
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => toggleMutation.mutate(lot.id)}
@@ -1968,7 +1974,6 @@ export default function AdminLots() {
                       {/* Price and details */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-1">
-                          <DollarSign className="w-4 h-4" />
                           <span className="font-semibold">
                             {(() => {
                               const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);

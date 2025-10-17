@@ -451,8 +451,7 @@ export default function Properties() {
                           <div className="space-y-2">
                             {prices.map((price, index) => (
                               <div key={index} className="flex items-center text-xl font-bold text-primary">
-                                <DollarSign className="w-5 h-5 mr-1" />
-                                <span>{parseInt(price.value).toLocaleString()}</span>
+                                <span>${parseInt(price.value).toLocaleString()}</span>
                                 <span className="text-lg ml-1">{price.suffix}</span>
                                 {prices.length > 1 && (
                                   <span className="text-sm ml-2 text-muted-foreground">({price.label})</span>

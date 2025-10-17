@@ -1866,7 +1866,6 @@ export default function ManagerLots() {
                     <div className="space-y-4">
                       {/* Price - most prominent */}
                       <div className="flex items-center justify-center p-3 bg-primary/10 rounded-lg">
-                        <DollarSign className="w-5 h-5 text-primary mr-2" />
                         <span className="text-2xl font-bold text-primary">
                           {(() => {
                             const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
@@ -1966,11 +1965,12 @@ export default function ManagerLots() {
                               Manage Photos
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => setShowCalculatorSelection(lot.id)}
+                              disabled
+                              className="opacity-50"
                               data-testid={`button-calculator-lot-${lot.id}`}
                             >
                               <Calculator className="w-4 h-4 mr-2" />
-                              Calculator
+                              Calculator <span className="text-xs ml-2">(Coming Soon)</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleAssignSpecialStatus(lot)}
@@ -1978,13 +1978,6 @@ export default function ManagerLots() {
                             >
                               <Tag className="w-4 h-4 mr-2" />
                               Special Status
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleExportToGoogleSheets(lot)}
-                              data-testid={`button-export-sheets-lot-${lot.id}`}
-                            >
-                              <FileSpreadsheet className="w-4 h-4 mr-2" />
-                              Send to Google Sheet
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleActive(lot.id)}
@@ -2093,8 +2086,7 @@ export default function ManagerLots() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <DollarSign className="w-3 h-3" />
-                          <span>
+                          <span>$
                             {(() => {
                               const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
                               
@@ -2147,17 +2139,13 @@ export default function ManagerLots() {
                               <Camera className="w-4 h-4 mr-2" />
                               Manage Photos
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setShowCalculatorSelection(lot.id)}>
+                            <DropdownMenuItem disabled className="opacity-50">
                               <Calculator className="w-4 h-4 mr-2" />
-                              Calculator
+                              Calculator <span className="text-xs ml-2">(Coming Soon)</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleAssignSpecialStatus(lot)}>
                               <Tag className="w-4 h-4 mr-2" />
                               Special Status
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleExportToGoogleSheets(lot)}>
-                              <FileSpreadsheet className="w-4 h-4 mr-2" />
-                              Send to Google Sheet
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => toggleVisibility(lot.id, !lot.isActive)}>
                               {lot.isActive ? (

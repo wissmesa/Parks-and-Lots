@@ -61,7 +61,6 @@ export function LotCard({ lot, showBookButton = true }: LotCardProps) {
                 </div>
               )}
               <div className="flex items-center">
-                <DollarSign className="w-4 h-4 mr-2" />
                 ${parseFloat(lot.price).toLocaleString()}{(() => {
                   const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
                   return statusArray.includes('FOR_RENT') || statusArray.includes('RENT_TO_OWN') ? '/mo' : '';
