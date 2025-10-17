@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search, Trash2 } from "lucide-react";
 import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
 import { AMENITY_ICON_OPTIONS, getAmenityIcon, type AmenityType } from "@/pages/park-detail";
 
@@ -59,6 +59,7 @@ export default function ManagerParks() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPark, setEditingPark] = useState<Park | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -241,6 +242,30 @@ export default function ManagerParks() {
     return filtered;
   }, [parks, searchText, filters, sortBy, sortOrder]);
 
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      return apiRequest("POST", "/api/parks", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/parks"] });
+      setIsCreateModalOpen(false);
+      resetForm();
+      toast({
+        title: "Success",
+        description: "Park created successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create park",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       return apiRequest("PATCH", `/api/parks/${editingPark?.id}`, data);
@@ -260,6 +285,28 @@ export default function ManagerParks() {
       toast({
         title: "Error",
         description: "Failed to update park",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (parkId: string) => {
+      return apiRequest("DELETE", `/api/parks/${parkId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/manager/assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/parks"] });
+      toast({
+        title: "Success",
+        description: "Park deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete park",
         variant: "destructive",
       });
     },
@@ -363,6 +410,8 @@ export default function ManagerParks() {
     
     if (editingPark) {
       updateMutation.mutate(finalFormData);
+    } else {
+      createMutation.mutate(finalFormData);
     }
   };
 
@@ -517,6 +566,12 @@ export default function ManagerParks() {
               <h1 className="text-3xl font-bold text-foreground">My Parks</h1>
               <p className="text-muted-foreground">Manage parks assigned to you</p>
             </div>
+            {isCompanyManager && (
+              <Button onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Park
+              </Button>
+            )}
           </div>
 
           {isLoading ? (
@@ -764,6 +819,20 @@ export default function ManagerParks() {
                                 <Facebook className="w-4 h-4 mr-2" />
                                 Get Facebook Post
                               </DropdownMenuItem>
+                              {isCompanyManager && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (park?.id && confirm("Are you sure you want to delete this park?")) {
+                                      deleteMutation.mutate(park.id);
+                                    }
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                  data-testid={`delete-park-${park?.id || 'unknown'}`}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete Park
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -835,6 +904,20 @@ export default function ManagerParks() {
                                 <Facebook className="w-4 h-4 mr-2" />
                                 Get Facebook Post
                               </DropdownMenuItem>
+                              {isCompanyManager && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    if (park?.id && confirm("Are you sure you want to delete this park?")) {
+                                      deleteMutation.mutate(park.id);
+                                    }
+                                  }}
+                                  className="text-destructive focus:text-destructive"
+                                  data-testid={`delete-park-card-${park?.id || 'unknown'}`}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete Park
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </CardContent>
@@ -844,6 +927,241 @@ export default function ManagerParks() {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Create Park Dialog (ADMIN only) */}
+          {isCompanyManager && (
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+              <DialogContent className="max-w-3xl mx-4 max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Park</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="create-name">Park Name</Label>
+                    <Input
+                      id="create-name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                      data-testid="input-park-name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-description">Description</Label>
+                    <Textarea
+                      id="create-description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      data-testid="input-park-description"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-meetingPlace">Meeting Place</Label>
+                    <Textarea
+                      id="create-meetingPlace"
+                      value={formData.meetingPlace}
+                      onChange={(e) => setFormData({ ...formData, meetingPlace: e.target.value })}
+                      rows={2}
+                      placeholder="Describe where to meet for showings (e.g., front office, clubhouse)"
+                      data-testid="input-park-meeting-place"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-address">Address</Label>
+                    <Input
+                      id="create-address"
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      required
+                      data-testid="input-park-address"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="create-city">City</Label>
+                      <Input
+                        id="create-city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        required
+                        data-testid="input-park-city"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="create-state">State</Label>
+                      <Input
+                        id="create-state"
+                        value={formData.state}
+                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                        required
+                        data-testid="input-park-state"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="create-zip">ZIP Code</Label>
+                      <Input
+                        id="create-zip"
+                        value={formData.zip}
+                        onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                        required
+                        data-testid="input-park-zip"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Amenities Section */}
+                  <div>
+                    <Label>Amenities</Label>
+                    <div className="space-y-3 mt-2">
+                      <div className="grid grid-cols-1 gap-2">
+                        {formData.amenities.map((amenity, index) => {
+                          const amenityName = typeof amenity === 'string' ? amenity : (amenity?.name || '');
+                          const amenityIcon = typeof amenity === 'object' && amenity?.icon ? amenity.icon : 'check';
+                          const IconComponent = getAmenityIcon(amenityIcon);
+                          
+                          return (
+                            <div key={index} className="flex items-center gap-2">
+                              <Select
+                                value={amenityIcon}
+                                onValueChange={(value) => {
+                                  const newAmenities = [...formData.amenities];
+                                  newAmenities[index] = typeof newAmenities[index] === 'string' 
+                                    ? { name: newAmenities[index] as string, icon: value }
+                                    : { ...(newAmenities[index] as any), icon: value };
+                                  setFormData({ ...formData, amenities: newAmenities });
+                                }}
+                              >
+                                <SelectTrigger className="w-[50px] px-2">
+                                  <IconComponent className="w-4 h-4 mx-auto" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {AMENITY_ICON_OPTIONS.map((option) => {
+                                    const OptionIcon = option.icon;
+                                    return (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        <div className="flex items-center gap-2">
+                                          <OptionIcon className="w-4 h-4" />
+                                          <span>{option.label}</span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                              <Input 
+                                value={amenityName}
+                                onChange={(e) => {
+                                  const newAmenities = [...formData.amenities];
+                                  newAmenities[index] = typeof newAmenities[index] === 'string'
+                                    ? { name: e.target.value, icon: 'check' }
+                                    : { ...(newAmenities[index] as any), name: e.target.value };
+                                  setFormData({ ...formData, amenities: newAmenities });
+                                }}
+                                placeholder="Amenity name"
+                                data-testid={`input-amenity-${index}`}
+                              />
+                              <Button 
+                                type="button"
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => {
+                                  const newAmenities = formData.amenities.filter((_, i) => i !== index);
+                                  setFormData({ ...formData, amenities: newAmenities });
+                                }}
+                                data-testid={`button-remove-amenity-${index}`}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Select
+                          value={newAmenity.icon}
+                          onValueChange={(value) => setNewAmenity({ ...newAmenity, icon: value })}
+                        >
+                          <SelectTrigger className="w-[50px] px-2">
+                            {(() => {
+                              const IconComponent = getAmenityIcon(newAmenity.icon);
+                              return <IconComponent className="w-4 h-4 mx-auto" />;
+                            })()}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {AMENITY_ICON_OPTIONS.map((option) => {
+                              const OptionIcon = option.icon;
+                              return (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <div className="flex items-center gap-2">
+                                    <OptionIcon className="w-4 h-4" />
+                                    <span>{option.label}</span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Input 
+                          placeholder="Add new amenity..."
+                          value={newAmenity.name}
+                          onChange={(e) => setNewAmenity({ ...newAmenity, name: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (newAmenity?.name?.trim()) {
+                                setFormData({ 
+                                  ...formData, 
+                                  amenities: [...formData.amenities, { name: newAmenity.name.trim(), icon: newAmenity.icon }] 
+                                });
+                                setNewAmenity({ name: '', icon: 'check' });
+                              }
+                            }
+                          }}
+                          data-testid="input-new-amenity"
+                        />
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => {
+                            if (newAmenity?.name?.trim()) {
+                              setFormData({ 
+                                ...formData, 
+                                amenities: [...formData.amenities, { name: newAmenity.name.trim(), icon: newAmenity.icon }] 
+                              });
+                              setNewAmenity({ name: '', icon: 'check' });
+                            }
+                          }}
+                          disabled={!newAmenity?.name?.trim()}
+                          data-testid="button-add-amenity"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsCreateModalOpen(false);
+                        resetForm();
+                      }}
+                      data-testid="button-cancel-create"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" data-testid="button-submit-create">
+                      Create Park
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           )}
 
           {/* Edit Park Dialog */}
