@@ -369,17 +369,17 @@ export default function Properties() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
          
-            <TabsTrigger value="lots"  className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
->
-              <MapPin className="w-4 h-4" />
-              Homes
-              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
-            </TabsTrigger>
             <TabsTrigger value="parks"  className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
 >
               <TreePine className="w-4 h-4" />
               Parks
               {parksPagination?.total && <Badge variant="secondary" className="ml-2">{parksPagination.total}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="lots"  className="flex items-center gap-2 bg-white text-gray-900 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+>
+              <MapPin className="w-4 h-4" />
+              Homes
+              {lotsPagination?.total && <Badge variant="secondary" className="ml-2">{lotsPagination.total}</Badge>}
             </TabsTrigger>
           </TabsList>
 
