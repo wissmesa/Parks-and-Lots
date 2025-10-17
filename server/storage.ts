@@ -502,6 +502,12 @@ export class DatabaseStorage implements IStorage {
       priceRentToOwn: lots.priceRentToOwn,
       priceContractForDeed: lots.priceContractForDeed,
       lotRent: lots.lotRent,
+      promotionalPrice: lots.promotionalPrice,
+      promotionalPriceActive: lots.promotionalPriceActive,
+      estimatedPayment: lots.estimatedPayment,
+      availableDate: lots.availableDate,
+      mobileHomeYear: lots.mobileHomeYear,
+      mobileHomeSize: lots.mobileHomeSize,
       showingLink: lots.showingLink,
       description: lots.description,
       bedrooms: lots.bedrooms,
@@ -646,6 +652,17 @@ export class DatabaseStorage implements IStorage {
             nameOrNumber: lots.nameOrNumber,
             status: lots.status,
             price: lots.price,
+            priceForRent: lots.priceForRent,
+            priceForSale: lots.priceForSale,
+            priceRentToOwn: lots.priceRentToOwn,
+            priceContractForDeed: lots.priceContractForDeed,
+            lotRent: lots.lotRent,
+            promotionalPrice: lots.promotionalPrice,
+            promotionalPriceActive: lots.promotionalPriceActive,
+            estimatedPayment: lots.estimatedPayment,
+            availableDate: lots.availableDate,
+            mobileHomeYear: lots.mobileHomeYear,
+            mobileHomeSize: lots.mobileHomeSize,
             description: lots.description,
             bedrooms: lots.bedrooms,
             bathrooms: lots.bathrooms,
@@ -655,7 +672,6 @@ export class DatabaseStorage implements IStorage {
             parkId: lots.parkId,
             isActive: lots.isActive,
             specialStatusId: lots.specialStatusId,
-            lotRent: lots.lotRent,
             showingLink: lots.showingLink,
             facebookPostId: lots.facebookPostId
           })
@@ -671,16 +687,7 @@ export class DatabaseStorage implements IStorage {
           
           if (fallbackResults.length === 0) return undefined;
           
-          // Add missing price fields with default values for backward compatibility
-          const result = fallbackResults[0];
-          return {
-            ...result,
-            priceForRent: null,
-            priceForSale: null,
-            priceRentToOwn: null,
-            priceContractForDeed: null,
-            facebookPostId: result.facebookPostId
-          };
+          return fallbackResults[0];
         } catch (fallbackError) {
           console.error('Fallback query also failed:', fallbackError);
           throw fallbackError;
@@ -1517,6 +1524,12 @@ export class DatabaseStorage implements IStorage {
       priceRentToOwn: lots.priceRentToOwn,
       priceContractForDeed: lots.priceContractForDeed,
       lotRent: lots.lotRent,
+      promotionalPrice: lots.promotionalPrice,
+      promotionalPriceActive: lots.promotionalPriceActive,
+      estimatedPayment: lots.estimatedPayment,
+      availableDate: lots.availableDate,
+      mobileHomeYear: lots.mobileHomeYear,
+      mobileHomeSize: lots.mobileHomeSize,
       showingLink: lots.showingLink,
       description: lots.description,
       bedrooms: lots.bedrooms,

@@ -131,6 +131,12 @@ export const lots = pgTable("lots", {
   priceRentToOwn: decimal("price_rent_to_own", { precision: 10, scale: 2 }),
   priceContractForDeed: decimal("price_contract_for_deed", { precision: 10, scale: 2 }),
   lotRent: decimal("lot_rent", { precision: 10, scale: 2 }),
+  promotionalPrice: decimal("promotional_price", { precision: 10, scale: 2 }),
+  promotionalPriceActive: boolean("promotional_price_active").default(false),
+  estimatedPayment: decimal("estimated_payment", { precision: 10, scale: 2 }),
+  availableDate: timestamp("available_date"),
+  mobileHomeYear: integer("mobile_home_year"),
+  mobileHomeSize: varchar("mobile_home_size"),
   showingLink: varchar("showing_link"),
   description: text("description"),
   bedrooms: integer("bedrooms"),
@@ -429,7 +435,17 @@ export const insertParkSchema = createInsertSchema(parks, {
   createdAt: true,
 });
 
-export const insertLotSchema = createInsertSchema(lots).omit({
+export const insertLotSchema = createInsertSchema(lots, {
+  availableDate: z.union([
+    z.string().transform((val) => {
+      if (!val || val === '') return null;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    z.date(),
+    z.null()
+  ]).optional().nullable(),
+}).omit({
   id: true,
 });
 

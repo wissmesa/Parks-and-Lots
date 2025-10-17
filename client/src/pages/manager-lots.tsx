@@ -61,6 +61,12 @@ interface Lot {
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
   lotRent?: string | null;
+  promotionalPrice?: string | null;
+  promotionalPriceActive?: boolean;
+  estimatedPayment?: string | null;
+  availableDate?: string | null;
+  mobileHomeYear?: number | null;
+  mobileHomeSize?: string | null;
   showingLink?: string | null;
   description: string;
   bedrooms: number;
@@ -195,6 +201,12 @@ export default function ManagerLots() {
       priceRentToOwn: '',
       priceContractForDeed: '',
       lotRent: '',
+      promotionalPrice: '',
+      promotionalPriceActive: false,
+      estimatedPayment: '',
+      availableDate: '',
+      mobileHomeYear: '',
+      mobileHomeSize: '',
       showingLink: '',
       description: '',
       bedrooms: 1,
@@ -234,6 +246,12 @@ export default function ManagerLots() {
     priceRentToOwn: '',
     priceContractForDeed: '',
     lotRent: '',
+    promotionalPrice: '',
+    promotionalPriceActive: false,
+    estimatedPayment: '',
+    availableDate: '',
+    mobileHomeYear: '',
+    mobileHomeSize: '',
     showingLink: '',
     description: '',
     bedrooms: 1,
@@ -319,6 +337,12 @@ export default function ManagerLots() {
         priceRentToOwn: toStringOrNull(lotData.priceRentToOwn),
         priceContractForDeed: toStringOrNull(lotData.priceContractForDeed),
         lotRent: toStringOrNull(lotData.lotRent),
+        promotionalPrice: toStringOrNull(lotData.promotionalPrice),
+        promotionalPriceActive: lotData.promotionalPriceActive || false,
+        estimatedPayment: toStringOrNull(lotData.estimatedPayment),
+        availableDate: lotData.availableDate || null,
+        mobileHomeYear: lotData.mobileHomeYear ? parseInt(lotData.mobileHomeYear) : null,
+        mobileHomeSize: lotData.mobileHomeSize?.trim() || null,
         bedrooms: lotData.bedrooms || null,
         bathrooms: lotData.bathrooms || null,
         sqFt: lotData.sqFt || null,
@@ -346,6 +370,12 @@ export default function ManagerLots() {
         priceRentToOwn: '',
         priceContractForDeed: '',
         lotRent: '',
+        promotionalPrice: '',
+        promotionalPriceActive: false,
+        estimatedPayment: '',
+        availableDate: '',
+        mobileHomeYear: '',
+        mobileHomeSize: '',
         showingLink: '',
         description: '',
         bedrooms: 1,
@@ -403,6 +433,12 @@ export default function ManagerLots() {
       if (updates.houseManufacturer !== undefined) processedUpdates.houseManufacturer = typeof updates.houseManufacturer === 'string' ? (updates.houseManufacturer.trim() || null) : null;
       if (updates.houseModel !== undefined) processedUpdates.houseModel = typeof updates.houseModel === 'string' ? (updates.houseModel.trim() || null) : null;
       if (updates.description !== undefined) processedUpdates.description = typeof updates.description === 'string' ? (updates.description.trim() || null) : null;
+      if (updates.promotionalPrice !== undefined) processedUpdates.promotionalPrice = toStringOrNull(updates.promotionalPrice);
+      if (updates.promotionalPriceActive !== undefined) processedUpdates.promotionalPriceActive = updates.promotionalPriceActive || false;
+      if (updates.estimatedPayment !== undefined) processedUpdates.estimatedPayment = toStringOrNull(updates.estimatedPayment);
+      if (updates.availableDate !== undefined) processedUpdates.availableDate = updates.availableDate || null;
+      if (updates.mobileHomeYear !== undefined) processedUpdates.mobileHomeYear = updates.mobileHomeYear ? parseInt(updates.mobileHomeYear) : null;
+      if (updates.mobileHomeSize !== undefined) processedUpdates.mobileHomeSize = typeof updates.mobileHomeSize === 'string' ? (updates.mobileHomeSize.trim() || null) : null;
       
       const response = await apiRequest("PATCH", endpoint, processedUpdates);
       return response.json();
@@ -731,6 +767,12 @@ export default function ManagerLots() {
       priceRentToOwn: lot.priceRentToOwn || '',
       priceContractForDeed: lot.priceContractForDeed || '',
       lotRent: lot.lotRent || '',
+      promotionalPrice: lot.promotionalPrice || '',
+      promotionalPriceActive: lot.promotionalPriceActive || false,
+      estimatedPayment: lot.estimatedPayment || '',
+      availableDate: lot.availableDate ? lot.availableDate.split('T')[0] : '',
+      mobileHomeYear: lot.mobileHomeYear?.toString() || '',
+      mobileHomeSize: lot.mobileHomeSize || '',
       showingLink: lot.showingLink || '',
       description: lot.description,
       bedrooms: lot.bedrooms,
@@ -1248,6 +1290,78 @@ export default function ManagerLots() {
                         value={formData.houseModel}
                         onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
                         placeholder="e.g., Heritage 3264A"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="mobileHomeYear">Mobile Home Year</Label>
+                      <Select value={formData.mobileHomeYear} onValueChange={(value) => setFormData(prev => ({ ...prev, mobileHomeYear: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="mobileHomeSize">Mobile Home Size</Label>
+                      <Input
+                        id="mobileHomeSize"
+                        value={formData.mobileHomeSize}
+                        onChange={(e) => setFormData(prev => ({ ...prev, mobileHomeSize: e.target.value }))}
+                        placeholder="e.g., 14x70"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="promotionalPrice">Promotional Price</Label>
+                      <MoneyInput
+                        id="promotionalPrice"
+                        step="0.01"
+                        value={formData.promotionalPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                        placeholder="Special promotional price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="estimatedPayment">Estimated Payment</Label>
+                      <MoneyInput
+                        id="estimatedPayment"
+                        step="0.01"
+                        value={formData.estimatedPayment}
+                        onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                        placeholder="Estimated monthly payment"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2 pt-8">
+                      <Checkbox
+                        id="promotionalPriceActive"
+                        checked={formData.promotionalPriceActive}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
+                      />
+                      <Label htmlFor="promotionalPriceActive" className="text-sm cursor-pointer">
+                        Promotional Price Active
+                      </Label>
+                    </div>
+                    <div>
+                      <Label htmlFor="availableDate">Available Date</Label>
+                      <Input
+                        id="availableDate"
+                        type="date"
+                        value={formData.availableDate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -2258,6 +2372,82 @@ export default function ManagerLots() {
                         value={formData.houseModel}
                         onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
                         placeholder="e.g., Heritage 3264A"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-mobileHomeYear">Mobile Home Year</Label>
+                      <Select value={formData.mobileHomeYear} onValueChange={(value) => setFormData(prev => ({ ...prev, mobileHomeYear: value }))}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-mobileHomeSize">Mobile Home Size</Label>
+                      <Input
+                        id="edit-mobileHomeSize"
+                        value={formData.mobileHomeSize}
+                        onChange={(e) => setFormData(prev => ({ ...prev, mobileHomeSize: e.target.value }))}
+                        placeholder="e.g., 14x70"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-promotionalPrice">Promotional Price</Label>
+                      <MoneyInput
+                        id="edit-promotionalPrice"
+                        step="0.01"
+                        value={formData.promotionalPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                        placeholder="Special promotional price"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-estimatedPayment">Estimated Payment</Label>
+                      <MoneyInput
+                        id="edit-estimatedPayment"
+                        step="0.01"
+                        value={formData.estimatedPayment}
+                        onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                        placeholder="Estimated monthly payment"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2 pt-8">
+                      <Checkbox
+                        id="edit-promotionalPriceActive"
+                        checked={formData.promotionalPriceActive}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
+                      />
+                      <Label htmlFor="edit-promotionalPriceActive" className="text-sm cursor-pointer">
+                        Promotional Price Active
+                      </Label>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-availableDate">Available Date</Label>
+                      <Input
+                        id="edit-availableDate"
+                        type="date"
+                        value={formData.availableDate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
                         className="mt-1"
                       />
                     </div>

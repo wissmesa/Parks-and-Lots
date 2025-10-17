@@ -36,6 +36,12 @@ interface Lot {
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
   lotRent?: string | null;
+  promotionalPrice?: string | null;
+  promotionalPriceActive?: boolean;
+  estimatedPayment?: string | null;
+  availableDate?: string | null;
+  mobileHomeYear?: number | null;
+  mobileHomeSize?: string | null;
   showingLink?: string | null;
   description: string | null;
   bedrooms: number | null;
@@ -96,6 +102,12 @@ export default function AdminLots() {
     priceRentToOwn: "",
     priceContractForDeed: "",
     lotRent: "",
+    promotionalPrice: "",
+    promotionalPriceActive: false,
+    estimatedPayment: "",
+    availableDate: "",
+    mobileHomeYear: "",
+    mobileHomeSize: "",
     showingLink: "",
     description: "",
     bedrooms: 1,
@@ -442,6 +454,12 @@ export default function AdminLots() {
         priceRentToOwn: toStringOrNull(data.priceRentToOwn),
         priceContractForDeed: toStringOrNull(data.priceContractForDeed),
         lotRent: toStringOrNull(data.lotRent),
+        promotionalPrice: toStringOrNull(data.promotionalPrice),
+        promotionalPriceActive: data.promotionalPriceActive || false,
+        estimatedPayment: toStringOrNull(data.estimatedPayment),
+        availableDate: data.availableDate || null,
+        mobileHomeYear: data.mobileHomeYear ? parseInt(data.mobileHomeYear) : null,
+        mobileHomeSize: data.mobileHomeSize?.trim() || null,
         bedrooms: data.bedrooms || null,
         bathrooms: data.bathrooms || null,
         sqFt: data.sqFt || null,
@@ -505,6 +523,12 @@ export default function AdminLots() {
       if (data.houseManufacturer !== undefined) payload.houseManufacturer = data.houseManufacturer?.trim() || null;
       if (data.houseModel !== undefined) payload.houseModel = data.houseModel?.trim() || null;
       if (data.description !== undefined) payload.description = data.description?.trim() || null;
+      if (data.promotionalPrice !== undefined) payload.promotionalPrice = toStringOrNull(data.promotionalPrice);
+      if (data.promotionalPriceActive !== undefined) payload.promotionalPriceActive = data.promotionalPriceActive || false;
+      if (data.estimatedPayment !== undefined) payload.estimatedPayment = toStringOrNull(data.estimatedPayment);
+      if (data.availableDate !== undefined) payload.availableDate = data.availableDate || null;
+      if (data.mobileHomeYear !== undefined) payload.mobileHomeYear = data.mobileHomeYear ? parseInt(data.mobileHomeYear) : null;
+      if (data.mobileHomeSize !== undefined) payload.mobileHomeSize = data.mobileHomeSize?.trim() || null;
       const response = await apiRequest("PATCH", `/api/lots/${editingLot?.id}`, payload);
       return response.json();
     },
@@ -623,6 +647,12 @@ export default function AdminLots() {
       priceRentToOwn: "",
       priceContractForDeed: "",
       lotRent: "",
+      promotionalPrice: "",
+      promotionalPriceActive: false,
+      estimatedPayment: "",
+      availableDate: "",
+      mobileHomeYear: "",
+      mobileHomeSize: "",
       showingLink: "",
       description: "",
       bedrooms: 1,
@@ -645,6 +675,12 @@ export default function AdminLots() {
       priceRentToOwn: lot.priceRentToOwn || "",
       priceContractForDeed: lot.priceContractForDeed || "",
       lotRent: lot.lotRent || "",
+      promotionalPrice: lot.promotionalPrice || "",
+      promotionalPriceActive: lot.promotionalPriceActive || false,
+      estimatedPayment: lot.estimatedPayment || "",
+      availableDate: lot.availableDate ? lot.availableDate.split('T')[0] : "",
+      mobileHomeYear: lot.mobileHomeYear?.toString() || "",
+      mobileHomeSize: lot.mobileHomeSize || "",
       showingLink: lot.showingLink || "",
       description: lot.description || "",
       bedrooms: lot.bedrooms || 1,
@@ -1149,6 +1185,78 @@ export default function AdminLots() {
                         value={formData.houseModel}
                         onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
                         placeholder="e.g., Heritage 3264A"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="mobileHomeYear">Mobile Home Year</Label>
+                      <Select value={formData.mobileHomeYear} onValueChange={(value) => setFormData(prev => ({ ...prev, mobileHomeYear: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="mobileHomeSize">Mobile Home Size</Label>
+                      <Input
+                        id="mobileHomeSize"
+                        value={formData.mobileHomeSize}
+                        onChange={(e) => setFormData(prev => ({ ...prev, mobileHomeSize: e.target.value }))}
+                        placeholder="e.g., 14x70"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="promotionalPrice">Promotional Price</Label>
+                      <MoneyInput
+                        id="promotionalPrice"
+                        step="0.01"
+                        value={formData.promotionalPrice}
+                        onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                        placeholder="Special promotional price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="estimatedPayment">Estimated Payment</Label>
+                      <MoneyInput
+                        id="estimatedPayment"
+                        step="0.01"
+                        value={formData.estimatedPayment}
+                        onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                        placeholder="Estimated monthly payment"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center space-x-2 pt-8">
+                      <Checkbox
+                        id="promotionalPriceActive"
+                        checked={formData.promotionalPriceActive}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
+                      />
+                      <Label htmlFor="promotionalPriceActive" className="text-sm cursor-pointer">
+                        Promotional Price Active
+                      </Label>
+                    </div>
+                    <div>
+                      <Label htmlFor="availableDate">Available Date</Label>
+                      <Input
+                        id="availableDate"
+                        type="date"
+                        value={formData.availableDate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -2216,6 +2324,82 @@ export default function AdminLots() {
                       value={formData.houseModel}
                       onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
                       placeholder="e.g., Heritage 3264A"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-mobileHomeYear">Mobile Home Year</Label>
+                    <Select value={formData.mobileHomeYear} onValueChange={(value) => setFormData(prev => ({ ...prev, mobileHomeYear: value }))}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-mobileHomeSize">Mobile Home Size</Label>
+                    <Input
+                      id="edit-mobileHomeSize"
+                      value={formData.mobileHomeSize}
+                      onChange={(e) => setFormData(prev => ({ ...prev, mobileHomeSize: e.target.value }))}
+                      placeholder="e.g., 14x70"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-promotionalPrice">Promotional Price</Label>
+                    <MoneyInput
+                      id="edit-promotionalPrice"
+                      step="0.01"
+                      value={formData.promotionalPrice}
+                      onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                      placeholder="Special promotional price"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-estimatedPayment">Estimated Payment</Label>
+                    <MoneyInput
+                      id="edit-estimatedPayment"
+                      step="0.01"
+                      value={formData.estimatedPayment}
+                      onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                      placeholder="Estimated monthly payment"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2 pt-8">
+                    <Checkbox
+                      id="edit-promotionalPriceActive"
+                      checked={formData.promotionalPriceActive}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
+                    />
+                    <Label htmlFor="edit-promotionalPriceActive" className="text-sm cursor-pointer">
+                      Promotional Price Active
+                    </Label>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-availableDate">Available Date</Label>
+                    <Input
+                      id="edit-availableDate"
+                      type="date"
+                      value={formData.availableDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
                       className="mt-1"
                     />
                   </div>

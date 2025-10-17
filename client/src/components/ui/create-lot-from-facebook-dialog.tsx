@@ -12,6 +12,7 @@ import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -57,6 +58,12 @@ export function CreateLotFromFacebookDialog({
     priceRentToOwn: '',
     priceContractForDeed: '',
     lotRent: '',
+    promotionalPrice: '',
+    promotionalPriceActive: false,
+    estimatedPayment: '',
+    availableDate: '',
+    mobileHomeYear: '',
+    mobileHomeSize: '',
     showingLink: '',
     description: prefilledDescription,
     bedrooms: 1,
@@ -92,6 +99,12 @@ export function CreateLotFromFacebookDialog({
         priceRentToOwn: '',
         priceContractForDeed: '',
         lotRent: '',
+        promotionalPrice: '',
+        promotionalPriceActive: false,
+        estimatedPayment: '',
+        availableDate: '',
+        mobileHomeYear: '',
+        mobileHomeSize: '',
         showingLink: '',
         description: prefilledDescription,
         bedrooms: 1,
@@ -150,6 +163,12 @@ export function CreateLotFromFacebookDialog({
         priceRentToOwn: priceRentToOwnNum,
         priceContractForDeed: priceContractForDeedNum,
         lotRent: lotRentNum,
+        promotionalPrice: toNumberOrNull(data.promotionalPrice),
+        promotionalPriceActive: data.promotionalPriceActive || false,
+        estimatedPayment: toNumberOrNull(data.estimatedPayment),
+        availableDate: data.availableDate || null,
+        mobileHomeYear: data.mobileHomeYear ? parseInt(data.mobileHomeYear) : null,
+        mobileHomeSize: data.mobileHomeSize?.trim() || null,
         bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
         bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : null,
         sqFt: data.sqFt ? parseInt(data.sqFt) : null,
@@ -173,7 +192,10 @@ export function CreateLotFromFacebookDialog({
       return response.json();
     },
     onSuccess: (data) => {
+      // Invalidate all possible lot query keys for real-time updates
       queryClient.invalidateQueries({ queryKey: ['/api/lots'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/lots'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/company-manager/lots'] });
       setCreatedLotId(data.id);
       setCreatedLotName(formData.nameOrNumber);
       toast({
@@ -547,6 +569,81 @@ export function CreateLotFromFacebookDialog({
                     value={formData.houseModel}
                     onChange={(e) => setFormData(prev => ({ ...prev, houseModel: e.target.value }))}
                     placeholder="e.g., Heritage 3264A"
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Home Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="mobileHomeYear">Mobile Home Year</Label>
+                  <Select value={formData.mobileHomeYear} onValueChange={(value) => setFormData(prev => ({ ...prev, mobileHomeYear: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="mobileHomeSize">Mobile Home Size</Label>
+                  <Input
+                    id="mobileHomeSize"
+                    value={formData.mobileHomeSize}
+                    onChange={(e) => setFormData(prev => ({ ...prev, mobileHomeSize: e.target.value }))}
+                    placeholder="e.g., 14x70"
+                  />
+                </div>
+              </div>
+
+              {/* Additional Pricing */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="promotionalPrice">Promotional Price</Label>
+                  <MoneyInput
+                    id="promotionalPrice"
+                    step="0.01"
+                    value={formData.promotionalPrice}
+                    onChange={(e) => setFormData(prev => ({ ...prev, promotionalPrice: e.target.value }))}
+                    placeholder="Special promotional price"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="estimatedPayment">Estimated Payment</Label>
+                  <MoneyInput
+                    id="estimatedPayment"
+                    step="0.01"
+                    value={formData.estimatedPayment}
+                    onChange={(e) => setFormData(prev => ({ ...prev, estimatedPayment: e.target.value }))}
+                    placeholder="Estimated monthly payment"
+                  />
+                </div>
+              </div>
+
+              {/* Additional Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2 pt-8">
+                  <Checkbox
+                    id="promotionalPriceActive"
+                    checked={formData.promotionalPriceActive}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, promotionalPriceActive: checked as boolean }))}
+                  />
+                  <Label htmlFor="promotionalPriceActive" className="text-sm cursor-pointer">
+                    Promotional Price Active
+                  </Label>
+                </div>
+                <div>
+                  <Label htmlFor="availableDate">Available Date</Label>
+                  <Input
+                    id="availableDate"
+                    type="date"
+                    value={formData.availableDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, availableDate: e.target.value }))}
                   />
                 </div>
               </div>
