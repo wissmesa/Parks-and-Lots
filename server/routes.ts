@@ -2759,16 +2759,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/parks', authenticateToken, requireRole(['MHP_LORD', 'ADMIN']), async (req: AuthRequest, res) => {
     try {
-      const parsed = insertParkSchema.parse(req.body);
-      
       // For ADMIN users, enforce that the park belongs to their company
+      // Set companyId before validation
       if (req.user?.role === 'ADMIN') {
         if (!req.user.companyId) {
           return res.status(403).json({ message: 'Admin must be assigned to a company' });
         }
-        // Override the companyId with the admin's company
-        parsed.companyId = req.user.companyId;
+        // Set the companyId to the admin's company before parsing
+        req.body.companyId = req.user.companyId;
       }
+      
+      const parsed = insertParkSchema.parse(req.body);
       
       // Schema already transforms amenity objects to JSON strings
       const park = await storage.createPark(parsed);
