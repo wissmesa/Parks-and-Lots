@@ -418,11 +418,30 @@ export default function AdminLots() {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Helper function to convert empty strings to null for numeric fields
+      const toNumberOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      };
+      
       const payload = {
-        ...data,
+        parkId: data.parkId,
+        nameOrNumber: data.nameOrNumber,
+        status: data.status,
+        price: data.price || '0',
+        priceForRent: toNumberOrNull(data.priceForRent),
+        priceForSale: toNumberOrNull(data.priceForSale),
+        priceRentToOwn: toNumberOrNull(data.priceRentToOwn),
+        priceContractForDeed: toNumberOrNull(data.priceContractForDeed),
+        lotRent: toNumberOrNull(data.lotRent),
         bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
-        bathrooms: data.bathrooms ? parseInt(data.bathrooms) : null,
+        bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : null,
         sqFt: data.sqFt ? parseInt(data.sqFt) : null,
+        showingLink: data.showingLink?.trim() || null,
+        houseManufacturer: data.houseManufacturer?.trim() || null,
+        houseModel: data.houseModel?.trim() || null,
+        description: data.description?.trim() || null,
         isActive: true
       };
       return apiRequest("POST", "/api/lots", payload);
@@ -447,22 +466,32 @@ export default function AdminLots() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const payload = {
-        ...data,
-        bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
-        bathrooms: data.bathrooms ? parseInt(data.bathrooms) : null,
-        sqFt: data.sqFt ? parseInt(data.sqFt) : null,
-        priceForRent: data.priceForRent || null,
-        priceForSale: data.priceForSale || null,
-        priceRentToOwn: data.priceRentToOwn || null,
-        priceContractForDeed: data.priceContractForDeed || null,
-        lotRent: data.lotRent || null,
-        showingLink: data.showingLink || null,
-        houseManufacturer: data.houseManufacturer || null,
-        houseModel: data.houseModel || null,
-        description: data.description || null,
+      // Helper function to convert empty strings to null for numeric fields
+      const toNumberOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
       };
-      console.log("Sending update payload:", payload);
+      
+      // Build payload explicitly to avoid sending empty strings
+      const payload: any = {};
+      
+      if (data.parkId !== undefined) payload.parkId = data.parkId;
+      if (data.nameOrNumber !== undefined) payload.nameOrNumber = data.nameOrNumber;
+      if (data.status !== undefined) payload.status = data.status;
+      if (data.price !== undefined) payload.price = data.price || '0';
+      if (data.priceForRent !== undefined) payload.priceForRent = toNumberOrNull(data.priceForRent);
+      if (data.priceForSale !== undefined) payload.priceForSale = toNumberOrNull(data.priceForSale);
+      if (data.priceRentToOwn !== undefined) payload.priceRentToOwn = toNumberOrNull(data.priceRentToOwn);
+      if (data.priceContractForDeed !== undefined) payload.priceContractForDeed = toNumberOrNull(data.priceContractForDeed);
+      if (data.lotRent !== undefined) payload.lotRent = toNumberOrNull(data.lotRent);
+      if (data.bedrooms !== undefined) payload.bedrooms = data.bedrooms ? parseInt(data.bedrooms) : null;
+      if (data.bathrooms !== undefined) payload.bathrooms = data.bathrooms ? parseFloat(data.bathrooms) : null;
+      if (data.sqFt !== undefined) payload.sqFt = data.sqFt ? parseInt(data.sqFt) : null;
+      if (data.showingLink !== undefined) payload.showingLink = data.showingLink?.trim() || null;
+      if (data.houseManufacturer !== undefined) payload.houseManufacturer = data.houseManufacturer?.trim() || null;
+      if (data.houseModel !== undefined) payload.houseModel = data.houseModel?.trim() || null;
+      if (data.description !== undefined) payload.description = data.description?.trim() || null;
       const response = await apiRequest("PATCH", `/api/lots/${editingLot?.id}`, payload);
       return response.json();
     },
@@ -1154,7 +1183,7 @@ export default function AdminLots() {
                     <Label htmlFor="showingLink">Showing Link</Label>
                     <Input
                       id="showingLink"
-                      type="url"
+                      type="text"
                       value={formData.showingLink}
                       onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                       placeholder="https://example.com/showing-link"
@@ -2205,7 +2234,7 @@ export default function AdminLots() {
                   <Label htmlFor="edit-showingLink">Showing Link</Label>
                   <Input
                     id="edit-showingLink"
-                    type="url"
+                    type="text"
                     value={formData.showingLink}
                     onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                     placeholder="https://example.com/showing-link"

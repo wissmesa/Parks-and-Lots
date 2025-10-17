@@ -295,27 +295,31 @@ export default function ManagerLots() {
     mutationFn: async (lotData: typeof formData) => {
       const endpoint = isCompanyManager ? "/api/company-manager/lots" : "/api/manager/lots";
       
-      // Process the form data to handle empty strings for numeric fields
-      console.log('Original form data:', lotData);
-      
-      const processedData = {
-        ...lotData,
-        price: '0', // Legacy price field - required by database (as string for decimal)
-        bedrooms: lotData.bedrooms || 0,
-        bathrooms: lotData.bathrooms || 0,
-        sqFt: lotData.sqFt || 0,
-        priceForRent: lotData.priceForRent || null,
-        priceForSale: lotData.priceForSale || null,
-        priceRentToOwn: lotData.priceRentToOwn || null,
-        priceContractForDeed: lotData.priceContractForDeed || null,
-        lotRent: lotData.lotRent || null,
-        showingLink: lotData.showingLink || null,
-        houseManufacturer: lotData.houseManufacturer || null,
-        houseModel: lotData.houseModel || null,
-        description: lotData.description || null,
+      // Helper function to convert empty strings to null for numeric fields
+      const toNumberOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
       };
       
-      console.log('Processed data:', processedData);
+      const processedData = {
+        parkId: lotData.parkId,
+        nameOrNumber: lotData.nameOrNumber,
+        status: lotData.status,
+        price: '0', // Legacy price field - required by database (as string for decimal)
+        priceForRent: toNumberOrNull(lotData.priceForRent),
+        priceForSale: toNumberOrNull(lotData.priceForSale),
+        priceRentToOwn: toNumberOrNull(lotData.priceRentToOwn),
+        priceContractForDeed: toNumberOrNull(lotData.priceContractForDeed),
+        lotRent: toNumberOrNull(lotData.lotRent),
+        bedrooms: lotData.bedrooms ? parseInt(lotData.bedrooms) : null,
+        bathrooms: lotData.bathrooms ? parseFloat(lotData.bathrooms) : null,
+        sqFt: lotData.sqFt ? parseInt(lotData.sqFt) : null,
+        showingLink: lotData.showingLink?.trim() || null,
+        houseManufacturer: lotData.houseManufacturer?.trim() || null,
+        houseModel: lotData.houseModel?.trim() || null,
+        description: lotData.description?.trim() || null,
+      };
       
       const response = await apiRequest("POST", endpoint, processedData);
       return response.json();
@@ -358,32 +362,34 @@ export default function ManagerLots() {
   // Update lot mutation
   const updateLotMutation = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<typeof formData>) => {
-      console.log('=== MANAGER LOT UPDATE DEBUG ===');
-      console.log('Original updates:', updates);
-      console.log('Updates types:', Object.keys(updates).map(key => `${key}: ${typeof updates[key]}`));
-      
       const endpoint = isCompanyManager ? `/api/company-manager/lots/${id}` : `/api/manager/lots/${id}`;
       
-      // Process the updates to handle empty strings for numeric fields
-      const processedUpdates = {
-        ...updates,
-        price: updates.price && updates.price !== '' ? updates.price : '0', // Legacy price field - required by database (as string for decimal)
-        bedrooms: updates.bedrooms && updates.bedrooms !== 0 ? updates.bedrooms : null,
-        bathrooms: updates.bathrooms && updates.bathrooms !== 0 ? updates.bathrooms : null,
-        sqFt: updates.sqFt && updates.sqFt !== 0 ? updates.sqFt : null,
-        priceForRent: updates.priceForRent && updates.priceForRent !== '' ? updates.priceForRent : null,
-        priceForSale: updates.priceForSale && updates.priceForSale !== '' ? updates.priceForSale : null,
-        priceRentToOwn: updates.priceRentToOwn && updates.priceRentToOwn !== '' ? updates.priceRentToOwn : null,
-        priceContractForDeed: updates.priceContractForDeed && updates.priceContractForDeed !== '' ? updates.priceContractForDeed : null,
-        lotRent: updates.lotRent && updates.lotRent !== '' ? updates.lotRent : null,
-        showingLink: updates.showingLink && updates.showingLink !== '' ? updates.showingLink : null,
-        houseManufacturer: updates.houseManufacturer && updates.houseManufacturer !== '' ? updates.houseManufacturer : null,
-        houseModel: updates.houseModel && updates.houseModel !== '' ? updates.houseModel : null,
-        description: updates.description && updates.description !== '' ? updates.description : null,
+      // Helper function to convert empty strings to null for numeric fields
+      const toNumberOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
       };
       
-      console.log('Processed updates:', processedUpdates);
-      console.log('Processed types:', Object.keys(processedUpdates).map(key => `${key}: ${typeof processedUpdates[key]}`));
+      // Build payload explicitly to avoid sending empty strings
+      const processedUpdates: any = {};
+      
+      if (updates.parkId !== undefined) processedUpdates.parkId = updates.parkId;
+      if (updates.nameOrNumber !== undefined) processedUpdates.nameOrNumber = updates.nameOrNumber;
+      if (updates.status !== undefined) processedUpdates.status = updates.status;
+      if (updates.price !== undefined) processedUpdates.price = updates.price || '0';
+      if (updates.priceForRent !== undefined) processedUpdates.priceForRent = toNumberOrNull(updates.priceForRent);
+      if (updates.priceForSale !== undefined) processedUpdates.priceForSale = toNumberOrNull(updates.priceForSale);
+      if (updates.priceRentToOwn !== undefined) processedUpdates.priceRentToOwn = toNumberOrNull(updates.priceRentToOwn);
+      if (updates.priceContractForDeed !== undefined) processedUpdates.priceContractForDeed = toNumberOrNull(updates.priceContractForDeed);
+      if (updates.lotRent !== undefined) processedUpdates.lotRent = toNumberOrNull(updates.lotRent);
+      if (updates.bedrooms !== undefined) processedUpdates.bedrooms = updates.bedrooms ? parseInt(updates.bedrooms as any) : null;
+      if (updates.bathrooms !== undefined) processedUpdates.bathrooms = updates.bathrooms ? parseFloat(updates.bathrooms as any) : null;
+      if (updates.sqFt !== undefined) processedUpdates.sqFt = updates.sqFt ? parseInt(updates.sqFt as any) : null;
+      if (updates.showingLink !== undefined) processedUpdates.showingLink = typeof updates.showingLink === 'string' ? (updates.showingLink.trim() || null) : null;
+      if (updates.houseManufacturer !== undefined) processedUpdates.houseManufacturer = typeof updates.houseManufacturer === 'string' ? (updates.houseManufacturer.trim() || null) : null;
+      if (updates.houseModel !== undefined) processedUpdates.houseModel = typeof updates.houseModel === 'string' ? (updates.houseModel.trim() || null) : null;
+      if (updates.description !== undefined) processedUpdates.description = typeof updates.description === 'string' ? (updates.description.trim() || null) : null;
       
       const response = await apiRequest("PATCH", endpoint, processedUpdates);
       return response.json();
@@ -1277,7 +1283,7 @@ export default function ManagerLots() {
                     <Label htmlFor="showingLink">Showing Link</Label>
                     <Input
                       id="showingLink"
-                      type="url"
+                      type="text"
                       value={formData.showingLink}
                       onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                       placeholder="https://example.com/showing-link"
@@ -2270,7 +2276,7 @@ export default function ManagerLots() {
                     <Label htmlFor="edit-showingLink">Showing Link</Label>
                     <Input
                       id="edit-showingLink"
-                      type="url"
+                      type="text"
                       value={formData.showingLink}
                       onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                       placeholder="https://example.com/showing-link"

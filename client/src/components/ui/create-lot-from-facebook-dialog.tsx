@@ -113,25 +113,50 @@ export function CreateLotFromFacebookDialog({
   // Create lot mutation
   const createLotMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Helper function to convert empty strings to null for numeric fields
+      const toNumberOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        const num = parseFloat(value);
+        return isNaN(num) ? null : num;
+      };
+      
       // Calculate a default price from the available price fields
       // Priority: priceForSale > priceForRent > priceRentToOwn > priceContractForDeed
+      const priceForRentNum = toNumberOrNull(data.priceForRent);
+      const priceForSaleNum = toNumberOrNull(data.priceForSale);
+      const priceRentToOwnNum = toNumberOrNull(data.priceRentToOwn);
+      const priceContractForDeedNum = toNumberOrNull(data.priceContractForDeed);
+      const lotRentNum = toNumberOrNull(data.lotRent);
+      
       let defaultPrice = '0';
-      if (data.priceForSale && data.priceForSale !== '') {
-        defaultPrice = data.priceForSale;
-      } else if (data.priceForRent && data.priceForRent !== '') {
-        defaultPrice = data.priceForRent;
-      } else if (data.priceRentToOwn && data.priceRentToOwn !== '') {
-        defaultPrice = data.priceRentToOwn;
-      } else if (data.priceContractForDeed && data.priceContractForDeed !== '') {
-        defaultPrice = data.priceContractForDeed;
+      if (priceForSaleNum) {
+        defaultPrice = priceForSaleNum.toString();
+      } else if (priceForRentNum) {
+        defaultPrice = priceForRentNum.toString();
+      } else if (priceRentToOwnNum) {
+        defaultPrice = priceRentToOwnNum.toString();
+      } else if (priceContractForDeedNum) {
+        defaultPrice = priceContractForDeedNum.toString();
       }
       
       const payload = {
-        ...data,
+        parkId: data.parkId,
+        nameOrNumber: data.nameOrNumber,
+        status: data.status,
         price: defaultPrice, // Legacy price field - required for backward compatibility
+        priceForRent: priceForRentNum,
+        priceForSale: priceForSaleNum,
+        priceRentToOwn: priceRentToOwnNum,
+        priceContractForDeed: priceContractForDeedNum,
+        lotRent: lotRentNum,
         bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
-        bathrooms: data.bathrooms ? parseInt(data.bathrooms) : null,
+        bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : null,
         sqFt: data.sqFt ? parseInt(data.sqFt) : null,
+        showingLink: data.showingLink?.trim() || null,
+        description: data.description?.trim() || null,
+        houseManufacturer: data.houseManufacturer?.trim() || null,
+        houseModel: data.houseModel?.trim() || null,
+        facebookPostId: data.facebookPostId || null,
         isActive: true
       };
       
@@ -417,8 +442,8 @@ export function CreateLotFromFacebookDialog({
                     <Label htmlFor="priceForRent">For Rent ($/month)</Label>
                     <Input
                       id="priceForRent"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.priceForRent}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
                       placeholder="Monthly rent amount"
@@ -428,8 +453,8 @@ export function CreateLotFromFacebookDialog({
                     <Label htmlFor="priceForSale">For Sale ($)</Label>
                     <Input
                       id="priceForSale"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.priceForSale}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
                       placeholder="Sale price"
@@ -439,8 +464,8 @@ export function CreateLotFromFacebookDialog({
                     <Label htmlFor="priceRentToOwn">Rent to Own ($/month)</Label>
                     <Input
                       id="priceRentToOwn"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.priceRentToOwn}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
                       placeholder="Monthly rent-to-own amount"
@@ -450,8 +475,8 @@ export function CreateLotFromFacebookDialog({
                     <Label htmlFor="priceContractForDeed">Contract for Deed ($/month)</Label>
                     <Input
                       id="priceContractForDeed"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.priceContractForDeed}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
                       placeholder="Monthly contract payment"
@@ -461,8 +486,8 @@ export function CreateLotFromFacebookDialog({
                     <Label htmlFor="lotRent">Lot Rent ($/month)</Label>
                     <Input
                       id="lotRent"
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.lotRent}
                       onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
                       placeholder="Monthly lot rent amount"
@@ -477,31 +502,33 @@ export function CreateLotFromFacebookDialog({
                   <Label htmlFor="bedrooms">Bedrooms</Label>
                   <Input
                     id="bedrooms"
-                    type="number"
-                    min="0"
-                    value={formData.bedrooms}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.bedrooms || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
                   />
                 </div>
                 <div>
                   <Label htmlFor="bathrooms">Bathrooms</Label>
                   <Input
                     id="bathrooms"
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={formData.bathrooms}
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.bathrooms || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0"
                   />
                 </div>
                 <div>
                   <Label htmlFor="sqFt">Square Feet</Label>
                   <Input
                     id="sqFt"
-                    type="number"
-                    min="0"
-                    value={formData.sqFt}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.sqFt || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
                   />
                 </div>
               </div>
@@ -545,7 +572,7 @@ export function CreateLotFromFacebookDialog({
                 <Label htmlFor="showingLink">Showing Link</Label>
                 <Input
                   id="showingLink"
-                  type="url"
+                  type="text"
                   value={formData.showingLink}
                   onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                   placeholder="https://example.com/showing-link"
