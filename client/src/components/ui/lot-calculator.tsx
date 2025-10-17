@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog';
 import { Button } from './button';
 import { Input } from './input';
+import { MoneyInput } from './money-input';
 import { Label } from './label';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
@@ -379,9 +380,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="price">Price</Label>
-                  <Input
+                  <MoneyInput
                     id="price"
-                    type="number"
                     value={data.price}
                     onChange={(e) => handleInputChange('price', e.target.value)}
                     className="mt-1"
@@ -389,9 +389,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                 </div>
                 <div>
                   <Label htmlFor="downpayment">Downpayment</Label>
-                  <Input
+                  <MoneyInput
                     id="downpayment"
-                    type="number"
                     value={data.downpayment}
                     onChange={(e) => handleInputChange('downpayment', e.target.value)}
                     className="mt-1"
@@ -411,9 +410,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="taxes">Taxes</Label>
-                  <Input
+                  <MoneyInput
                     id="taxes"
-                    type="number"
                     value={data.taxes}
                     onChange={(e) => handleInputChange('taxes', e.target.value)}
                     className="mt-1"
@@ -421,9 +419,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                 </div>
                 <div>
                   <Label htmlFor="insurance">Insurance</Label>
-                  <Input
+                  <MoneyInput
                     id="insurance"
-                    type="number"
                     value={data.insurance}
                     onChange={(e) => handleInputChange('insurance', e.target.value)}
                     className="mt-1"
@@ -443,9 +440,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
 
                 <div>
                   <Label htmlFor="lotRent">Lot rent</Label>
-                  <Input
+                  <MoneyInput
                     id="lotRent"
-                    type="number"
                     value={data.lotRent}
                     onChange={(e) => handleInputChange('lotRent', e.target.value)}
                     className="mt-1"
@@ -490,9 +486,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
 
               <div>
                 <Label htmlFor="securityDeposit">Security deposit</Label>
-                <Input
+                <MoneyInput
                   id="securityDeposit"
-                  type="number"
                   value={data.securityDeposit}
                   onChange={(e) => handleInputChange('securityDeposit', e.target.value)}
                   className="mt-1"
@@ -562,9 +557,8 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
 
                 <div>
                   <Label htmlFor="targetValue">Target Value</Label>
-                  <Input
+                  <MoneyInput
                     id="targetValue"
-                    type="number"
                     step="0.01"
                     value={goalSeekConfig.targetValue}
                     onChange={(e) => setGoalSeekConfig(prev => ({ ...prev, targetValue: parseFloat(e.target.value) || 0 }))}

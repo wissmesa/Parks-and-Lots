@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -302,19 +303,25 @@ export default function ManagerLots() {
         return isNaN(num) ? null : num;
       };
       
+      // Helper function to convert empty strings to null, keeping valid values as strings for decimal fields
+      const toStringOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        return String(value);
+      };
+      
       const processedData = {
         parkId: lotData.parkId,
         nameOrNumber: lotData.nameOrNumber,
         status: lotData.status,
         price: '0', // Legacy price field - required by database (as string for decimal)
-        priceForRent: toNumberOrNull(lotData.priceForRent),
-        priceForSale: toNumberOrNull(lotData.priceForSale),
-        priceRentToOwn: toNumberOrNull(lotData.priceRentToOwn),
-        priceContractForDeed: toNumberOrNull(lotData.priceContractForDeed),
-        lotRent: toNumberOrNull(lotData.lotRent),
-        bedrooms: lotData.bedrooms ? parseInt(lotData.bedrooms) : null,
-        bathrooms: lotData.bathrooms ? parseFloat(lotData.bathrooms) : null,
-        sqFt: lotData.sqFt ? parseInt(lotData.sqFt) : null,
+        priceForRent: toStringOrNull(lotData.priceForRent),
+        priceForSale: toStringOrNull(lotData.priceForSale),
+        priceRentToOwn: toStringOrNull(lotData.priceRentToOwn),
+        priceContractForDeed: toStringOrNull(lotData.priceContractForDeed),
+        lotRent: toStringOrNull(lotData.lotRent),
+        bedrooms: lotData.bedrooms || null,
+        bathrooms: lotData.bathrooms || null,
+        sqFt: lotData.sqFt || null,
         showingLink: lotData.showingLink?.trim() || null,
         houseManufacturer: lotData.houseManufacturer?.trim() || null,
         houseModel: lotData.houseModel?.trim() || null,
@@ -371,6 +378,12 @@ export default function ManagerLots() {
         return isNaN(num) ? null : num;
       };
       
+      // Helper function to convert empty strings to null, keeping valid values as strings for decimal fields
+      const toStringOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        return String(value);
+      };
+      
       // Build payload explicitly to avoid sending empty strings
       const processedUpdates: any = {};
       
@@ -378,14 +391,14 @@ export default function ManagerLots() {
       if (updates.nameOrNumber !== undefined) processedUpdates.nameOrNumber = updates.nameOrNumber;
       if (updates.status !== undefined) processedUpdates.status = updates.status;
       if (updates.price !== undefined) processedUpdates.price = updates.price || '0';
-      if (updates.priceForRent !== undefined) processedUpdates.priceForRent = toNumberOrNull(updates.priceForRent);
-      if (updates.priceForSale !== undefined) processedUpdates.priceForSale = toNumberOrNull(updates.priceForSale);
-      if (updates.priceRentToOwn !== undefined) processedUpdates.priceRentToOwn = toNumberOrNull(updates.priceRentToOwn);
-      if (updates.priceContractForDeed !== undefined) processedUpdates.priceContractForDeed = toNumberOrNull(updates.priceContractForDeed);
-      if (updates.lotRent !== undefined) processedUpdates.lotRent = toNumberOrNull(updates.lotRent);
-      if (updates.bedrooms !== undefined) processedUpdates.bedrooms = updates.bedrooms ? parseInt(updates.bedrooms as any) : null;
-      if (updates.bathrooms !== undefined) processedUpdates.bathrooms = updates.bathrooms ? parseFloat(updates.bathrooms as any) : null;
-      if (updates.sqFt !== undefined) processedUpdates.sqFt = updates.sqFt ? parseInt(updates.sqFt as any) : null;
+      if (updates.priceForRent !== undefined) processedUpdates.priceForRent = toStringOrNull(updates.priceForRent);
+      if (updates.priceForSale !== undefined) processedUpdates.priceForSale = toStringOrNull(updates.priceForSale);
+      if (updates.priceRentToOwn !== undefined) processedUpdates.priceRentToOwn = toStringOrNull(updates.priceRentToOwn);
+      if (updates.priceContractForDeed !== undefined) processedUpdates.priceContractForDeed = toStringOrNull(updates.priceContractForDeed);
+      if (updates.lotRent !== undefined) processedUpdates.lotRent = toStringOrNull(updates.lotRent);
+      if (updates.bedrooms !== undefined) processedUpdates.bedrooms = updates.bedrooms || null;
+      if (updates.bathrooms !== undefined) processedUpdates.bathrooms = updates.bathrooms || null;
+      if (updates.sqFt !== undefined) processedUpdates.sqFt = updates.sqFt || null;
       if (updates.showingLink !== undefined) processedUpdates.showingLink = typeof updates.showingLink === 'string' ? (updates.showingLink.trim() || null) : null;
       if (updates.houseManufacturer !== undefined) processedUpdates.houseManufacturer = typeof updates.houseManufacturer === 'string' ? (updates.houseManufacturer.trim() || null) : null;
       if (updates.houseModel !== undefined) processedUpdates.houseModel = typeof updates.houseModel === 'string' ? (updates.houseModel.trim() || null) : null;
@@ -1128,10 +1141,9 @@ export default function ManagerLots() {
                     <Label className="text-base font-medium">Prices by Status</Label>
                     <div className="grid grid-cols-1 gap-3">
                       <div>
-                        <Label htmlFor="priceForRent">For Rent ($)</Label>
-                        <Input
+                        <Label htmlFor="priceForRent">For Rent</Label>
+                        <MoneyInput
                           id="priceForRent"
-                          type="number"
                           step="0.01"
                           value={formData.priceForRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
@@ -1139,10 +1151,9 @@ export default function ManagerLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceForSale">For Sale ($)</Label>
-                        <Input
+                        <Label htmlFor="priceForSale">For Sale</Label>
+                        <MoneyInput
                           id="priceForSale"
-                          type="number"
                           step="0.01"
                           value={formData.priceForSale}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
@@ -1150,10 +1161,9 @@ export default function ManagerLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
-                        <Input
+                        <Label htmlFor="priceRentToOwn">Rent to Own</Label>
+                        <MoneyInput
                           id="priceRentToOwn"
-                          type="number"
                           step="0.01"
                           value={formData.priceRentToOwn}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
@@ -1161,10 +1171,9 @@ export default function ManagerLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
-                        <Input
+                        <Label htmlFor="priceContractForDeed">Contract for Deed</Label>
+                        <MoneyInput
                           id="priceContractForDeed"
-                          type="number"
                           step="0.01"
                           value={formData.priceContractForDeed}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
@@ -1172,10 +1181,9 @@ export default function ManagerLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="lotRent">Lot Rent ($)</Label>
-                        <Input
+                        <Label htmlFor="lotRent">Lot Rent</Label>
+                        <MoneyInput
                           id="lotRent"
-                          type="number"
                           step="0.01"
                           value={formData.lotRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
@@ -2131,9 +2139,8 @@ export default function ManagerLots() {
                       <div className="mt-3 space-y-3">
                         <div>
                           <Label htmlFor="edit-priceForRent" className="text-sm">For Rent ($/month)</Label>
-                          <Input
+                          <MoneyInput
                             id="edit-priceForRent"
-                            type="number"
                             step="0.01"
                             value={formData.priceForRent}
                             onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
@@ -2142,10 +2149,9 @@ export default function ManagerLots() {
                           />
                         </div>
                         <div>
-                          <Label htmlFor="edit-priceForSale" className="text-sm">For Sale ($)</Label>
-                          <Input
+                          <Label htmlFor="edit-priceForSale" className="text-sm">For Sale</Label>
+                          <MoneyInput
                             id="edit-priceForSale"
-                            type="number"
                             step="0.01"
                             value={formData.priceForSale}
                             onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
@@ -2155,9 +2161,8 @@ export default function ManagerLots() {
                         </div>
                         <div>
                           <Label htmlFor="edit-priceRentToOwn" className="text-sm">Rent to Own ($/month)</Label>
-                          <Input
+                          <MoneyInput
                             id="edit-priceRentToOwn"
-                            type="number"
                             step="0.01"
                             value={formData.priceRentToOwn}
                             onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
@@ -2167,9 +2172,8 @@ export default function ManagerLots() {
                         </div>
                         <div>
                           <Label htmlFor="edit-priceContractForDeed" className="text-sm">Contract for Deed ($/month)</Label>
-                          <Input
+                          <MoneyInput
                             id="edit-priceContractForDeed"
-                            type="number"
                             step="0.01"
                             value={formData.priceContractForDeed}
                             onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
@@ -2179,9 +2183,8 @@ export default function ManagerLots() {
                         </div>
                         <div>
                           <Label htmlFor="edit-lotRent" className="text-sm">Lot Rent ($/month)</Label>
-                          <Input
+                          <MoneyInput
                             id="edit-lotRent"
-                            type="number"
                             step="0.01"
                             value={formData.lotRent}
                             onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}

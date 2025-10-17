@@ -10,6 +10,7 @@ import { SheetsConnection } from "@/components/ui/sheets-connection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -425,19 +426,25 @@ export default function AdminLots() {
         return isNaN(num) ? null : num;
       };
       
+      // Helper function to convert empty strings to null, keeping valid values as strings for decimal fields
+      const toStringOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        return String(value);
+      };
+      
       const payload = {
         parkId: data.parkId,
         nameOrNumber: data.nameOrNumber,
         status: data.status,
         price: data.price || '0',
-        priceForRent: toNumberOrNull(data.priceForRent),
-        priceForSale: toNumberOrNull(data.priceForSale),
-        priceRentToOwn: toNumberOrNull(data.priceRentToOwn),
-        priceContractForDeed: toNumberOrNull(data.priceContractForDeed),
-        lotRent: toNumberOrNull(data.lotRent),
-        bedrooms: data.bedrooms ? parseInt(data.bedrooms) : null,
-        bathrooms: data.bathrooms ? parseFloat(data.bathrooms) : null,
-        sqFt: data.sqFt ? parseInt(data.sqFt) : null,
+        priceForRent: toStringOrNull(data.priceForRent),
+        priceForSale: toStringOrNull(data.priceForSale),
+        priceRentToOwn: toStringOrNull(data.priceRentToOwn),
+        priceContractForDeed: toStringOrNull(data.priceContractForDeed),
+        lotRent: toStringOrNull(data.lotRent),
+        bedrooms: data.bedrooms || null,
+        bathrooms: data.bathrooms || null,
+        sqFt: data.sqFt || null,
         showingLink: data.showingLink?.trim() || null,
         houseManufacturer: data.houseManufacturer?.trim() || null,
         houseModel: data.houseModel?.trim() || null,
@@ -473,6 +480,12 @@ export default function AdminLots() {
         return isNaN(num) ? null : num;
       };
       
+      // Helper function to convert empty strings to null, keeping valid values as strings for decimal fields
+      const toStringOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        return String(value);
+      };
+      
       // Build payload explicitly to avoid sending empty strings
       const payload: any = {};
       
@@ -480,14 +493,14 @@ export default function AdminLots() {
       if (data.nameOrNumber !== undefined) payload.nameOrNumber = data.nameOrNumber;
       if (data.status !== undefined) payload.status = data.status;
       if (data.price !== undefined) payload.price = data.price || '0';
-      if (data.priceForRent !== undefined) payload.priceForRent = toNumberOrNull(data.priceForRent);
-      if (data.priceForSale !== undefined) payload.priceForSale = toNumberOrNull(data.priceForSale);
-      if (data.priceRentToOwn !== undefined) payload.priceRentToOwn = toNumberOrNull(data.priceRentToOwn);
-      if (data.priceContractForDeed !== undefined) payload.priceContractForDeed = toNumberOrNull(data.priceContractForDeed);
-      if (data.lotRent !== undefined) payload.lotRent = toNumberOrNull(data.lotRent);
-      if (data.bedrooms !== undefined) payload.bedrooms = data.bedrooms ? parseInt(data.bedrooms) : null;
-      if (data.bathrooms !== undefined) payload.bathrooms = data.bathrooms ? parseFloat(data.bathrooms) : null;
-      if (data.sqFt !== undefined) payload.sqFt = data.sqFt ? parseInt(data.sqFt) : null;
+      if (data.priceForRent !== undefined) payload.priceForRent = toStringOrNull(data.priceForRent);
+      if (data.priceForSale !== undefined) payload.priceForSale = toStringOrNull(data.priceForSale);
+      if (data.priceRentToOwn !== undefined) payload.priceRentToOwn = toStringOrNull(data.priceRentToOwn);
+      if (data.priceContractForDeed !== undefined) payload.priceContractForDeed = toStringOrNull(data.priceContractForDeed);
+      if (data.lotRent !== undefined) payload.lotRent = toStringOrNull(data.lotRent);
+      if (data.bedrooms !== undefined) payload.bedrooms = data.bedrooms || null;
+      if (data.bathrooms !== undefined) payload.bathrooms = data.bathrooms || null;
+      if (data.sqFt !== undefined) payload.sqFt = data.sqFt || null;
       if (data.showingLink !== undefined) payload.showingLink = data.showingLink?.trim() || null;
       if (data.houseManufacturer !== undefined) payload.houseManufacturer = data.houseManufacturer?.trim() || null;
       if (data.houseModel !== undefined) payload.houseModel = data.houseModel?.trim() || null;
@@ -1029,10 +1042,9 @@ export default function AdminLots() {
                     <Label className="text-base font-medium">Prices by Status</Label>
                     <div className="grid grid-cols-1 gap-3">
                       <div>
-                        <Label htmlFor="priceForRent">For Rent ($)</Label>
-                        <Input
+                        <Label htmlFor="priceForRent">For Rent</Label>
+                        <MoneyInput
                           id="priceForRent"
-                          type="number"
                           step="0.01"
                           value={formData.priceForRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
@@ -1040,10 +1052,9 @@ export default function AdminLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceForSale">For Sale ($)</Label>
-                        <Input
+                        <Label htmlFor="priceForSale">For Sale</Label>
+                        <MoneyInput
                           id="priceForSale"
-                          type="number"
                           step="0.01"
                           value={formData.priceForSale}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
@@ -1051,10 +1062,9 @@ export default function AdminLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceRentToOwn">Rent to Own ($)</Label>
-                        <Input
+                        <Label htmlFor="priceRentToOwn">Rent to Own</Label>
+                        <MoneyInput
                           id="priceRentToOwn"
-                          type="number"
                           step="0.01"
                           value={formData.priceRentToOwn}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
@@ -1062,10 +1072,9 @@ export default function AdminLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="priceContractForDeed">Contract for Deed ($)</Label>
-                        <Input
+                        <Label htmlFor="priceContractForDeed">Contract for Deed</Label>
+                        <MoneyInput
                           id="priceContractForDeed"
-                          type="number"
                           step="0.01"
                           value={formData.priceContractForDeed}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
@@ -1073,10 +1082,9 @@ export default function AdminLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="lotRent">Lot Rent ($)</Label>
-                        <Input
+                        <Label htmlFor="lotRent">Lot Rent</Label>
+                        <MoneyInput
                           id="lotRent"
-                          type="number"
                           step="0.01"
                           value={formData.lotRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
@@ -2092,9 +2100,8 @@ export default function AdminLots() {
                     <div className="mt-3 space-y-3">
                       <div>
                         <Label htmlFor="edit-priceForRent" className="text-sm">For Rent ($/month)</Label>
-                        <Input
+                        <MoneyInput
                           id="edit-priceForRent"
-                          type="number"
                           step="0.01"
                           value={formData.priceForRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
@@ -2103,10 +2110,9 @@ export default function AdminLots() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="edit-priceForSale" className="text-sm">For Sale ($)</Label>
-                        <Input
+                        <Label htmlFor="edit-priceForSale" className="text-sm">For Sale</Label>
+                        <MoneyInput
                           id="edit-priceForSale"
-                          type="number"
                           step="0.01"
                           value={formData.priceForSale}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
@@ -2116,9 +2122,8 @@ export default function AdminLots() {
                       </div>
                       <div>
                         <Label htmlFor="edit-priceRentToOwn" className="text-sm">Rent to Own ($/month)</Label>
-                        <Input
+                        <MoneyInput
                           id="edit-priceRentToOwn"
-                          type="number"
                           step="0.01"
                           value={formData.priceRentToOwn}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
@@ -2128,9 +2133,8 @@ export default function AdminLots() {
                       </div>
                       <div>
                         <Label htmlFor="edit-priceContractForDeed" className="text-sm">Contract for Deed ($/month)</Label>
-                        <Input
+                        <MoneyInput
                           id="edit-priceContractForDeed"
-                          type="number"
                           step="0.01"
                           value={formData.priceContractForDeed}
                           onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
@@ -2140,9 +2144,8 @@ export default function AdminLots() {
                       </div>
                       <div>
                         <Label htmlFor="edit-lotRent" className="text-sm">Lot Rent ($/month)</Label>
-                        <Input
+                        <MoneyInput
                           id="edit-lotRent"
-                          type="number"
                           step="0.01"
                           value={formData.lotRent}
                           onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
@@ -2166,7 +2169,7 @@ export default function AdminLots() {
                       type="number"
                       min="0"
                       value={formData.bedrooms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: e.target.value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bedrooms: e.target.value ? parseInt(e.target.value) : 0 }))}
                       className="mt-1"
                     />
                   </div>
@@ -2178,7 +2181,7 @@ export default function AdminLots() {
                       min="0"
                       step="0.5"
                       value={formData.bathrooms}
-                      onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: e.target.value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, bathrooms: e.target.value ? parseFloat(e.target.value) : 0 }))}
                       className="mt-1"
                     />
                   </div>
@@ -2189,7 +2192,7 @@ export default function AdminLots() {
                       type="number"
                       min="0"
                       value={formData.sqFt}
-                      onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value }))}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
                       className="mt-1"
                     />
                   </div>

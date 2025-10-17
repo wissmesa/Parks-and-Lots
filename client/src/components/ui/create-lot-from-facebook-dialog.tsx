@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -440,21 +441,19 @@ export function CreateLotFromFacebookDialog({
                 <div className="grid grid-cols-1 gap-3">
                   <div>
                     <Label htmlFor="priceForRent">For Rent ($/month)</Label>
-                    <Input
+                    <MoneyInput
                       id="priceForRent"
-                      type="text"
-                      inputMode="decimal"
+                      step="0.01"
                       value={formData.priceForRent}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
                       placeholder="Monthly rent amount"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="priceForSale">For Sale ($)</Label>
-                    <Input
+                    <Label htmlFor="priceForSale">For Sale</Label>
+                    <MoneyInput
                       id="priceForSale"
-                      type="text"
-                      inputMode="decimal"
+                      step="0.01"
                       value={formData.priceForSale}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
                       placeholder="Sale price"
@@ -462,10 +461,9 @@ export function CreateLotFromFacebookDialog({
                   </div>
                   <div>
                     <Label htmlFor="priceRentToOwn">Rent to Own ($/month)</Label>
-                    <Input
+                    <MoneyInput
                       id="priceRentToOwn"
-                      type="text"
-                      inputMode="decimal"
+                      step="0.01"
                       value={formData.priceRentToOwn}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
                       placeholder="Monthly rent-to-own amount"
@@ -473,10 +471,9 @@ export function CreateLotFromFacebookDialog({
                   </div>
                   <div>
                     <Label htmlFor="priceContractForDeed">Contract for Deed ($/month)</Label>
-                    <Input
+                    <MoneyInput
                       id="priceContractForDeed"
-                      type="text"
-                      inputMode="decimal"
+                      step="0.01"
                       value={formData.priceContractForDeed}
                       onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
                       placeholder="Monthly contract payment"
@@ -484,10 +481,9 @@ export function CreateLotFromFacebookDialog({
                   </div>
                   <div>
                     <Label htmlFor="lotRent">Lot Rent ($/month)</Label>
-                    <Input
+                    <MoneyInput
                       id="lotRent"
-                      type="text"
-                      inputMode="decimal"
+                      step="0.01"
                       value={formData.lotRent}
                       onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
                       placeholder="Monthly lot rent amount"
