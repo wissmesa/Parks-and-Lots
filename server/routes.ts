@@ -68,14 +68,10 @@ const getFrontendBaseUrl = () => {
 
 const FRONTEND_BASE_URL = getFrontendBaseUrl();
 
-// Function to generate absolute photo URLs
+// Function to generate photo URLs - use relative paths for better compatibility
 const getPhotoUrl = (req: Request, filename: string): string => {
-  // Get the base URL from the request
-  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
-  const baseUrl = `${protocol}://${host}`;
-  
-  return `${baseUrl}/static/uploads/${filename}`;
+  // Use relative paths that work in both development and production
+  return `/static/uploads/${filename}`;
 };
 
 // Configure multer for file uploads
@@ -100,15 +96,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Serve static files - ensure this is before any other middleware
-  app.use('/static', express.static(path.join(process.cwd(), 'static'), {
+  // Use a more explicit configuration for static file serving
+  const staticOptions = {
     maxAge: '1d', // Cache for 1 day
     etag: true,
-    lastModified: true
-  }));
+    lastModified: true,
+    setHeaders: (res: any, path: string) => {
+      // Add CORS headers for static files
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      // Ensure proper content type for images
+      if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (path.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (path.endsWith('.gif')) {
+        res.setHeader('Content-Type', 'image/gif');
+      } else if (path.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    }
+  };
+  
+  app.use('/static', express.static(path.join(process.cwd(), 'static'), staticOptions));
 
   // Health check
   app.get('/api/healthz', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Debug endpoint to test static file serving
+  app.get('/api/debug/static', (req, res) => {
+    const fs = require('fs');
+    const uploadsPath = path.join(process.cwd(), 'static/uploads');
+    
+    try {
+      const files = fs.readdirSync(uploadsPath);
+      const fileInfo = files.map((filename: string) => {
+        const filePath = path.join(uploadsPath, filename);
+        const stats = fs.statSync(filePath);
+        return {
+          filename,
+          size: stats.size,
+          url: `/static/uploads/${filename}`,
+          exists: fs.existsSync(filePath)
+        };
+      });
+      
+      res.json({
+        uploadsPath,
+        fileCount: files.length,
+        files: fileInfo.slice(0, 5) // Show first 5 files
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Failed to read uploads directory',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Serve photos from database
+  app.get('/api/photos/:filename', async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      
+      // Find photo by filename in urlOrPath
+      const photos = await storage.getPhotosByFilename(filename);
+      if (!photos || photos.length === 0) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+      
+      const photo = photos[0];
+      
+      // Convert base64 back to buffer
+      const imageBuffer = Buffer.from(photo.imageData || '', 'base64');
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      res.setHeader('Content-Length', imageBuffer.length);
+      
+      // Send the image data
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error('Error serving photo:', error);
+      res.status(500).json({ message: 'Error serving photo' });
+    }
   });
 
 
@@ -2654,13 +2729,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Company photo ${i} caption:`, caption);
         
+        // Read the file and store it as base64 in database
+        const fs = require('fs');
+        const filePath = file.path;
+        const imageBuffer = fs.readFileSync(filePath);
+        const imageBase64 = imageBuffer.toString('base64');
+        const mimeType = file.mimetype || 'image/jpeg';
+        
         const photo = await storage.createPhoto({
           entityType: 'COMPANY',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
+          imageData: imageBase64,
+          mimeType: mimeType,
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
+        // Clean up temporary file
+        fs.unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -2953,13 +3040,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Photo ${i} caption:`, caption);
         
+        // Read the file and store it as base64 in database
+        const fs = require('fs');
+        const filePath = file.path;
+        const imageBuffer = fs.readFileSync(filePath);
+        const imageBase64 = imageBuffer.toString('base64');
+        const mimeType = file.mimetype || 'image/jpeg';
+        
         const photo = await storage.createPhoto({
           entityType: 'PARK',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
+          imageData: imageBase64,
+          mimeType: mimeType,
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
+        // Clean up temporary file
+        fs.unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -3915,13 +4014,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Lot photo ${i} caption:`, caption);
         
+        // Read the file and store it as base64 in database
+        const fs = require('fs');
+        const filePath = file.path;
+        const imageBuffer = fs.readFileSync(filePath);
+        const imageBase64 = imageBuffer.toString('base64');
+        const mimeType = file.mimetype || 'image/jpeg';
+        
         const photo = await storage.createPhoto({
           entityType: 'LOT',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
+          imageData: imageBase64,
+          mimeType: mimeType,
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
+        // Clean up temporary file
+        fs.unlinkSync(filePath);
         photos.push(photo);
       }
 
