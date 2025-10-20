@@ -89,8 +89,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('[Server] Failed to clean old login logs on startup:', error);
   }
 
-  // Serve static files
-  app.use('/static', express.static(path.join(process.cwd(), 'static')));
+  // Serve static files - ensure this is before any other middleware
+  app.use('/static', express.static(path.join(process.cwd(), 'static'), {
+    maxAge: '1d', // Cache for 1 day
+    etag: true,
+    lastModified: true
+  }));
 
   // Health check
   app.get('/api/healthz', (req, res) => {

@@ -44,8 +44,8 @@ export async function setupVite(app: Express, server: Server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     
-    // Skip API routes - let them be handled by the API middleware
-    if (url.startsWith('/api/')) {
+    // Skip API routes and static files - let them be handled by their respective middleware
+    if (url.startsWith('/api/') || url.startsWith('/static/')) {
       return next();
     }
 
