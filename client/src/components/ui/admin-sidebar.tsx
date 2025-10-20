@@ -50,7 +50,7 @@ export function AdminSidebar() {
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
           <Shield className="text-primary-foreground w-4 h-4" />
         </div>
-        <span className="font-bold text-foreground">Admin Panel</span>
+        <span className="font-bold text-foreground">MHP Lord Panel</span>
       </div>
       
       <nav className="space-y-2 flex-1">

@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle, List, Grid3X3 } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle, List, Grid3X3, UserCheck } from "lucide-react";
 import { validateEmail, validatePhone } from "@/lib/validation";
 
 interface Company {
@@ -35,6 +35,14 @@ interface Park {
   id: string;
   name: string;
   companyId: string;
+}
+
+interface Manager {
+  id: string;
+  fullName: string;
+  email: string;
+  role: 'MANAGER' | 'ADMIN';
+  companyId?: string;
 }
 
 export default function AdminCompanies() {
@@ -60,6 +68,8 @@ export default function AdminCompanies() {
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
   const [assigningParks, setAssigningParks] = useState<Company | null>(null);
   const [selectedParkIds, setSelectedParkIds] = useState<string[]>([]);
+  const [assigningManager, setAssigningManager] = useState<Company | null>(null);
+  const [selectedManagerId, setSelectedManagerId] = useState<string>('');
 
   // Validation functions
   const validateField = (field: string, value: string) => {
@@ -105,6 +115,11 @@ export default function AdminCompanies() {
 
   const { data: parks } = useQuery<{ parks: Park[] }>({
     queryKey: ["/api/parks"],
+    enabled: user?.role === 'MHP_LORD',
+  });
+
+  const { data: managersData } = useQuery<Manager[]>({
+    queryKey: ["/api/admin/managers"],
     enabled: user?.role === 'MHP_LORD',
   });
 
@@ -226,6 +241,29 @@ export default function AdminCompanies() {
     },
   });
 
+  const assignManagerMutation = useMutation({
+    mutationFn: async ({ companyId, managerId }: { companyId: string; managerId: string }) => {
+      return apiRequest("PATCH", `/api/admin/managers/${managerId}`, { companyId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/managers"] });
+      setAssigningManager(null);
+      setSelectedManagerId('');
+      toast({
+        title: "Success",
+        description: "Manager assigned to company successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to assign manager to company",
+        variant: "destructive",
+      });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -323,8 +361,27 @@ export default function AdminCompanies() {
     }
   };
 
+  const handleAssignManager = (company: Company) => {
+    setAssigningManager(company);
+    setSelectedManagerId('');
+  };
+
+  const handleManagerSelection = (managerId: string) => {
+    setSelectedManagerId(managerId);
+  };
+
+  const handleConfirmManagerAssignment = () => {
+    if (assigningManager && selectedManagerId) {
+      assignManagerMutation.mutate({
+        companyId: assigningManager.id,
+        managerId: selectedManagerId
+      });
+    }
+  };
+
   const companiesList = companies ?? [];
   const parksList = parks?.parks ?? [];
+  const managersList = managersData ?? [];
   
   // Create efficient lookup maps for relationships
   const parksByCompanyId = new Map<string, Park[]>();
@@ -578,6 +635,13 @@ export default function AdminCompanies() {
                               Assign Parks
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => handleAssignManager(company)}
+                              data-testid={`assign-manager-${company.id}`}
+                            >
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Assign Company to Manager
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => setShowPhotos(company.id)}
                               data-testid={`manage-photos-${company.id}`}
                             >
@@ -672,6 +736,10 @@ export default function AdminCompanies() {
                           <DropdownMenuItem onClick={() => handleAssignParks(company)}>
                             <TreePine className="w-4 h-4 mr-2" />
                             Assign Parks
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleAssignManager(company)}>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Assign Company to Manager
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setShowPhotos(company.id)}>
                             <Camera className="w-4 h-4 mr-2" />
@@ -881,6 +949,80 @@ export default function AdminCompanies() {
                   data-testid="confirm-assign-parks"
                 >
                   {assignParksMutation.isPending ? "Assigning..." : "Assign Parks"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Manager Assignment Dialog */}
+        <Dialog open={!!assigningManager} onOpenChange={(open) => !open && setAssigningManager(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                Assign {assigningManager?.name} to Manager
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select a manager or admin to assign this company to:
+              </p>
+              {managersList.length === 0 ? (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No managers or admins available
+                </div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {managersList.map(manager => {
+                    const isAdmin = manager.role === 'ADMIN';
+                    return (
+                      <div key={manager.id} className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id={`manager-${manager.id}`}
+                          name="manager-selection"
+                          checked={selectedManagerId === manager.id}
+                          onChange={() => handleManagerSelection(manager.id)}
+                          className="rounded border-gray-300"
+                          data-testid={`radio-manager-${manager.id}`}
+                        />
+                        <Label htmlFor={`manager-${manager.id}`} className="text-sm cursor-pointer flex-1">
+                          <div>
+                            <div className="font-medium">{manager.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{manager.email}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Role: {isAdmin ? 'Company Manager (Admin)' : 'Park Manager'}
+                            </div>
+                            {isAdmin && manager.companyId && (
+                              <div className={`text-xs ${manager.companyId === assigningManager?.id ? 'text-green-600' : 'text-amber-600'}`}>
+                                {manager.companyId === assigningManager?.id 
+                                  ? '(Currently assigned to this company)' 
+                                  : `(Currently assigned to: ${companiesList.find(c => c.id === manager.companyId)?.name || 'Another Company'})`
+                                }
+                              </div>
+                            )}
+                          </div>
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAssigningManager(null)}
+                  data-testid="cancel-assign-manager"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmManagerAssignment}
+                  disabled={!selectedManagerId || assignManagerMutation.isPending}
+                  data-testid="confirm-assign-manager"
+                >
+                  {assignManagerMutation.isPending ? "Assigning..." : "Assign Manager"}
                 </Button>
               </div>
             </div>
