@@ -340,12 +340,32 @@ export class DatabaseStorage implements IStorage {
         lotConditions.push(sql`${filters.status} = ANY(${lots.status})`);
       }
       
-      // Price filtering
-      if (filters?.minPrice) {
-        lotConditions.push(gte(lots.price, filters.minPrice.toString()));
-      }
-      if (filters?.maxPrice) {
-        lotConditions.push(lte(lots.price, filters.maxPrice.toString()));
+      // Price filtering - check all price fields
+      if (filters?.minPrice || filters?.maxPrice) {
+        const minPrice = filters?.minPrice ? filters.minPrice.toString() : '0';
+        const maxPrice = filters?.maxPrice ? filters.maxPrice.toString() : '999999999';
+        
+        lotConditions.push(sql`(
+          (${lots.priceForRent} IS NOT NULL AND ${lots.priceForRent} != '0' AND 
+           CAST(${lots.priceForRent} AS DECIMAL) >= ${minPrice} AND 
+           CAST(${lots.priceForRent} AS DECIMAL) <= ${maxPrice})
+          OR
+          (${lots.priceForSale} IS NOT NULL AND ${lots.priceForSale} != '0' AND 
+           CAST(${lots.priceForSale} AS DECIMAL) >= ${minPrice} AND 
+           CAST(${lots.priceForSale} AS DECIMAL) <= ${maxPrice})
+          OR
+          (${lots.priceRentToOwn} IS NOT NULL AND ${lots.priceRentToOwn} != '0' AND 
+           CAST(${lots.priceRentToOwn} AS DECIMAL) >= ${minPrice} AND 
+           CAST(${lots.priceRentToOwn} AS DECIMAL) <= ${maxPrice})
+          OR
+          (${lots.priceContractForDeed} IS NOT NULL AND ${lots.priceContractForDeed} != '0' AND 
+           CAST(${lots.priceContractForDeed} AS DECIMAL) >= ${minPrice} AND 
+           CAST(${lots.priceContractForDeed} AS DECIMAL) <= ${maxPrice})
+          OR
+          (${lots.price} IS NOT NULL AND ${lots.price} != '0' AND 
+           CAST(${lots.price} AS DECIMAL) >= ${minPrice} AND 
+           CAST(${lots.price} AS DECIMAL) <= ${maxPrice})
+        )`);
       }
       
       // Include inactive lot check
@@ -456,11 +476,32 @@ export class DatabaseStorage implements IStorage {
       // Check if the array contains the specific status
       conditions.push(sql`${filters.status} = ANY(${lots.status})`);
     }
-    if (filters?.minPrice) {
-      conditions.push(gte(lots.price, filters.minPrice.toString()));
-    }
-    if (filters?.maxPrice) {
-      conditions.push(lte(lots.price, filters.maxPrice.toString()));
+    // Price filtering - check all price fields
+    if (filters?.minPrice || filters?.maxPrice) {
+      const minPrice = filters?.minPrice ? filters.minPrice.toString() : '0';
+      const maxPrice = filters?.maxPrice ? filters.maxPrice.toString() : '999999999';
+      
+      conditions.push(sql`(
+        (${lots.priceForRent} IS NOT NULL AND ${lots.priceForRent} != '0' AND 
+         CAST(${lots.priceForRent} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceForRent} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceForSale} IS NOT NULL AND ${lots.priceForSale} != '0' AND 
+         CAST(${lots.priceForSale} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceForSale} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceRentToOwn} IS NOT NULL AND ${lots.priceRentToOwn} != '0' AND 
+         CAST(${lots.priceRentToOwn} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceRentToOwn} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceContractForDeed} IS NOT NULL AND ${lots.priceContractForDeed} != '0' AND 
+         CAST(${lots.priceContractForDeed} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceContractForDeed} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.price} IS NOT NULL AND ${lots.price} != '0' AND 
+         CAST(${lots.price} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.price} AS DECIMAL) <= ${maxPrice})
+      )`);
     }
     if (filters?.bedrooms) {
       conditions.push(eq(lots.bedrooms, filters.bedrooms));
@@ -553,11 +594,32 @@ export class DatabaseStorage implements IStorage {
       // Check if the array contains the specific status
       conditions.push(sql`${filters.status} = ANY(${lots.status})`);
     }
-    if (filters?.minPrice) {
-      conditions.push(gte(lots.price, filters.minPrice.toString()));
-    }
-    if (filters?.maxPrice) {
-      conditions.push(lte(lots.price, filters.maxPrice.toString()));
+    // Price filtering - check all price fields
+    if (filters?.minPrice || filters?.maxPrice) {
+      const minPrice = filters?.minPrice ? filters.minPrice.toString() : '0';
+      const maxPrice = filters?.maxPrice ? filters.maxPrice.toString() : '999999999';
+      
+      conditions.push(sql`(
+        (${lots.priceForRent} IS NOT NULL AND ${lots.priceForRent} != '0' AND 
+         CAST(${lots.priceForRent} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceForRent} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceForSale} IS NOT NULL AND ${lots.priceForSale} != '0' AND 
+         CAST(${lots.priceForSale} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceForSale} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceRentToOwn} IS NOT NULL AND ${lots.priceRentToOwn} != '0' AND 
+         CAST(${lots.priceRentToOwn} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceRentToOwn} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.priceContractForDeed} IS NOT NULL AND ${lots.priceContractForDeed} != '0' AND 
+         CAST(${lots.priceContractForDeed} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.priceContractForDeed} AS DECIMAL) <= ${maxPrice})
+        OR
+        (${lots.price} IS NOT NULL AND ${lots.price} != '0' AND 
+         CAST(${lots.price} AS DECIMAL) >= ${minPrice} AND 
+         CAST(${lots.price} AS DECIMAL) <= ${maxPrice})
+      )`);
     }
     if (filters?.bedrooms) {
       conditions.push(eq(lots.bedrooms, filters.bedrooms));

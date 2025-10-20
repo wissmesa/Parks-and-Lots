@@ -105,7 +105,6 @@ export default function Properties() {
   const [searchQuery, setSearchQuery] = useState(""); // Actual search query for API
   const [selectedState, setSelectedState] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
-  const [priceRange, setPriceRange] = useState("");
   const [activeTab, setActiveTab] = useState("parks");
   
   // Pagination state for lots
@@ -122,7 +121,6 @@ export default function Properties() {
     const urlSearchQuery = params.get('q') || '';
     const urlState = params.get('state') || '';
     const urlStatus = params.get('status') || '';
-    const urlPrice = params.get('price') || '';
     const urlTab = params.get('tab') || 'parks';
     const urlPage = params.get('page') || '1';
     
@@ -130,7 +128,6 @@ export default function Properties() {
     setSearchQuery(urlSearchQuery); // Set immediately for URL params
     setSelectedState(urlState);
     setSelectedStatus(urlStatus);
-    setPriceRange(urlPrice);
     setActiveTab(urlTab);
     
     if (urlTab === 'parks') {
@@ -203,13 +200,12 @@ export default function Properties() {
 
   // Lots data with pagination
   const { data: lotsData, isLoading: lotsLoading } = useQuery({
-    queryKey: ["/api/public/lots", searchQuery, selectedState, selectedStatus, priceRange, lotsCurrentPage, lotsItemsPerPage],
+    queryKey: ["/api/public/lots", searchQuery, selectedState, selectedStatus, lotsCurrentPage, lotsItemsPerPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.set('q', searchQuery);
       if (selectedState && selectedState !== 'all') params.set('state', selectedState);
       if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
-      if (priceRange && priceRange !== 'all') params.set('price', priceRange);
       params.set('page', lotsCurrentPage.toString());
       params.set('limit', lotsItemsPerPage.toString());
       
@@ -241,7 +237,7 @@ export default function Properties() {
   useEffect(() => {
     setLotsCurrentPage(1);
     setParksCurrentPage(1);
-  }, [searchQuery, selectedState, selectedStatus, priceRange]);
+  }, [searchQuery, selectedState, selectedStatus]);
 
   // Clear search when switching tabs
   useEffect(() => {
@@ -258,7 +254,6 @@ export default function Properties() {
     if (searchInput.trim()) params.set('q', searchInput.trim());
     if (selectedState && selectedState !== 'all') params.set('state', selectedState);
     if (selectedStatus && selectedStatus !== 'all') params.set('status', selectedStatus);
-    if (priceRange && priceRange !== 'all') params.set('price', priceRange);
     params.set('tab', activeTab);
     params.set('page', '1'); // Reset to first page on search
     
@@ -343,24 +338,6 @@ export default function Properties() {
                   </Select>
                 )}
               </div>
-
-              {/* Only show Price Range filter for Homes tab */}
-              {activeTab === 'lots' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Select value={priceRange} onValueChange={setPriceRange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Price Range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Prices</SelectItem>
-                      <SelectItem value="0-100000">Under $100k</SelectItem>
-                      <SelectItem value="100000-200000">$100k - $200k</SelectItem>
-                      <SelectItem value="200000-300000">$200k - $300k</SelectItem>
-                      <SelectItem value="300000+">Over $300k</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>

@@ -147,8 +147,6 @@ export default function ManagerLots() {
     specialStatusId: [] as string[],
     houseManufacturer: [] as string[],
     houseModel: [] as string[],
-    priceMin: "",
-    priceMax: "",
     bedroomsMin: "",
     bedroomsMax: "",
     bathroomsMin: "",
@@ -181,8 +179,6 @@ export default function ManagerLots() {
       specialStatusId: [],
       houseManufacturer: [],
       houseModel: [],
-      priceMin: "",
-      priceMax: "",
       bedroomsMin: "",
       bedroomsMax: "",
       bathroomsMin: "",
@@ -227,8 +223,6 @@ export default function ManagerLots() {
            filters.specialStatusId.length > 0 ||
            filters.houseManufacturer.length > 0 ||
            filters.houseModel.length > 0 ||
-           filters.priceMin ||
-           filters.priceMax ||
            filters.bedroomsMin ||
            filters.bedroomsMax ||
            filters.bathroomsMin ||
@@ -971,13 +965,6 @@ export default function ManagerLots() {
         }
       }
 
-      // Price range filter
-      if (filters.priceMin || filters.priceMax) {
-        const price = parseFloat((lot.price || '').toString().replace(/[^\d.-]/g, '')) || 0;
-        if (filters.priceMin && price < parseFloat(filters.priceMin)) return false;
-        if (filters.priceMax && price > parseFloat(filters.priceMax)) return false;
-      }
-
       // Bedrooms range filter
       if (filters.bedroomsMin || filters.bedroomsMax) {
         const bedrooms = lot.bedrooms || 0;
@@ -1677,45 +1664,6 @@ export default function ManagerLots() {
                       </PopoverContent>
                     </Popover>
                   )}
-
-                  {/* Price Range Filter */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-price-filter-trigger">
-                        <Filter className="w-4 h-4" />
-                        Price {(filters.priceMin || filters.priceMax) && "✓"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64" align="start">
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Price Range</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label htmlFor="manager-priceMin" className="text-xs">Min</Label>
-                            <Input
-                              id="manager-priceMin"
-                              type="number"
-                              placeholder="Min price"
-                              value={filters.priceMin}
-                              onChange={(e) => updateRangeFilter("priceMin", e.target.value)}
-                              data-testid="manager-price-min-filter"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="manager-priceMax" className="text-xs">Max</Label>
-                            <Input
-                              id="manager-priceMax"
-                              type="number"
-                              placeholder="Max price"
-                              value={filters.priceMax}
-                              onChange={(e) => updateRangeFilter("priceMax", e.target.value)}
-                              data-testid="manager-price-max-filter"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
 
                   {/* Bedrooms Range Filter */}
                   <Popover>
