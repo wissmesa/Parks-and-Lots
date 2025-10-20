@@ -68,6 +68,16 @@ const getFrontendBaseUrl = () => {
 
 const FRONTEND_BASE_URL = getFrontendBaseUrl();
 
+// Function to generate absolute photo URLs
+const getPhotoUrl = (req: Request, filename: string): string => {
+  // Get the base URL from the request
+  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
+  const baseUrl = `${protocol}://${host}`;
+  
+  return `${baseUrl}/static/uploads/${filename}`;
+};
+
 // Configure multer for file uploads
 const upload = multer({
   dest: path.join(process.cwd(), 'static/uploads'),
@@ -2639,7 +2649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const photo = await storage.createPhoto({
           entityType: 'COMPANY',
           entityId: req.params.id,
-          urlOrPath: `/static/uploads/${file.filename}`,
+          urlOrPath: getPhotoUrl(req, file.filename),
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
@@ -2938,7 +2948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const photo = await storage.createPhoto({
           entityType: 'PARK',
           entityId: req.params.id,
-          urlOrPath: `/static/uploads/${file.filename}`,
+          urlOrPath: getPhotoUrl(req, file.filename),
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
@@ -3900,7 +3910,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const photo = await storage.createPhoto({
           entityType: 'LOT',
           entityId: req.params.id,
-          urlOrPath: `/static/uploads/${file.filename}`,
+          urlOrPath: getPhotoUrl(req, file.filename),
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
