@@ -184,6 +184,19 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    
+    // Check if user is trying to upload more than 20 photos
+    if (files.length > 20) {
+      toast({
+        title: "Error",
+        description: `You can only upload up to 20 photos at a time. You selected ${files.length} photos.`,
+        variant: "destructive",
+      });
+      // Reset the input
+      e.target.value = '';
+      return;
+    }
+    
     const validFiles: File[] = [];
     
     for (const file of files) {

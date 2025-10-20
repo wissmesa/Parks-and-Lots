@@ -205,8 +205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.fullName = fullName.trim();
       }
       
-      // Update companyId if provided and user is ADMIN
-      if (companyId !== undefined && manager.role === 'ADMIN') {
+      // Update companyId if provided (allowed for both MANAGER and ADMIN roles)
+      if (companyId !== undefined) {
         updateData.companyId = companyId;
       }
       
@@ -2595,7 +2595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/companies/:id/photos', authenticateToken, requireRole('MHP_LORD'), upload.fields([
-    { name: 'photos', maxCount: 10 },
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
@@ -2894,7 +2894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/parks/:id/photos', authenticateToken, requireParkAccess, upload.fields([
-    { name: 'photos', maxCount: 10 },
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
@@ -3856,7 +3856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/lots/:id/photos', authenticateToken, requireLotAccess, upload.fields([
-    { name: 'photos', maxCount: 10 },
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
