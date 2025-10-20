@@ -158,6 +158,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   // Reorder mutation
   const reorderMutation = useMutation({
     mutationFn: async (photoOrders: Array<{id: string, sortOrder: number}>) => {
+      console.log('Reordering photos:', { entityType, entityId, photoOrders });
       return apiRequest("PATCH", "/api/photos/reorder", {
         entityType,
         entityId,
@@ -171,10 +172,11 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         description: "Photos reordered successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Reorder photos error:', error);
       toast({
         title: "Error",
-        description: "Failed to reorder photos",
+        description: error?.message || "Failed to reorder photos",
         variant: "destructive",
       });
     },
@@ -275,10 +277,16 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     e.preventDefault();
     setDragOverIndex(null);
     
-    if (!draggedPhoto) return;
+    if (!draggedPhoto) {
+      console.log('No dragged photo');
+      return;
+    }
 
     const dragIndex = photos.findIndex(p => p.id === draggedPhoto.id);
-    if (dragIndex === dropIndex) return;
+    if (dragIndex === dropIndex) {
+      console.log('Same position, no reorder needed');
+      return;
+    }
 
     // Create new order for photos
     const reorderedPhotos = [...photos];
@@ -290,6 +298,13 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
       id: photo.id,
       sortOrder: index + 1
     }));
+
+    console.log('About to call reorder mutation with:', {
+      entityType,
+      entityId,
+      photoOrders,
+      photoCount: photoOrders.length
+    });
 
     // Call reorder mutation
     reorderMutation.mutate(photoOrders);
