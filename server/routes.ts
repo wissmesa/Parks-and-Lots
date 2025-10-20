@@ -5364,47 +5364,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (entityType === 'LOT') {
-        // For lots, allow both admins and managers with lot access
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo reorder permissions for role:', req.user?.role);
+        
         if (req.user?.role === 'MHP_LORD') {
           // Super admin can reorder any lot photos
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
-          
-          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
-          if (!lot.parkId) {
-            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
-          }
-          
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
+          console.log('MHP_LORD: Access granted');
         } else if (req.user?.role === 'ADMIN') {
-          // Check if company manager has access to this lot
+          // Company manager can reorder lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
+          
           if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const lot = await storage.getLotAny(entityId);
           if (!lot) {
+            console.log('ADMIN: Lot not found');
             return res.status(404).json({ message: 'Lot not found' });
           }
           
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
           // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
           if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
             return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
           }
           
           const park = await storage.getPark(lot.parkId);
+          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+          
           if (!park || park.companyId !== req.user.companyId) {
+            console.log('ADMIN: Park does not belong to user company');
             return res.status(403).json({ message: 'Access denied to this lot' });
           }
+          
+          console.log('ADMIN: Access granted');
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can reorder lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
         } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (entityType === 'PARK') {
@@ -5432,8 +5456,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else {
-        // For company photos, only admins can reorder
-        if (req.user?.role !== 'ADMIN') {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can reorder any company photos
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can reorder their company's photos
+          // Additional permission checks could be added here if needed
+        } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
@@ -5483,47 +5512,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow admins, managers, and company managers with lot access
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo deletion permissions for role:', req.user?.role);
+        
         if (req.user?.role === 'MHP_LORD') {
-          // Admin can delete any lot photo
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(photo.entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
-          
-          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
-          if (!lot.parkId) {
-            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
-          }
-          
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
+          // Super admin can delete any lot photo
+          console.log('MHP_LORD: Access granted');
         } else if (req.user?.role === 'ADMIN') {
-          // Check if company manager has access to this lot
+          // Company manager can delete lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
+          
           if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const lot = await storage.getLotAny(photo.entityId);
           if (!lot) {
+            console.log('ADMIN: Lot not found');
             return res.status(404).json({ message: 'Lot not found' });
           }
           
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
           // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
           if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
             return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
           }
           
           const park = await storage.getPark(lot.parkId);
+          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+          
           if (!park || park.companyId !== req.user.companyId) {
+            console.log('ADMIN: Park does not belong to user company');
             return res.status(403).json({ message: 'Access denied to this lot' });
           }
+          
+          console.log('ADMIN: Access granted');
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can delete lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
         } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
@@ -5551,8 +5604,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else {
-        // For company photos, only admins can delete
-        if (req.user?.role !== 'ADMIN') {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can delete any company photo
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can delete their company's photos
+          // Additional permission checks could be added here if needed
+        } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
@@ -5605,47 +5663,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow admins, managers, and company managers with lot access
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo caption update permissions for role:', req.user?.role);
+        
         if (req.user?.role === 'MHP_LORD') {
-          // Admin can update any lot photo
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(photo.entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
-          
-          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
-          if (!lot.parkId) {
-            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
-          }
-          
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
+          // Super admin can update any lot photo
+          console.log('MHP_LORD: Access granted');
         } else if (req.user?.role === 'ADMIN') {
-          // Check if company manager has access to this lot
+          // Company manager can update lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
+          
           if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const lot = await storage.getLotAny(photo.entityId);
           if (!lot) {
+            console.log('ADMIN: Lot not found');
             return res.status(404).json({ message: 'Lot not found' });
           }
           
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
           // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
           if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
             return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
           }
           
           const park = await storage.getPark(lot.parkId);
+          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+          
           if (!park || park.companyId !== req.user.companyId) {
+            console.log('ADMIN: Park does not belong to user company');
             return res.status(403).json({ message: 'Access denied to this lot' });
           }
+          
+          console.log('ADMIN: Access granted');
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can update lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
         } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
@@ -5673,8 +5755,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else {
-        // For company photos, only admins can update
-        if (req.user?.role !== 'ADMIN') {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can update any company photo
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can update their company's photos
+          // Additional permission checks could be added here if needed
+        } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
