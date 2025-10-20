@@ -122,10 +122,10 @@ export const specialStatuses = pgTable("special_statuses", {
 // Lots table
 export const lots = pgTable("lots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  parkId: varchar("park_id").references(() => parks.id).notNull(),
+  parkId: varchar("park_id").references(() => parks.id),
   nameOrNumber: varchar("name_or_number").notNull(),
   status: lotStatusEnum("status").array(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(), // Legacy price field - keep for backward compatibility
+  price: decimal("price", { precision: 10, scale: 2 }), // Legacy price field - optional, use specific price fields instead
   priceForRent: decimal("price_for_rent", { precision: 10, scale: 2 }),
   priceForSale: decimal("price_for_sale", { precision: 10, scale: 2 }),
   priceRentToOwn: decimal("price_rent_to_own", { precision: 10, scale: 2 }),
