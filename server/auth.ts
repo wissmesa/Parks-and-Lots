@@ -118,6 +118,36 @@ export async function requireParkAccess(req: AuthRequest, res: Response, next: N
   next();
 }
 
+export async function requireCompanyAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (req.user.role === 'MHP_LORD') {
+    return next();
+  }
+
+  const companyId = req.params.companyId || req.params.id || req.body.companyId;
+  if (!companyId) {
+    return res.status(400).json({ message: 'Company ID required' });
+  }
+
+  // For ADMIN, check if the company is their company
+  if (req.user.role === 'ADMIN') {
+    if (!req.user.companyId) {
+      return res.status(403).json({ message: 'Admin must be assigned to a company' });
+    }
+    
+    if (req.user.companyId !== companyId) {
+      return res.status(403).json({ message: 'Access denied to this company' });
+    }
+    
+    return next();
+  }
+
+  return res.status(403).json({ message: 'Access denied' });
+}
+
 export async function requireLotAccess(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });

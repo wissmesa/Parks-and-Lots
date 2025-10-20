@@ -14,6 +14,7 @@ import {
   requireRole, 
   requireParkAccess, 
   requireLotAccess, 
+  requireCompanyAccess,
   generateTokens, 
   hashPassword, 
   comparePassword,
@@ -2683,7 +2684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:id/photos', authenticateToken, requireRole('MHP_LORD'), upload.fields([
+  app.post('/api/companies/:id/photos', authenticateToken, requireCompanyAccess, upload.fields([
     { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
@@ -5734,7 +5735,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Super admin can delete any company photo
         } else if (req.user?.role === 'ADMIN') {
           // Company manager can delete their company's photos
-          // Additional permission checks could be added here if needed
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          if (photo.entityId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied - you can only delete your own company photos' });
+          }
         } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
@@ -5885,7 +5892,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Super admin can update any company photo
         } else if (req.user?.role === 'ADMIN') {
           // Company manager can update their company's photos
-          // Additional permission checks could be added here if needed
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          if (photo.entityId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied - you can only update your own company photos' });
+          }
         } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
