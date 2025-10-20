@@ -2947,7 +2947,7 @@ export default function ManagerLots() {
                     </Button>
                   </div>
                   
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <div>
                       <h4 className="font-semibold mb-3 text-green-700">Required Columns</h4>
                       <ul className="space-y-1 text-sm">
@@ -2956,17 +2956,50 @@ export default function ManagerLots() {
                     </div>
                     <div>
                       <h4 className="font-semibold mb-3 text-blue-700">Optional Columns</h4>
-                      <ul className="space-y-1 text-sm">
-                        <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, RENT_TO_OWN, or CONTRACT_FOR_DEED</li>
-                        <li>• <strong>Special Status</strong> - Creates new status if doesn't exist</li>
-                        <li>• <strong>Price</strong> - Rental or sale price</li>
-                        <li>• <strong>Description</strong> - Lot description</li>
-                        <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
-                        <li>• <strong>Bathrooms</strong> - Number of bathrooms</li>
-                        <li>• <strong>Sq Ft</strong> - Square footage</li>
-                        <li>• <strong>Park ID</strong> - Required for multi-park managers</li>
-                        <li>• <strong>Park Name</strong> - Alternative to Park ID</li>
-                      </ul>
+                      <div className="grid md:grid-cols-2 gap-x-6 gap-y-1">
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-gray-700 mb-2">Basic Info:</p>
+                          <li>• <strong>Status</strong> - FOR_RENT, FOR_SALE, RENT_TO_OWN, CONTRACT_FOR_DEED</li>
+                          <li>• <strong>Special Status</strong> - Creates new status if doesn't exist</li>
+                          <li>• <strong>Description</strong> - Lot description</li>
+                          <li>• <strong>Available Date</strong> - When lot is available (YYYY-MM-DD)</li>
+                          <li>• <strong>Showing Link</strong> - URL for scheduling showings</li>
+                          <li>• <strong>Park ID</strong> - Required for multi-park managers</li>
+                          <li>• <strong>Park Name</strong> - Alternative to Park ID</li>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-gray-700 mb-2">Property Details:</p>
+                          <li>• <strong>Bedrooms</strong> - Number of bedrooms</li>
+                          <li>• <strong>Bathrooms</strong> - Number of bathrooms</li>
+                          <li>• <strong>Sq Ft</strong> - Square footage</li>
+                          <li>• <strong>House Manufacturer</strong> - Mobile home manufacturer</li>
+                          <li>• <strong>House Model</strong> - Mobile home model</li>
+                          <li>• <strong>Mobile Home Year</strong> - Year of mobile home</li>
+                          <li>• <strong>Mobile Home Size</strong> - Size/dimensions</li>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-gray-700 mb-2">Pricing (Rent):</p>
+                          <li>• <strong>Price For Rent</strong> - Monthly rent price</li>
+                          <li>• <strong>Deposit For Rent</strong> - Security deposit for rent</li>
+                          <li>• <strong>Lot Rent</strong> - Lot rent amount</li>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-gray-700 mb-2">Pricing (Sale):</p>
+                          <li>• <strong>Price For Sale</strong> - Sale price</li>
+                          <li>• <strong>Deposit For Sale</strong> - Security deposit for sale</li>
+                          <li>• <strong>Price Rent To Own</strong> - Rent to own monthly price</li>
+                          <li>• <strong>Deposit Rent To Own</strong> - Rent to own deposit</li>
+                          <li>• <strong>Price Contract For Deed</strong> - Contract for deed monthly price</li>
+                          <li>• <strong>Deposit Contract For Deed</strong> - Contract for deed deposit</li>
+                          <li>• <strong>Down Payment Contract For Deed</strong> - Down payment amount</li>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-gray-700 mb-2">Additional:</p>
+                          <li>• <strong>Promotional Price</strong> - Special promotional price</li>
+                          <li>• <strong>Promotional Price Active</strong> - true/false</li>
+                          <li>• <strong>Estimated Payment</strong> - Estimated monthly payment</li>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3027,7 +3060,14 @@ export default function ManagerLots() {
                     <div className="space-y-3">
                       <h4 className="font-medium text-blue-700">Optional Fields</h4>
                       
-                      {['price', 'description', 'specialStatus', 'status', 'bedrooms', 'bathrooms', 'sqFt', 'parkId'].filter(field => {
+                      {[
+                        'status', 'specialStatus', 'description', 'availableDate', 'showingLink',
+                        'bedrooms', 'bathrooms', 'sqFt', 'houseManufacturer', 'houseModel', 'mobileHomeYear', 'mobileHomeSize',
+                        'priceForRent', 'priceForSale', 'priceRentToOwn', 'priceContractForDeed',
+                        'depositForRent', 'depositForSale', 'depositRentToOwn', 'depositContractForDeed',
+                        'downPaymentContractForDeed', 'lotRent', 'promotionalPrice', 'promotionalPriceActive', 'estimatedPayment',
+                        'parkId', 'parkName'
+                      ].filter(field => {
                         // Don't filter during loading
                         if (assignmentsLoading) {
                           return true;
@@ -3042,23 +3082,41 @@ export default function ManagerLots() {
                         }
                         return true;
                       }).map(field => {
-                        const fieldLabels = {
+                        const fieldLabels: Record<string, string> = {
                           'status': 'Status',
-                          'price': 'Price',
-                          'description': 'Description',
                           'specialStatus': 'Special Status',
+                          'description': 'Description',
+                          'availableDate': 'Available Date',
+                          'showingLink': 'Showing Link',
                           'bedrooms': 'Bedrooms',
                           'bathrooms': 'Bathrooms',
                           'sqFt': 'Sq Ft',
+                          'houseManufacturer': 'House Manufacturer',
+                          'houseModel': 'House Model',
+                          'mobileHomeYear': 'Mobile Home Year',
+                          'mobileHomeSize': 'Mobile Home Size',
+                          'priceForRent': 'Price For Rent',
+                          'priceForSale': 'Price For Sale',
+                          'priceRentToOwn': 'Price Rent To Own',
+                          'priceContractForDeed': 'Price Contract For Deed',
+                          'depositForRent': 'Deposit For Rent',
+                          'depositForSale': 'Deposit For Sale',
+                          'depositRentToOwn': 'Deposit Rent To Own',
+                          'depositContractForDeed': 'Deposit Contract For Deed',
+                          'downPaymentContractForDeed': 'Down Payment Contract For Deed',
+                          'lotRent': 'Lot Rent',
+                          'promotionalPrice': 'Promotional Price',
+                          'promotionalPriceActive': 'Promotional Price Active',
+                          'estimatedPayment': 'Estimated Payment',
                           'parkId': 'Park ID (Optional)',
                           'parkName': 'Park Name (Required for multi-park)'
                         };
                         return (
                           <div key={field}>
-                            <Label htmlFor={`${field}-mapping`}>{fieldLabels[field as keyof typeof fieldLabels]}</Label>
+                            <Label htmlFor={`${field}-mapping`}>{fieldLabels[field]}</Label>
                             <Select value={columnMapping[field] || ''} onValueChange={(value) => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
                               <SelectTrigger>
-                                <SelectValue placeholder={`Select CSV column for ${field}`} />
+                                <SelectValue placeholder={`Select CSV column for ${fieldLabels[field]}`} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="ignore">-- Ignore --</SelectItem>
@@ -3214,6 +3272,19 @@ export default function ManagerLots() {
                       <div className="text-sm text-muted-foreground">Total</div>
                     </div>
                   </div>
+                  
+                  {importResults?.warnings?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-amber-700">⚠️ Warnings:</h4>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {importResults.warnings.map((warning: any, index: number) => (
+                          <div key={index} className="text-xs bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-200">
+                            <strong>Row {warning.row}:</strong> {warning.message}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   {importResults?.failed?.length > 0 && (
                     <div className="space-y-2">

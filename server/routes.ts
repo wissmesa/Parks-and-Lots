@@ -468,45 +468,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedParkName = companyParks.parks[0].name;
       }
 
-      const results: { successful: any[], failed: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
+      const results: { successful: any[], failed: any[], warnings?: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
         successful: [], 
         failed: [],
+        warnings: [],
         assignedPark: assignedParkName,
         multiPark: isMultiPark,
         assignedParks: companyParks.parks.map(p => ({ id: p.id, name: p.name }))
       };
 
-      for (const lotData of lots) {
+      for (let i = 0; i < lots.length; i++) {
+        const lotData = lots[i];
+        const rowNumber = i + 1;
+        
         try {
           // Auto-assign to single park if only one park
-          if (defaultParkId && !lotData.parkId) {
+          if (defaultParkId && !lotData.parkId && !lotData.parkName) {
             lotData.parkId = defaultParkId;
           }
           
-          // Validate park assignment
+          // Resolve park name to park ID if provided (prioritized over parkId)
+          if (lotData.parkName && String(lotData.parkName).trim()) {
+            const parkName = String(lotData.parkName).trim();
+            const matchingPark = companyParks.parks.find(p => 
+              p.name.toLowerCase() === parkName.toLowerCase()
+            );
+            if (matchingPark) {
+              lotData.parkId = matchingPark.id;
+            } else {
+              const availableParks = companyParks.parks.map(p => p.name).join(', ');
+              results.failed.push({
+                row: rowNumber,
+                ...lotData,
+                error: `Park '${parkName}' not found in company parks. Available parks: ${availableParks}`
+              });
+              continue;
+            }
+          }
+          
+          // Validate park ID if provided
           if (lotData.parkId) {
             const park = companyParks.parks.find(p => p.id === lotData.parkId);
             if (!park) {
               results.failed.push({
+                row: rowNumber,
                 ...lotData,
                 error: `Park ${lotData.parkId} not found in your company parks`
               });
               continue;
             }
-          } else if (isMultiPark) {
-            results.failed.push({
-              ...lotData,
-              error: 'Park ID required when company has multiple parks'
-            });
-            continue;
           }
+          // Note: Lots without park assignment are now allowed and can be assigned later
 
           const parsedLot = insertLotSchema.parse(lotData);
           const createdLot = await storage.createLot(parsedLot);
           results.successful.push(createdLot);
+          
+          // Add warning if lot was created without park assignment
+          if (!createdLot.parkId) {
+            results.warnings!.push({
+              row: rowNumber,
+              lotName: createdLot.nameOrNumber,
+              message: `Lot '${createdLot.nameOrNumber}' was created without park assignment. You can assign it to a park later.`
+            });
+          }
         } catch (error) {
           console.error('Bulk lot creation error for lot:', lotData, error);
           results.failed.push({
+            row: rowNumber,
             ...lotData,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
@@ -3110,7 +3139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Maximum 1000 lots per upload' });
       }
 
-      const results: { successful: any[], failed: any[] } = { successful: [], failed: [] };
+      const results: { successful: any[], failed: any[], warnings?: any[] } = { successful: [], failed: [], warnings: [] };
       
       for (let i = 0; i < lots.length; i++) {
         const lotData = lots[i];
@@ -3136,7 +3165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Determine park ID - prioritize park name over park ID
-          let lotParkId: string;
+          let lotParkId: string | undefined;
           
           // Check if parkName is provided first (prioritized)
           if (lotData.parkName && String(lotData.parkName).trim()) {
@@ -3169,19 +3198,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             lotParkId = parkId;
           }
-          // Neither park name nor park ID provided
-          else {
-            results.failed.push({
-              row: rowNumber,
-              error: 'Park Name or Park ID must be specified'
-            });
-            continue;
-          }
+          // Note: Lots without park assignment are now allowed and can be assigned later by admins/MHP_LORD
 
           // Handle special status if provided
           let specialStatusId: string | null = null;
           if (lotData.specialStatus && String(lotData.specialStatus).trim()) {
             const specialStatusName = String(lotData.specialStatus).trim();
+            
+            // Special status requires a park assignment
+            if (!lotParkId) {
+              results.failed.push({
+                row: rowNumber,
+                error: `Cannot assign special status '${specialStatusName}' without a park assignment. Please specify Park Name or Park ID.`
+              });
+              continue;
+            }
+            
             try {
               const specialStatus = await storage.findOrCreateSpecialStatus(lotParkId, specialStatusName);
               specialStatusId = specialStatus.id;
@@ -3199,7 +3231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
             status: lotData.status,
             parkId: lotParkId,
-            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
+            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : null,
             description: lotData.description ? String(lotData.description).trim() : "",
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
@@ -3219,6 +3251,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: newLot.id,
             nameOrNumber: newLot.nameOrNumber
           });
+          
+          // Add warning if lot was created without park assignment
+          if (!newLot.parkId) {
+            results.warnings!.push({
+              row: rowNumber,
+              lotName: newLot.nameOrNumber,
+              message: `Lot '${newLot.nameOrNumber}' was created without park assignment. You can assign it to a park later.`
+            });
+          }
 
         } catch (error) {
           console.error(`Error creating lot at row ${rowNumber}:`, error);
@@ -3266,9 +3307,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedParkName = assignments[0].parkName;
       }
 
-      const results: { successful: any[], failed: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
+      const results: { successful: any[], failed: any[], warnings?: any[], assignedPark?: string, multiPark?: boolean, assignedParks?: any[] } = { 
         successful: [], 
         failed: [],
+        warnings: [],
         ...(isMultiPark ? { 
           multiPark: true, 
           assignedParks: assignments.map(a => ({ id: a.parkId, name: a.parkName }))
@@ -3372,7 +3414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nameOrNumber: String(lotData.nameOrNumber).trim(),
             status: lotData.status,
             parkId: lotParkId,
-            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : "0",
+            price: lotData.price && String(lotData.price).trim() !== "" ? String(lotData.price) : null,
             description: lotData.description ? String(lotData.description).trim() : "",
             bedrooms: lotData.bedrooms && String(lotData.bedrooms).trim() !== "" ? parseInt(lotData.bedrooms) || null : null,
             bathrooms: lotData.bathrooms && String(lotData.bathrooms).trim() !== "" ? parseInt(lotData.bathrooms) || null : null,
@@ -3392,6 +3434,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: newLot.id,
             nameOrNumber: newLot.nameOrNumber
           });
+          
+          // Add warning if lot was created without park assignment
+          if (!newLot.parkId) {
+            results.warnings!.push({
+              row: rowNumber,
+              lotName: newLot.nameOrNumber,
+              message: `Lot '${newLot.nameOrNumber}' was created without park assignment. You can assign it to a park later.`
+            });
+          }
 
         } catch (error) {
           console.error(`Error creating lot at row ${rowNumber}:`, error);

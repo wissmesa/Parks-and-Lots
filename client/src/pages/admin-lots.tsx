@@ -2894,19 +2894,65 @@ export default function AdminLots() {
                   </label>
                 </div>
                 
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h4 className="font-medium mb-2">Required Columns:</h4>
-                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                    <li>Lot Name/Number</li>
-                    <li>Status (FOR_RENT, FOR_SALE, RENT_TO_OWN, or CONTRACT_FOR_DEED)</li>
-                    <li>Park Name (preferred - easier than Park ID)</li>
+                <div className="bg-blue-50 p-4 rounded-lg max-h-96 overflow-y-auto">
+                  <h4 className="font-medium mb-2 text-green-700">Required Columns:</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1 mb-4">
+                    <li>Lot Name/Number - Unique identifier</li>
                   </ul>
-                  <h4 className="font-medium mt-3 mb-2">Optional Columns:</h4>
-                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                    <li>Park ID (can be used instead of Park Name)</li>
-                    <li>Special Status (creates new status if doesn't exist)</li>
-                    <li>Price, Description, Bedrooms, Bathrooms, Square Feet</li>
-                  </ul>
+                  <p className="text-sm text-amber-700 mb-4">💡 <strong>Note:</strong> Lots without Park Name/ID will be created as unassigned. You can assign them to parks later.</p>
+                  <h4 className="font-medium mb-2 text-blue-700">Optional Columns:</h4>
+                  <div className="grid md:grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">Basic Info:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Park ID (alternative to Park Name)</li>
+                        <li>Special Status</li>
+                        <li>Description</li>
+                        <li>Available Date (YYYY-MM-DD)</li>
+                        <li>Showing Link</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">Property Details:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Bedrooms</li>
+                        <li>Bathrooms</li>
+                        <li>Sq Ft</li>
+                        <li>House Manufacturer</li>
+                        <li>House Model</li>
+                        <li>Mobile Home Year</li>
+                        <li>Mobile Home Size</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">Pricing (Rent):</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Price For Rent</li>
+                        <li>Deposit For Rent</li>
+                        <li>Lot Rent</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">Pricing (Sale):</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Price For Sale</li>
+                        <li>Deposit For Sale</li>
+                        <li>Price Rent To Own</li>
+                        <li>Deposit Rent To Own</li>
+                        <li>Price Contract For Deed</li>
+                        <li>Deposit Contract For Deed</li>
+                        <li>Down Payment Contract For Deed</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">Additional:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        <li>Promotional Price</li>
+                        <li>Promotional Price Active (true/false)</li>
+                        <li>Estimated Payment</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -2923,18 +2969,36 @@ export default function AdminLots() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-medium mb-2">Lot Fields</h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                       {[
                         { field: 'nameOrNumber', label: 'Lot Name/Number *', required: true },
-                        { field: 'parkName', label: 'Park Name * (Required)', required: true },
-                        { field: 'parkId', label: 'Park ID (Optional)', required: false },
+                        { field: 'parkName', label: 'Park Name (Optional)', required: false },
+                        { field: 'parkId', label: 'Park ID (alternative to Park Name)', required: false },
                         { field: 'status', label: 'Status', required: false },
                         { field: 'specialStatus', label: 'Special Status', required: false },
-                        { field: 'price', label: 'Price', required: false },
                         { field: 'description', label: 'Description', required: false },
+                        { field: 'availableDate', label: 'Available Date', required: false },
+                        { field: 'showingLink', label: 'Showing Link', required: false },
                         { field: 'bedrooms', label: 'Bedrooms', required: false },
                         { field: 'bathrooms', label: 'Bathrooms', required: false },
-                        { field: 'sqFt', label: 'Square Feet', required: false }
+                        { field: 'sqFt', label: 'Square Feet', required: false },
+                        { field: 'houseManufacturer', label: 'House Manufacturer', required: false },
+                        { field: 'houseModel', label: 'House Model', required: false },
+                        { field: 'mobileHomeYear', label: 'Mobile Home Year', required: false },
+                        { field: 'mobileHomeSize', label: 'Mobile Home Size', required: false },
+                        { field: 'priceForRent', label: 'Price For Rent', required: false },
+                        { field: 'priceForSale', label: 'Price For Sale', required: false },
+                        { field: 'priceRentToOwn', label: 'Price Rent To Own', required: false },
+                        { field: 'priceContractForDeed', label: 'Price Contract For Deed', required: false },
+                        { field: 'depositForRent', label: 'Deposit For Rent', required: false },
+                        { field: 'depositForSale', label: 'Deposit For Sale', required: false },
+                        { field: 'depositRentToOwn', label: 'Deposit Rent To Own', required: false },
+                        { field: 'depositContractForDeed', label: 'Deposit Contract For Deed', required: false },
+                        { field: 'downPaymentContractForDeed', label: 'Down Payment Contract For Deed', required: false },
+                        { field: 'lotRent', label: 'Lot Rent', required: false },
+                        { field: 'promotionalPrice', label: 'Promotional Price', required: false },
+                        { field: 'promotionalPriceActive', label: 'Promotional Price Active', required: false },
+                        { field: 'estimatedPayment', label: 'Estimated Payment', required: false }
                       ].map(({ field, label, required }) => (
                         <div key={field} className="flex items-center justify-between p-2 border rounded">
                           <span className={required ? 'font-medium' : ''}>{label}</span>
@@ -3114,6 +3178,19 @@ export default function AdminLots() {
                     <div className="text-sm text-muted-foreground">Total</div>
                   </div>
                 </div>
+                
+                {importResults?.warnings?.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm text-amber-700">⚠️ Warnings:</h4>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {importResults.warnings.map((warning: any, index: number) => (
+                        <div key={index} className="text-xs bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-200">
+                          <strong>Row {warning.row}:</strong> {warning.message}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {importResults?.failed?.length > 0 && (
                   <div className="space-y-2">
