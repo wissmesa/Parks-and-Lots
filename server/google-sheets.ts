@@ -125,6 +125,7 @@ export class GoogleSheetsService {
     
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
+      prompt: 'consent', // Force consent screen to always get a refresh token
       scope: SCOPES,
       state: state
     });
@@ -140,13 +141,18 @@ export class GoogleSheetsService {
   }
 
   async storeTokens(userId: string, tokens: any) {
+    // Get existing account to preserve refresh token and spreadsheet ID if not provided
+    const existingAccount = await storage.getOAuthAccount(userId, 'google-sheets');
+    
     await storage.createOrUpdateOAuthAccount(userId, {
       provider: 'google-sheets',
       accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
+      // Preserve existing refresh token if new one isn't provided (Google only sends it on first auth)
+      refreshToken: tokens.refresh_token || existingAccount?.refreshToken,
       tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
       scope: tokens.scope,
-      spreadsheetId: undefined // Will be set later when user provides their sheet ID
+      // Preserve existing spreadsheet ID
+      spreadsheetId: existingAccount?.spreadsheetId
     });
   }
 

@@ -58,6 +58,11 @@ export function CreateLotFromFacebookDialog({
     priceForSale: '',
     priceRentToOwn: '',
     priceContractForDeed: '',
+    depositForRent: '',
+    depositForSale: '',
+    depositRentToOwn: '',
+    depositContractForDeed: '',
+    downPaymentContractForDeed: '',
     lotRent: '',
     promotionalPrice: '',
     promotionalPriceActive: false,
@@ -99,6 +104,11 @@ export function CreateLotFromFacebookDialog({
         priceForSale: '',
         priceRentToOwn: '',
         priceContractForDeed: '',
+        depositForRent: '',
+        depositForSale: '',
+        depositRentToOwn: '',
+        depositContractForDeed: '',
+        downPaymentContractForDeed: '',
         lotRent: '',
         promotionalPrice: '',
         promotionalPriceActive: false,
@@ -163,6 +173,11 @@ export function CreateLotFromFacebookDialog({
         priceForSale: priceForSaleNum !== null ? priceForSaleNum.toString() : null,
         priceRentToOwn: priceRentToOwnNum !== null ? priceRentToOwnNum.toString() : null,
         priceContractForDeed: priceContractForDeedNum !== null ? priceContractForDeedNum.toString() : null,
+        depositForRent: toNumberOrNull(data.depositForRent) !== null ? toNumberOrNull(data.depositForRent)!.toString() : null,
+        depositForSale: toNumberOrNull(data.depositForSale) !== null ? toNumberOrNull(data.depositForSale)!.toString() : null,
+        depositRentToOwn: toNumberOrNull(data.depositRentToOwn) !== null ? toNumberOrNull(data.depositRentToOwn)!.toString() : null,
+        depositContractForDeed: toNumberOrNull(data.depositContractForDeed) !== null ? toNumberOrNull(data.depositContractForDeed)!.toString() : null,
+        downPaymentContractForDeed: toNumberOrNull(data.downPaymentContractForDeed) !== null ? toNumberOrNull(data.downPaymentContractForDeed)!.toString() : null,
         lotRent: lotRentNum !== null ? lotRentNum.toString() : null,
         promotionalPrice: toNumberOrNull(data.promotionalPrice) !== null ? toNumberOrNull(data.promotionalPrice)!.toString() : null,
         promotionalPriceActive: data.promotionalPriceActive || false,
@@ -463,16 +478,29 @@ export function CreateLotFromFacebookDialog({
                     </Label>
                   </div>
                   {formData.status.includes('FOR_RENT') && (
-                    <div className="ml-6">
-                      <Label htmlFor="priceForRent" className="text-sm">Price ($/month)</Label>
-                      <MoneyInput
-                        id="priceForRent"
-                        step="0.01"
-                        value={formData.priceForRent}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                        placeholder="Monthly rent amount"
-                        className="mt-1"
-                      />
+                    <div className="ml-6 space-y-3">
+                      <div>
+                        <Label htmlFor="priceForRent" className="text-sm">Price ($/month)</Label>
+                        <MoneyInput
+                          id="priceForRent"
+                          step="0.01"
+                          value={formData.priceForRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                          placeholder="Monthly rent amount"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="depositForRent" className="text-sm">Deposit</Label>
+                        <MoneyInput
+                          id="depositForRent"
+                          step="0.01"
+                          value={formData.depositForRent}
+                          onChange={(e) => setFormData(prev => ({ ...prev, depositForRent: e.target.value }))}
+                          placeholder="Deposit amount"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -496,16 +524,29 @@ export function CreateLotFromFacebookDialog({
                     </Label>
                   </div>
                   {formData.status.includes('FOR_SALE') && (
-                    <div className="ml-6">
-                      <Label htmlFor="priceForSale" className="text-sm">Sale Price</Label>
-                      <MoneyInput
-                        id="priceForSale"
-                        step="0.01"
-                        value={formData.priceForSale}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                        placeholder="Sale price"
-                        className="mt-1"
-                      />
+                    <div className="ml-6 space-y-3">
+                      <div>
+                        <Label htmlFor="priceForSale" className="text-sm">Sale Price</Label>
+                        <MoneyInput
+                          id="priceForSale"
+                          step="0.01"
+                          value={formData.priceForSale}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                          placeholder="Sale price"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="depositForSale" className="text-sm">Deposit</Label>
+                        <MoneyInput
+                          id="depositForSale"
+                          step="0.01"
+                          value={formData.depositForSale}
+                          onChange={(e) => setFormData(prev => ({ ...prev, depositForSale: e.target.value }))}
+                          placeholder="Deposit amount"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -529,16 +570,29 @@ export function CreateLotFromFacebookDialog({
                     </Label>
                   </div>
                   {formData.status.includes('RENT_TO_OWN') && (
-                    <div className="ml-6">
-                      <Label htmlFor="priceRentToOwn" className="text-sm">Price ($/month)</Label>
-                      <MoneyInput
-                        id="priceRentToOwn"
-                        step="0.01"
-                        value={formData.priceRentToOwn}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                        placeholder="Monthly rent-to-own amount"
-                        className="mt-1"
-                      />
+                    <div className="ml-6 space-y-3">
+                      <div>
+                        <Label htmlFor="priceRentToOwn" className="text-sm">Price ($/month)</Label>
+                        <MoneyInput
+                          id="priceRentToOwn"
+                          step="0.01"
+                          value={formData.priceRentToOwn}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                          placeholder="Monthly rent-to-own amount"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="depositRentToOwn" className="text-sm">Deposit</Label>
+                        <MoneyInput
+                          id="depositRentToOwn"
+                          step="0.01"
+                          value={formData.depositRentToOwn}
+                          onChange={(e) => setFormData(prev => ({ ...prev, depositRentToOwn: e.target.value }))}
+                          placeholder="Deposit amount"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -562,16 +616,40 @@ export function CreateLotFromFacebookDialog({
                     </Label>
                   </div>
                   {formData.status.includes('CONTRACT_FOR_DEED') && (
-                    <div className="ml-6">
-                      <Label htmlFor="priceContractForDeed" className="text-sm">Price ($/month)</Label>
-                      <MoneyInput
-                        id="priceContractForDeed"
-                        step="0.01"
-                        value={formData.priceContractForDeed}
-                        onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                        placeholder="Monthly contract payment"
-                        className="mt-1"
-                      />
+                    <div className="ml-6 space-y-3">
+                      <div>
+                        <Label htmlFor="priceContractForDeed" className="text-sm">Price ($/month)</Label>
+                        <MoneyInput
+                          id="priceContractForDeed"
+                          step="0.01"
+                          value={formData.priceContractForDeed}
+                          onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                          placeholder="Monthly contract payment"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="depositContractForDeed" className="text-sm">Deposit</Label>
+                        <MoneyInput
+                          id="depositContractForDeed"
+                          step="0.01"
+                          value={formData.depositContractForDeed}
+                          onChange={(e) => setFormData(prev => ({ ...prev, depositContractForDeed: e.target.value }))}
+                          placeholder="Deposit amount"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="downPaymentContractForDeed" className="text-sm">Down Payment</Label>
+                        <MoneyInput
+                          id="downPaymentContractForDeed"
+                          step="0.01"
+                          value={formData.downPaymentContractForDeed}
+                          onChange={(e) => setFormData(prev => ({ ...prev, downPaymentContractForDeed: e.target.value }))}
+                          placeholder="Down payment amount"
+                          className="mt-1"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

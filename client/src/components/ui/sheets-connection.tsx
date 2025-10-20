@@ -43,17 +43,29 @@ export function SheetsConnection() {
         const popup = window.open(data.authUrl, 'google-sheets-auth', 'width=500,height=600');
         
         // Listen for postMessage from popup
-        const handleMessage = (event: MessageEvent) => {
+        const handleMessage = async (event: MessageEvent) => {
           if (event.data?.type === 'GOOGLE_SHEETS_CONNECTED') {
             setIsConnecting(false);
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/status"] });
             
             if (event.data.success) {
-              toast({
-                title: "Google Sheets Connected",
-                description: "Now provide your Google Sheet ID to link it.",
+              // Refetch status to check if spreadsheet ID exists
+              const updatedStatus = await queryClient.fetchQuery<SheetsStatus>({ 
+                queryKey: ["/api/auth/google-sheets/status"] 
               });
-              setShowSpreadsheetInput(true);
+              
+              // Only show spreadsheet input if no spreadsheet ID exists
+              if (!updatedStatus?.spreadsheetId) {
+                toast({
+                  title: "Google Sheets Connected",
+                  description: "Now provide your Google Sheet ID to link it.",
+                });
+                setShowSpreadsheetInput(true);
+              } else {
+                toast({
+                  title: "Google Sheets Reconnected",
+                  description: "Your existing spreadsheet configuration has been preserved.",
+                });
+              }
             } else {
               toast({
                 title: "Connection Failed",

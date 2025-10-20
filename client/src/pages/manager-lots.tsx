@@ -60,6 +60,11 @@ interface Lot {
   priceForSale?: string | null;
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
+  depositForRent?: string | null;
+  depositForSale?: string | null;
+  depositRentToOwn?: string | null;
+  depositContractForDeed?: string | null;
+  downPaymentContractForDeed?: string | null;
   lotRent?: string | null;
   promotionalPrice?: string | null;
   promotionalPriceActive?: boolean;
@@ -198,6 +203,11 @@ export default function ManagerLots() {
       priceForSale: '',
       priceRentToOwn: '',
       priceContractForDeed: '',
+      depositForRent: '',
+      depositForSale: '',
+      depositRentToOwn: '',
+      depositContractForDeed: '',
+      downPaymentContractForDeed: '',
       lotRent: '',
       promotionalPrice: '',
       promotionalPriceActive: false,
@@ -241,6 +251,11 @@ export default function ManagerLots() {
     priceForSale: '',
     priceRentToOwn: '',
     priceContractForDeed: '',
+    depositForRent: '',
+    depositForSale: '',
+    depositRentToOwn: '',
+    depositContractForDeed: '',
+    downPaymentContractForDeed: '',
     lotRent: '',
     promotionalPrice: '',
     promotionalPriceActive: false,
@@ -332,6 +347,11 @@ export default function ManagerLots() {
         priceForSale: toStringOrNull(lotData.priceForSale),
         priceRentToOwn: toStringOrNull(lotData.priceRentToOwn),
         priceContractForDeed: toStringOrNull(lotData.priceContractForDeed),
+        depositForRent: toStringOrNull(lotData.depositForRent),
+        depositForSale: toStringOrNull(lotData.depositForSale),
+        depositRentToOwn: toStringOrNull(lotData.depositRentToOwn),
+        depositContractForDeed: toStringOrNull(lotData.depositContractForDeed),
+        downPaymentContractForDeed: toStringOrNull(lotData.downPaymentContractForDeed),
         lotRent: toStringOrNull(lotData.lotRent),
         promotionalPrice: toStringOrNull(lotData.promotionalPrice),
         promotionalPriceActive: lotData.promotionalPriceActive || false,
@@ -365,6 +385,11 @@ export default function ManagerLots() {
         priceForSale: '',
         priceRentToOwn: '',
         priceContractForDeed: '',
+        depositForRent: '',
+        depositForSale: '',
+        depositRentToOwn: '',
+        depositContractForDeed: '',
+        downPaymentContractForDeed: '',
         lotRent: '',
         promotionalPrice: '',
         promotionalPriceActive: false,
@@ -421,6 +446,11 @@ export default function ManagerLots() {
       if (updates.priceForSale !== undefined) processedUpdates.priceForSale = toStringOrNull(updates.priceForSale);
       if (updates.priceRentToOwn !== undefined) processedUpdates.priceRentToOwn = toStringOrNull(updates.priceRentToOwn);
       if (updates.priceContractForDeed !== undefined) processedUpdates.priceContractForDeed = toStringOrNull(updates.priceContractForDeed);
+      if (updates.depositForRent !== undefined) processedUpdates.depositForRent = toStringOrNull(updates.depositForRent);
+      if (updates.depositForSale !== undefined) processedUpdates.depositForSale = toStringOrNull(updates.depositForSale);
+      if (updates.depositRentToOwn !== undefined) processedUpdates.depositRentToOwn = toStringOrNull(updates.depositRentToOwn);
+      if (updates.depositContractForDeed !== undefined) processedUpdates.depositContractForDeed = toStringOrNull(updates.depositContractForDeed);
+      if (updates.downPaymentContractForDeed !== undefined) processedUpdates.downPaymentContractForDeed = toStringOrNull(updates.downPaymentContractForDeed);
       if (updates.lotRent !== undefined) processedUpdates.lotRent = toStringOrNull(updates.lotRent);
       if (updates.bedrooms !== undefined) processedUpdates.bedrooms = updates.bedrooms || null;
       if (updates.bathrooms !== undefined) processedUpdates.bathrooms = updates.bathrooms || null;
@@ -762,6 +792,11 @@ export default function ManagerLots() {
       priceForSale: lot.priceForSale || '',
       priceRentToOwn: lot.priceRentToOwn || '',
       priceContractForDeed: lot.priceContractForDeed || '',
+      depositForRent: lot.depositForRent || '',
+      depositForSale: lot.depositForSale || '',
+      depositRentToOwn: lot.depositRentToOwn || '',
+      depositContractForDeed: lot.depositContractForDeed || '',
+      downPaymentContractForDeed: lot.downPaymentContractForDeed || '',
       lotRent: lot.lotRent || '',
       promotionalPrice: lot.promotionalPrice || '',
       promotionalPriceActive: lot.promotionalPriceActive || false,
@@ -1200,16 +1235,29 @@ export default function ManagerLots() {
                         </Label>
                       </div>
                       {formData.status.includes('FOR_RENT') && (
-                        <div className="ml-6">
-                          <Label htmlFor="priceForRent" className="text-sm">Price ($/month)</Label>
-                          <MoneyInput
-                            id="priceForRent"
-                            step="0.01"
-                            value={formData.priceForRent}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                            placeholder="Monthly rent amount"
-                            className="mt-1"
-                          />
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <Label htmlFor="priceForRent" className="text-sm">Price ($/month)</Label>
+                            <MoneyInput
+                              id="priceForRent"
+                              step="0.01"
+                              value={formData.priceForRent}
+                              onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                              placeholder="Monthly rent amount"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="depositForRent" className="text-sm">Deposit</Label>
+                            <MoneyInput
+                              id="depositForRent"
+                              step="0.01"
+                              value={formData.depositForRent}
+                              onChange={(e) => setFormData(prev => ({ ...prev, depositForRent: e.target.value }))}
+                              placeholder="Deposit amount"
+                              className="mt-1"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1233,16 +1281,29 @@ export default function ManagerLots() {
                         </Label>
                       </div>
                       {formData.status.includes('FOR_SALE') && (
-                        <div className="ml-6">
-                          <Label htmlFor="priceForSale" className="text-sm">Sale Price</Label>
-                          <MoneyInput
-                            id="priceForSale"
-                            step="0.01"
-                            value={formData.priceForSale}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                            placeholder="Sale price"
-                            className="mt-1"
-                          />
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <Label htmlFor="priceForSale" className="text-sm">Sale Price</Label>
+                            <MoneyInput
+                              id="priceForSale"
+                              step="0.01"
+                              value={formData.priceForSale}
+                              onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                              placeholder="Sale price"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="depositForSale" className="text-sm">Deposit</Label>
+                            <MoneyInput
+                              id="depositForSale"
+                              step="0.01"
+                              value={formData.depositForSale}
+                              onChange={(e) => setFormData(prev => ({ ...prev, depositForSale: e.target.value }))}
+                              placeholder="Deposit amount"
+                              className="mt-1"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1266,16 +1327,29 @@ export default function ManagerLots() {
                         </Label>
                       </div>
                       {formData.status.includes('RENT_TO_OWN') && (
-                        <div className="ml-6">
-                          <Label htmlFor="priceRentToOwn" className="text-sm">Price ($/month)</Label>
-                          <MoneyInput
-                            id="priceRentToOwn"
-                            step="0.01"
-                            value={formData.priceRentToOwn}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                            placeholder="Monthly rent-to-own amount"
-                            className="mt-1"
-                          />
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <Label htmlFor="priceRentToOwn" className="text-sm">Price ($/month)</Label>
+                            <MoneyInput
+                              id="priceRentToOwn"
+                              step="0.01"
+                              value={formData.priceRentToOwn}
+                              onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                              placeholder="Monthly rent-to-own amount"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="depositRentToOwn" className="text-sm">Deposit</Label>
+                            <MoneyInput
+                              id="depositRentToOwn"
+                              step="0.01"
+                              value={formData.depositRentToOwn}
+                              onChange={(e) => setFormData(prev => ({ ...prev, depositRentToOwn: e.target.value }))}
+                              placeholder="Deposit amount"
+                              className="mt-1"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1299,16 +1373,40 @@ export default function ManagerLots() {
                         </Label>
                       </div>
                       {formData.status.includes('CONTRACT_FOR_DEED') && (
-                        <div className="ml-6">
-                          <Label htmlFor="priceContractForDeed" className="text-sm">Price ($/month)</Label>
-                          <MoneyInput
-                            id="priceContractForDeed"
-                            step="0.01"
-                            value={formData.priceContractForDeed}
-                            onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                            placeholder="Monthly contract payment"
-                            className="mt-1"
-                          />
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <Label htmlFor="priceContractForDeed" className="text-sm">Price ($/month)</Label>
+                            <MoneyInput
+                              id="priceContractForDeed"
+                              step="0.01"
+                              value={formData.priceContractForDeed}
+                              onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                              placeholder="Monthly contract payment"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="depositContractForDeed" className="text-sm">Deposit</Label>
+                            <MoneyInput
+                              id="depositContractForDeed"
+                              step="0.01"
+                              value={formData.depositContractForDeed}
+                              onChange={(e) => setFormData(prev => ({ ...prev, depositContractForDeed: e.target.value }))}
+                              placeholder="Deposit amount"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="downPaymentContractForDeed" className="text-sm">Down Payment</Label>
+                            <MoneyInput
+                              id="downPaymentContractForDeed"
+                              step="0.01"
+                              value={formData.downPaymentContractForDeed}
+                              onChange={(e) => setFormData(prev => ({ ...prev, downPaymentContractForDeed: e.target.value }))}
+                              placeholder="Down payment amount"
+                              className="mt-1"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2274,16 +2372,29 @@ export default function ManagerLots() {
                       </Label>
                     </div>
                     {formData.status.includes('FOR_RENT') && (
-                      <div className="ml-6">
-                        <Label htmlFor="edit-priceForRent" className="text-sm">Price ($/month)</Label>
-                        <MoneyInput
-                          id="edit-priceForRent"
-                          step="0.01"
-                          value={formData.priceForRent}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
-                          placeholder="Monthly rent amount"
-                          className="mt-1"
-                        />
+                      <div className="ml-6 space-y-3">
+                        <div>
+                          <Label htmlFor="edit-priceForRent" className="text-sm">Price ($/month)</Label>
+                          <MoneyInput
+                            id="edit-priceForRent"
+                            step="0.01"
+                            value={formData.priceForRent}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForRent: e.target.value }))}
+                            placeholder="Monthly rent amount"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-depositForRent" className="text-sm">Deposit</Label>
+                          <MoneyInput
+                            id="edit-depositForRent"
+                            step="0.01"
+                            value={formData.depositForRent}
+                            onChange={(e) => setFormData(prev => ({ ...prev, depositForRent: e.target.value }))}
+                            placeholder="Deposit amount"
+                            className="mt-1"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2307,16 +2418,29 @@ export default function ManagerLots() {
                       </Label>
                     </div>
                     {formData.status.includes('FOR_SALE') && (
-                      <div className="ml-6">
-                        <Label htmlFor="edit-priceForSale" className="text-sm">Sale Price</Label>
-                        <MoneyInput
-                          id="edit-priceForSale"
-                          step="0.01"
-                          value={formData.priceForSale}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
-                          placeholder="Sale price"
-                          className="mt-1"
-                        />
+                      <div className="ml-6 space-y-3">
+                        <div>
+                          <Label htmlFor="edit-priceForSale" className="text-sm">Sale Price</Label>
+                          <MoneyInput
+                            id="edit-priceForSale"
+                            step="0.01"
+                            value={formData.priceForSale}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceForSale: e.target.value }))}
+                            placeholder="Sale price"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-depositForSale" className="text-sm">Deposit</Label>
+                          <MoneyInput
+                            id="edit-depositForSale"
+                            step="0.01"
+                            value={formData.depositForSale}
+                            onChange={(e) => setFormData(prev => ({ ...prev, depositForSale: e.target.value }))}
+                            placeholder="Deposit amount"
+                            className="mt-1"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2340,16 +2464,29 @@ export default function ManagerLots() {
                       </Label>
                     </div>
                     {formData.status.includes('RENT_TO_OWN') && (
-                      <div className="ml-6">
-                        <Label htmlFor="edit-priceRentToOwn" className="text-sm">Price ($/month)</Label>
-                        <MoneyInput
-                          id="edit-priceRentToOwn"
-                          step="0.01"
-                          value={formData.priceRentToOwn}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
-                          placeholder="Monthly rent-to-own amount"
-                          className="mt-1"
-                        />
+                      <div className="ml-6 space-y-3">
+                        <div>
+                          <Label htmlFor="edit-priceRentToOwn" className="text-sm">Price ($/month)</Label>
+                          <MoneyInput
+                            id="edit-priceRentToOwn"
+                            step="0.01"
+                            value={formData.priceRentToOwn}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceRentToOwn: e.target.value }))}
+                            placeholder="Monthly rent-to-own amount"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-depositRentToOwn" className="text-sm">Deposit</Label>
+                          <MoneyInput
+                            id="edit-depositRentToOwn"
+                            step="0.01"
+                            value={formData.depositRentToOwn}
+                            onChange={(e) => setFormData(prev => ({ ...prev, depositRentToOwn: e.target.value }))}
+                            placeholder="Deposit amount"
+                            className="mt-1"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2373,16 +2510,40 @@ export default function ManagerLots() {
                       </Label>
                     </div>
                     {formData.status.includes('CONTRACT_FOR_DEED') && (
-                      <div className="ml-6">
-                        <Label htmlFor="edit-priceContractForDeed" className="text-sm">Price ($/month)</Label>
-                        <MoneyInput
-                          id="edit-priceContractForDeed"
-                          step="0.01"
-                          value={formData.priceContractForDeed}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
-                          placeholder="Monthly contract payment"
-                          className="mt-1"
-                        />
+                      <div className="ml-6 space-y-3">
+                        <div>
+                          <Label htmlFor="edit-priceContractForDeed" className="text-sm">Price ($/month)</Label>
+                          <MoneyInput
+                            id="edit-priceContractForDeed"
+                            step="0.01"
+                            value={formData.priceContractForDeed}
+                            onChange={(e) => setFormData(prev => ({ ...prev, priceContractForDeed: e.target.value }))}
+                            placeholder="Monthly contract payment"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-depositContractForDeed" className="text-sm">Deposit</Label>
+                          <MoneyInput
+                            id="edit-depositContractForDeed"
+                            step="0.01"
+                            value={formData.depositContractForDeed}
+                            onChange={(e) => setFormData(prev => ({ ...prev, depositContractForDeed: e.target.value }))}
+                            placeholder="Deposit amount"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-downPaymentContractForDeed" className="text-sm">Down Payment</Label>
+                          <MoneyInput
+                            id="edit-downPaymentContractForDeed"
+                            step="0.01"
+                            value={formData.downPaymentContractForDeed}
+                            onChange={(e) => setFormData(prev => ({ ...prev, downPaymentContractForDeed: e.target.value }))}
+                            placeholder="Down payment amount"
+                            className="mt-1"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

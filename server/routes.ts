@@ -1607,8 +1607,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = (req as AuthRequest).user!;
       const account = await storage.getOAuthAccount(user.id, 'google-sheets');
+      
+      // Check if we have an account and a valid access token
+      let connected = false;
+      if (account && account.accessToken) {
+        // Verify we can actually get a valid access token (this will check expiry and refresh if needed)
+        const validToken = await googleSheetsService.getValidAccessToken(user.id);
+        connected = !!validToken;
+      }
+      
       res.json({ 
-        connected: !!account,
+        connected,
         spreadsheetId: account?.spreadsheetId || null 
       });
     } catch (error) {
