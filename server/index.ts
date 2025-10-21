@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import path from "path";
+// Force reload - S3 fallback enabled
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(process.cwd(), 'static', 'uploads')));
 
 app.use((req, res, next) => {
   const start = Date.now();
