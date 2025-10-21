@@ -213,7 +213,7 @@ export default function AdminInvites() {
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Company Manager"}</DialogTitle>
+                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Admin"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>

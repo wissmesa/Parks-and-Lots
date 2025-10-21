@@ -166,7 +166,7 @@ export default function AdminDashboard() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Company Manager"}</DialogTitle>
+                  <DialogTitle>Invite New {inviteRole === "MANAGER" ? "Manager" : "Admin"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleInviteSubmit} className="space-y-4">
                   <div>

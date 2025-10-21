@@ -2512,6 +2512,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(410).json({ message: 'Invite has expired' });
       }
 
+      // Determine the companyId for the user
+      let userCompanyId = invite.companyId;
+      
+      // For MANAGER role with a park assignment, get the company from the park
+      if (invite.role === 'MANAGER' && invite.parkId && !userCompanyId) {
+        try {
+          const park = await storage.getPark(invite.parkId);
+          if (park) {
+            userCompanyId = park.companyId;
+            console.log(`Setting MANAGER companyId to ${userCompanyId} from park ${invite.parkId}`);
+          }
+        } catch (parkError) {
+          console.error('Failed to fetch park for companyId:', parkError);
+        }
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(invite.email);
       let user;
@@ -2533,6 +2549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user = await storage.updateUser(existingUser.id, {
             passwordHash,
             fullName: finalFullName,
+            companyId: userCompanyId,
             isActive: true
           });
         } else {
@@ -2557,7 +2574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           passwordHash,
           fullName: finalFullName,
           role: invite.role,
-          companyId: invite.companyId, // Set companyId for ADMIN
+          companyId: userCompanyId,
           isActive: true
         });
       }
@@ -2590,9 +2607,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If this is an ADMIN, automatically assign all company parks
-      if (invite.role === 'ADMIN' && invite.companyId) {
+      if (invite.role === 'ADMIN' && userCompanyId) {
         try {
-          const companyParks = await storage.getParks({ companyId: invite.companyId });
+          const companyParks = await storage.getParks({ companyId: userCompanyId });
           for (const park of companyParks.parks) {
             await storage.assignManagerToPark(user.id, park.id);
           }
