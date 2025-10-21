@@ -1842,7 +1842,6 @@ export default function AdminLots() {
                     <TableHead>Status</TableHead>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
-                    <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -1921,11 +1920,6 @@ export default function AdminLots() {
                         <Badge variant={lot.isActive ? 'default' : 'secondary'}>
                           {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span>${parseInt(lot.price).toLocaleString()}</span>
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
