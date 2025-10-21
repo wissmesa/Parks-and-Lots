@@ -52,7 +52,12 @@ export async function uploadToS3(
 ): Promise<UploadResult> {
   const fileExtension = file.originalname.split('.').pop();
   const fileName = `${uuidv4()}.${fileExtension}`;
-  const key = `${folder}/${fileName}`;
+  
+  // Determine environment (declared once for the entire function)
+  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  
+  // Build key with environment prefix
+  const key = `${environment}/${folder}/${fileName}`;
 
   // If S3 is configured, use S3
   if (isS3Configured && s3Client && BUCKET_NAME) {
@@ -91,8 +96,8 @@ export async function uploadToS3(
     }
   }
 
-  // Fallback: Use local storage
-  const uploadDir = path.join(process.cwd(), 'static', 'uploads', folder);
+  // Fallback: Use local storage (reuses environment variable from above)
+  const uploadDir = path.join(process.cwd(), 'static', 'uploads', environment, folder);
   
   // Create directory if it doesn't exist
   if (!fs.existsSync(uploadDir)) {
@@ -102,7 +107,7 @@ export async function uploadToS3(
   const filePath = path.join(uploadDir, fileName);
   fs.writeFileSync(filePath, file.buffer);
 
-  const url = `/uploads/${folder}/${fileName}`;
+  const url = `/uploads/${environment}/${folder}/${fileName}`;
   console.log('✅ Uploaded to local storage:', url);
 
   return {
