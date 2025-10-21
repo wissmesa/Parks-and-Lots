@@ -174,9 +174,12 @@ export async function requireLotAccess(req: AuthRequest, res: Response, next: Ne
       return res.status(403).json({ message: 'Admin must be assigned to a company' });
     }
     
-    const park = await storage.getPark(lot.parkId);
-    if (!park || park.companyId !== req.user.companyId) {
-      return res.status(403).json({ message: 'Access denied to this lot' });
+    // Allow access to lots without parkId (unassigned lots can be managed by company admin)
+    if (lot.parkId) {
+      const park = await storage.getPark(lot.parkId);
+      if (!park || park.companyId !== req.user.companyId) {
+        return res.status(403).json({ message: 'Access denied to this lot' });
+      }
     }
     
     return next();

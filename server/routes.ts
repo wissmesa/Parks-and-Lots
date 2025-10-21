@@ -3,6 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import { promises as fs } from "fs";
+import { readFileSync, unlinkSync, readdirSync, statSync, existsSync } from "fs";
 import multer from "multer";
 import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
@@ -129,19 +130,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Debug endpoint to test static file serving
   app.get('/api/debug/static', (req, res) => {
-    const fs = require('fs');
     const uploadsPath = path.join(process.cwd(), 'static/uploads');
     
     try {
-      const files = fs.readdirSync(uploadsPath);
+      const files = readdirSync(uploadsPath);
       const fileInfo = files.map((filename: string) => {
         const filePath = path.join(uploadsPath, filename);
-        const stats = fs.statSync(filePath);
+        const stats = statSync(filePath);
         return {
           filename,
           size: stats.size,
           url: `/static/uploads/${filename}`,
-          exists: fs.existsSync(filePath)
+          exists: existsSync(filePath)
         };
       });
       
@@ -2731,9 +2731,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Company photo ${i} caption:`, caption);
         
         // Read the file and store it as base64 in database
-        const fs = require('fs');
         const filePath = file.path;
-        const imageBuffer = fs.readFileSync(filePath);
+        const imageBuffer = readFileSync(filePath);
         const imageBase64 = imageBuffer.toString('base64');
         const mimeType = file.mimetype || 'image/jpeg';
         
@@ -2748,7 +2747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Clean up temporary file
-        fs.unlinkSync(filePath);
+        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -3042,9 +3041,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Photo ${i} caption:`, caption);
         
         // Read the file and store it as base64 in database
-        const fs = require('fs');
         const filePath = file.path;
-        const imageBuffer = fs.readFileSync(filePath);
+        const imageBuffer = readFileSync(filePath);
         const imageBase64 = imageBuffer.toString('base64');
         const mimeType = file.mimetype || 'image/jpeg';
         
@@ -3059,7 +3057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Clean up temporary file
-        fs.unlinkSync(filePath);
+        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -4016,9 +4014,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`Lot photo ${i} caption:`, caption);
         
         // Read the file and store it as base64 in database
-        const fs = require('fs');
         const filePath = file.path;
-        const imageBuffer = fs.readFileSync(filePath);
+        const imageBuffer = readFileSync(filePath);
         const imageBase64 = imageBuffer.toString('base64');
         const mimeType = file.mimetype || 'image/jpeg';
         
@@ -4033,7 +4030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Clean up temporary file
-        fs.unlinkSync(filePath);
+        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -5661,21 +5658,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log('ADMIN: Lot found, parkId:', lot.parkId);
           
-          // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
+          // If lot has no park, allow access for company managers to manage unassigned lots
           if (!lot.parkId) {
             console.log('ADMIN: Lot not assigned to park');
-            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+            // Allow ADMIN to manage photos for unassigned lots
+            console.log('ADMIN: Access granted for unassigned lot');
+          } else {
+            const park = await storage.getPark(lot.parkId);
+            console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+            
+            if (!park || park.companyId !== req.user.companyId) {
+              console.log('ADMIN: Park does not belong to user company');
+              return res.status(403).json({ message: 'Access denied to this lot' });
+            }
+            
+            console.log('ADMIN: Access granted');
           }
-          
-          const park = await storage.getPark(lot.parkId);
-          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
-          
-          if (!park || park.companyId !== req.user.companyId) {
-            console.log('ADMIN: Park does not belong to user company');
-            return res.status(403).json({ message: 'Access denied to this lot' });
-          }
-          
-          console.log('ADMIN: Access granted');
         } else if (req.user?.role === 'MANAGER') {
           // Park manager can delete lot photos in parks they manage
           console.log('MANAGER: Checking park access');
@@ -5749,18 +5747,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Permission checks passed, proceeding with deletion');
 
-      // Delete the file from filesystem
-      try {
-        console.log('Photo urlOrPath:', photo.urlOrPath);
-        const filePath = path.join(process.cwd(), photo.urlOrPath.replace(/^\//, ''));
-        console.log('Attempting to delete file at:', filePath);
-        await fs.unlink(filePath);
-        console.log('File deleted successfully');
-      } catch (fileError) {
-        console.error('Failed to delete file:', fileError);
-        console.error('File path was:', path.join(process.cwd(), photo.urlOrPath.replace(/^\//, '')));
-        // Continue with DB deletion even if file deletion fails
-      }
+      // Photos are stored as base64 in the database, not as files
+      // No need to delete from filesystem
+      console.log('Photo stored as base64 in database, skipping filesystem deletion');
 
       console.log('Deleting photo from database');
       await storage.deletePhoto(req.params.id);
@@ -5818,21 +5807,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log('ADMIN: Lot found, parkId:', lot.parkId);
           
-          // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
+          // If lot has no park, allow access for company managers to manage unassigned lots
           if (!lot.parkId) {
             console.log('ADMIN: Lot not assigned to park');
-            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+            // Allow ADMIN to manage photos for unassigned lots
+            console.log('ADMIN: Access granted for unassigned lot');
+          } else {
+            const park = await storage.getPark(lot.parkId);
+            console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+            
+            if (!park || park.companyId !== req.user.companyId) {
+              console.log('ADMIN: Park does not belong to user company');
+              return res.status(403).json({ message: 'Access denied to this lot' });
+            }
+            
+            console.log('ADMIN: Access granted');
           }
-          
-          const park = await storage.getPark(lot.parkId);
-          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
-          
-          if (!park || park.companyId !== req.user.companyId) {
-            console.log('ADMIN: Park does not belong to user company');
-            return res.status(403).json({ message: 'Access denied to this lot' });
-          }
-          
-          console.log('ADMIN: Access granted');
         } else if (req.user?.role === 'MANAGER') {
           // Park manager can update lot photos in parks they manage
           console.log('MANAGER: Checking park access');
