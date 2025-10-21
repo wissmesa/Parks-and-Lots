@@ -95,6 +95,9 @@ export default function LotDetail() {
   
   // Booking dialog state
   const [showBookingDialog, setShowBookingDialog] = useState<boolean>(false);
+  
+  // State to track open tooltips for clickable info icons
+  const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
 
   const { data: lot, isLoading: lotLoading, error: lotError } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
@@ -529,9 +532,28 @@ export default function LotDetail() {
                           {price.label}
                           {price.showTooltip && (
                             <TooltipProvider>
-                              <Tooltip>
+                              <Tooltip
+                                open={openTooltips[`tooltip-${index}`]}
+                                onOpenChange={(open) => {
+                                  setOpenTooltips(prev => ({
+                                    ...prev,
+                                    [`tooltip-${index}`]: open
+                                  }));
+                                }}
+                              >
                                 <TooltipTrigger asChild>
-                                  <Info className="w-3.5 h-3.5 cursor-help" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenTooltips(prev => ({
+                                        ...prev,
+                                        [`tooltip-${index}`]: !prev[`tooltip-${index}`]
+                                      }));
+                                    }}
+                                    className="inline-flex"
+                                  >
+                                    <Info className="w-3.5 h-3.5 cursor-pointer" />
+                                  </button>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>Lot rent included: ${parseFloat(lot.lotRent!).toLocaleString()}/mo</p>

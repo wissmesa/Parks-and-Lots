@@ -117,6 +117,9 @@ export default function Properties() {
   // Pagination state for parks
   const [parksCurrentPage, setParksCurrentPage] = useState(1);
   const [parksItemsPerPage, setParksItemsPerPage] = useState(20);
+  
+  // State to track open tooltips for clickable info icons
+  const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
 
   // Parse URL parameters and set search immediately (only on initial load)
   useEffect(() => {
@@ -438,9 +441,28 @@ export default function Properties() {
                                 )}
                                 {price.showTooltip && (
                                   <TooltipProvider>
-                                    <Tooltip>
+                                    <Tooltip
+                                      open={openTooltips[`${lot.id}-${index}`]}
+                                      onOpenChange={(open) => {
+                                        setOpenTooltips(prev => ({
+                                          ...prev,
+                                          [`${lot.id}-${index}`]: open
+                                        }));
+                                      }}
+                                    >
                                       <TooltipTrigger asChild>
-                                        <Info className="w-4 h-4 ml-2 cursor-help text-muted-foreground" />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenTooltips(prev => ({
+                                              ...prev,
+                                              [`${lot.id}-${index}`]: !prev[`${lot.id}-${index}`]
+                                            }));
+                                          }}
+                                          className="inline-flex"
+                                        >
+                                          <Info className="w-4 h-4 ml-2 cursor-pointer text-muted-foreground" />
+                                        </button>
                                       </TooltipTrigger>
                                       <TooltipContent>
                                         <p>Lot rent included: ${parseFloat(lot.lotRent!).toLocaleString()}/mo</p>
