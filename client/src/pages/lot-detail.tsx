@@ -18,9 +18,11 @@ import {
   Clock,
   MapPin,
   Home,
-  Calculator
+  Calculator,
+  Info
 } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Lot {
   id: string;
@@ -31,6 +33,7 @@ interface Lot {
   priceForSale?: string | null;
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
+  lotRent?: string | null;
   description?: string;
   bedrooms?: number;
   bathrooms?: number;
@@ -490,32 +493,53 @@ export default function LotDetail() {
                       <div className="font-semibold">{lot.sqFt.toLocaleString()}</div>
                     </div>
                   )}
+                  {lot.lotRent && (
+                    <div className="text-center p-3 bg-muted rounded-lg">
+                      <DollarSign className="w-6 h-6 text-primary mb-2 mx-auto" />
+                      <div className="text-sm text-muted-foreground">Lot Rent</div>
+                      <div className="font-semibold">${parseFloat(lot.lotRent).toLocaleString()}/mo</div>
+                    </div>
+                  )}
                   {(() => {
                     const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
                     const prices = [];
                     
                     // Show pricing based on status and availability
                     if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
-                      prices.push({ label: 'Rent', value: lot.priceForRent, suffix: '/mo' });
+                      prices.push({ label: 'Rent', value: lot.priceForRent, suffix: '/mo', showTooltip: !!lot.lotRent });
                     }
                     if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
-                      prices.push({ label: 'Sale Price', value: lot.priceForSale, suffix: '' });
+                      prices.push({ label: 'Sale Price', value: lot.priceForSale, suffix: '', showTooltip: false });
                     }
                     if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
-                      prices.push({ label: 'Rent to Own', value: lot.priceRentToOwn, suffix: '/mo' });
+                      prices.push({ label: 'Rent to Own', value: lot.priceRentToOwn, suffix: '/mo', showTooltip: false });
                     }
                     if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
-                      prices.push({ label: 'Contract', value: lot.priceContractForDeed, suffix: '/mo' });
+                      prices.push({ label: 'Contract', value: lot.priceContractForDeed, suffix: '/mo', showTooltip: false });
                     }
                     
                     // Fallback to legacy price if no specific pricing is available
                     if (prices.length === 0 && lot.price) {
-                      prices.push({ label: 'Price', value: lot.price, suffix: statusArray.includes('FOR_RENT') ? '/mo' : '' });
+                      prices.push({ label: 'Price', value: lot.price, suffix: statusArray.includes('FOR_RENT') ? '/mo' : '', showTooltip: false });
                     }
                     
                     return prices.map((price, index) => (
                       <div key={index} className="text-center p-3 bg-muted rounded-lg">
-                        <div className="text-sm text-muted-foreground">{price.label}</div>
+                        <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                          {price.label}
+                          {price.showTooltip && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-3.5 h-3.5 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Lot rent included: ${parseFloat(lot.lotRent!).toLocaleString()}/mo</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                         <div className="font-semibold">
                           ${parseFloat(price.value).toLocaleString()}{price.suffix}
                         </div>

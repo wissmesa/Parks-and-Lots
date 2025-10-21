@@ -22,10 +22,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Info
 } from "lucide-react";
 import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
 import { ParkCard } from "@/components/ui/park-card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Lot preview image component for card layout
 function LotPreviewImageCard({ lotId }: { lotId: string }) {
@@ -85,6 +87,7 @@ interface Lot {
   priceForSale?: string | null;
   priceRentToOwn?: string | null;
   priceContractForDeed?: string | null;
+  lotRent?: string | null;
   description: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
@@ -407,21 +410,21 @@ export default function Properties() {
                         
                         // Show pricing based on status and availability
                         if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
-                          prices.push({ label: 'Rent', value: lot.priceForRent, suffix: '/mo' });
+                          prices.push({ label: 'Rent', value: lot.priceForRent, suffix: '/mo', showTooltip: !!lot.lotRent });
                         }
                         if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
-                          prices.push({ label: 'Sale', value: lot.priceForSale, suffix: '' });
+                          prices.push({ label: 'Sale', value: lot.priceForSale, suffix: '', showTooltip: false });
                         }
                         if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
-                          prices.push({ label: 'Rent to Own', value: lot.priceRentToOwn, suffix: '/mo' });
+                          prices.push({ label: 'Rent to Own', value: lot.priceRentToOwn, suffix: '/mo', showTooltip: false });
                         }
                         if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
-                          prices.push({ label: 'Contract', value: lot.priceContractForDeed, suffix: '/mo' });
+                          prices.push({ label: 'Contract', value: lot.priceContractForDeed, suffix: '/mo', showTooltip: false });
                         }
                         
                         // Fallback to legacy price if no specific pricing is available
                         if (prices.length === 0 && lot.price) {
-                          prices.push({ label: 'Price', value: lot.price, suffix: statusArray.includes('FOR_RENT') ? '/mo' : '' });
+                          prices.push({ label: 'Price', value: lot.price, suffix: statusArray.includes('FOR_RENT') ? '/mo' : '', showTooltip: false });
                         }
                         
                         return (
@@ -433,8 +436,25 @@ export default function Properties() {
                                 {prices.length > 1 && (
                                   <span className="text-sm ml-2 text-muted-foreground">({price.label})</span>
                                 )}
+                                {price.showTooltip && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Info className="w-4 h-4 ml-2 cursor-help text-muted-foreground" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Lot rent included: ${parseFloat(lot.lotRent!).toLocaleString()}/mo</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
                               </div>
                             ))}
+                            {lot.lotRent && (
+                              <div className="text-sm text-muted-foreground">
+                                Lot Rent: ${parseFloat(lot.lotRent).toLocaleString()}/mo
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
