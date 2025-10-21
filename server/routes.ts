@@ -25,6 +25,7 @@ import { calendarService } from "./calendar";
 import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
+import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -76,9 +77,9 @@ const getPhotoUrl = (req: Request, filename: string): string => {
   return `/static/uploads/${filename}`;
 };
 
-// Configure multer for file uploads
+// Configure multer for file uploads (using memory storage for S3)
 const upload = multer({
-  dest: path.join(process.cwd(), 'static/uploads'),
+  storage: multer.memoryStorage(), // Guardar en memoria para subir a S3
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -331,25 +332,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
       }
       
-      const { parks } = await storage.getParksByCompany(req.user!.companyId);
+      const result = await storage.getParksByCompany(req.user!.companyId);
+      const parks = result?.parks || [];
       
       // Parse amenities from JSON strings back to objects
-      parks.forEach((park: any) => {
-        if (park.amenities && Array.isArray(park.amenities)) {
-          park.amenities = park.amenities.map((amenity: any) => {
-            if (!amenity) return amenity;
-            try {
-              if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
-                return JSON.parse(amenity);
+      if (Array.isArray(parks)) {
+        parks.forEach((park: any) => {
+          if (park.amenities && Array.isArray(park.amenities)) {
+            park.amenities = park.amenities.map((amenity: any) => {
+              if (!amenity) return amenity;
+              try {
+                if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+                  return JSON.parse(amenity);
+                }
+                return amenity;
+              } catch (e) {
+                console.error('Failed to parse amenity:', amenity, e);
+                return amenity;
               }
-              return amenity;
-            } catch (e) {
-              console.error('Failed to parse amenity:', amenity, e);
-              return amenity;
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+      }
       
       res.json({ parks });
     } catch (error) {
@@ -2730,24 +2734,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Company photo ${i} caption:`, caption);
         
-        // Read the file and store it as base64 in database
-        const filePath = file.path;
-        const imageBuffer = readFileSync(filePath);
-        const imageBase64 = imageBuffer.toString('base64');
-        const mimeType = file.mimetype || 'image/jpeg';
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'companies');
+        console.log('Uploaded to S3:', s3Result.url);
         
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'COMPANY',
           entityId: req.params.id,
-          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
-          imageData: imageBase64,
-          mimeType: mimeType,
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
         
-        // Clean up temporary file
-        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -3040,24 +3041,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Photo ${i} caption:`, caption);
         
-        // Read the file and store it as base64 in database
-        const filePath = file.path;
-        const imageBuffer = readFileSync(filePath);
-        const imageBase64 = imageBuffer.toString('base64');
-        const mimeType = file.mimetype || 'image/jpeg';
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'parks');
+        console.log('Uploaded to S3:', s3Result.url);
         
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'PARK',
           entityId: req.params.id,
-          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
-          imageData: imageBase64,
-          mimeType: mimeType,
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
         
-        // Clean up temporary file
-        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -4013,24 +4011,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Lot photo ${i} caption:`, caption);
         
-        // Read the file and store it as base64 in database
-        const filePath = file.path;
-        const imageBuffer = readFileSync(filePath);
-        const imageBase64 = imageBuffer.toString('base64');
-        const mimeType = file.mimetype || 'image/jpeg';
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'lots');
+        console.log('Uploaded to S3:', s3Result.url);
         
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'LOT',
           entityId: req.params.id,
-          urlOrPath: `/api/photos/${file.filename}`, // Use API endpoint instead of static
-          imageData: imageBase64,
-          mimeType: mimeType,
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
         
-        // Clean up temporary file
-        unlinkSync(filePath);
         photos.push(photo);
       }
 
@@ -5747,9 +5742,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log('Permission checks passed, proceeding with deletion');
 
-      // Photos are stored as base64 in the database, not as files
-      // No need to delete from filesystem
-      console.log('Photo stored as base64 in database, skipping filesystem deletion');
+      // Extract S3 key from URL and delete from S3
+      const s3Key = extractS3KeyFromUrl(photo.urlOrPath);
+      if (s3Key) {
+        try {
+          console.log('Deleting photo from S3:', s3Key);
+          await deleteFromS3(s3Key);
+          console.log('Photo deleted successfully from S3');
+        } catch (s3Error) {
+          console.error('Failed to delete from S3 (continuing with DB deletion):', s3Error);
+          // Continue with database deletion even if S3 deletion fails
+        }
+      } else {
+        console.log('Photo not stored in S3 or legacy format, skipping S3 deletion');
+      }
 
       console.log('Deleting photo from database');
       await storage.deletePhoto(req.params.id);
