@@ -983,6 +983,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(photos.sortOrder));
   }
 
+  async getPhotosByFilename(filename: string): Promise<Photo[]> {
+    return await db.select().from(photos)
+      .where(like(photos.urlOrPath, `%${filename}`));
+  }
+
   async getPhoto(id: string): Promise<Photo | null> {
     const result = await db.select().from(photos).where(eq(photos.id, id)).limit(1);
     return result[0] || null;

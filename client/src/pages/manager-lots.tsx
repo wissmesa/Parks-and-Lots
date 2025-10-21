@@ -1459,11 +1459,10 @@ export default function ManagerLots() {
                     <Input
                       id="sqFt"
                       type="number"
-                      min="1"
+                      min="0"
                       value={formData.sqFt}
                       onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
                       placeholder="e.g., 1200"
-                      required
                     />
                   </div>
                   
@@ -1496,7 +1495,7 @@ export default function ManagerLots() {
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>
@@ -2598,14 +2597,13 @@ export default function ManagerLots() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit-sqFt">Square Feet *</Label>
+                      <Label htmlFor="edit-sqFt">Square Feet</Label>
                       <Input
                         id="edit-sqFt"
                         type="number"
-                        min="1"
+                        min="0"
                         value={formData.sqFt}
                         onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
-                        required
                         className="mt-1"
                       />
                     </div>
@@ -2642,7 +2640,7 @@ export default function ManagerLots() {
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>
