@@ -35,7 +35,7 @@ export function Navigation() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <MapPin className="text-primary-foreground h-4 w-4" />
               </div>
-              <span className="text-xl font-bold text-foreground">Parks & Lots</span>
+              <span className="text-xl font-bold text-foreground">MHP Sales Manager</span>
             </Link>
           </div>
           
