@@ -259,3 +259,114 @@ Parks & Lots Team
     html
   });
 }
+
+export async function sendLotCreationNotification(
+  lotData: {
+    id: string;
+    nameOrNumber: string;
+    parkName?: string;
+    status: string[];
+    description?: string;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+  },
+  createdByName: string,
+  fromEmail: string = 'support@bluepaperclip.com'
+): Promise<boolean> {
+  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com'];
+  
+  const subject = `Nuevo Lote Creado: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
+  
+  const statusText = lotData.status.join(', ');
+  const bedroomsBathrooms = lotData.bedrooms || lotData.bathrooms 
+    ? `${lotData.bedrooms || 'N/A'} habitaciones, ${lotData.bathrooms || 'N/A'} baños`
+    : 'No especificado';
+  
+  const text = `
+Se ha creado un nuevo lote en Parks & Lots
+
+Detalles del Lote:
+- ID: ${lotData.id}
+- Lote #: ${lotData.nameOrNumber}
+${lotData.parkName ? `- Parque: ${lotData.parkName}` : ''}
+- Estado: ${statusText}
+- Habitaciones/Baños: ${bedroomsBathrooms}
+${lotData.description ? `- Descripción: ${lotData.description}` : ''}
+
+Creado por: ${createdByName}
+
+Saludos,
+Sistema Parks & Lots
+  `;
+
+  const html = `
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">🏠 Nuevo Lote Creado</h2>
+      
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #007bff; margin-top: 0;">Detalles del Lote</h3>
+        
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">ID:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Lote #:</td>
+            <td style="padding: 8px 0; color: #333; font-size: 18px; font-weight: bold;">${lotData.nameOrNumber}</td>
+          </tr>
+          ${lotData.parkName ? `
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Parque:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.parkName}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Estado:</td>
+            <td style="padding: 8px 0; color: #333;">${statusText}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Habitaciones/Baños:</td>
+            <td style="padding: 8px 0; color: #333;">${bedroomsBathrooms}</td>
+          </tr>
+          ${lotData.description ? `
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555; vertical-align: top;">Descripción:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.description}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+        <strong>Creado por:</strong> ${createdByName}
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+      
+      <p style="color: #999; font-size: 12px;">
+        Saludos,<br>
+        Sistema Parks & Lots
+      </p>
+    </div>
+  `;
+
+  // Send to all recipients
+  const promises = recipients.map(recipient => 
+    sendEmail({
+      to: recipient,
+      from: fromEmail,
+      subject,
+      text,
+      html
+    })
+  );
+
+  try {
+    await Promise.all(promises);
+    return true;
+  } catch (error) {
+    console.error('Error sending lot creation notifications:', error);
+    return false;
+  }
+}

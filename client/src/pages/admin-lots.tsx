@@ -1370,11 +1370,10 @@ export default function AdminLots() {
                     <Input
                       id="sqFt"
                       type="number"
-                      min="1"
+                      min="0"
                       value={formData.sqFt}
                       onChange={(e) => setFormData(prev => ({ ...prev, sqFt: parseInt(e.target.value) || 0 }))}
                       placeholder="e.g., 1200"
-                      required
                     />
                   </div>
                   
@@ -1407,7 +1406,7 @@ export default function AdminLots() {
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>
@@ -1843,7 +1842,6 @@ export default function AdminLots() {
                     <TableHead>Status</TableHead>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
-                    <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -1922,11 +1920,6 @@ export default function AdminLots() {
                         <Badge variant={lot.isActive ? 'default' : 'secondary'}>
                           {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span>${parseInt(lot.price).toLocaleString()}</span>
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -2615,7 +2608,7 @@ export default function AdminLots() {
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                        {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                           <SelectItem key={year} value={year.toString()}>
                             {year}
                           </SelectItem>

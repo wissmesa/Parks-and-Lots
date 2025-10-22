@@ -1459,11 +1459,10 @@ export default function ManagerLots() {
                     <Input
                       id="sqFt"
                       type="number"
-                      min="1"
+                      min="0"
                       value={formData.sqFt}
                       onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
                       placeholder="e.g., 1200"
-                      required
                     />
                   </div>
                   
@@ -1496,7 +1495,7 @@ export default function ManagerLots() {
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>
@@ -2121,7 +2120,6 @@ export default function ManagerLots() {
                     <TableHead>Status</TableHead>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
-                    <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -2190,37 +2188,6 @@ export default function ManagerLots() {
                         <Badge variant={lot.isActive ? 'default' : 'destructive'}>
                           {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span>$
-                            {(() => {
-                              const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                              
-                              // Show pricing based on status and availability
-                              if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
-                                return `${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
-                              }
-                              if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
-                                return `${parseFloat(lot.priceForSale).toLocaleString()}`;
-                              }
-                              if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
-                                return `${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
-                              }
-                              if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
-                                return `${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
-                              }
-                              
-                              // Fallback to legacy price if no specific pricing is available
-                              if (lot.price) {
-                                const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
-                                return `${parseFloat(lot.price).toLocaleString()}${suffix}`;
-                              }
-                              
-                              return 'TBD';
-                            })()}
-                          </span>
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -2598,14 +2565,13 @@ export default function ManagerLots() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit-sqFt">Square Feet *</Label>
+                      <Label htmlFor="edit-sqFt">Square Feet</Label>
                       <Input
                         id="edit-sqFt"
                         type="number"
-                        min="1"
+                        min="0"
                         value={formData.sqFt}
                         onChange={(e) => setFormData(prev => ({ ...prev, sqFt: e.target.value ? parseInt(e.target.value) : 0 }))}
-                        required
                         className="mt-1"
                       />
                     </div>
@@ -2642,7 +2608,7 @@ export default function ManagerLots() {
                           <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 1969 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                          {Array.from({ length: new Date().getFullYear() + 1 - 1969 }, (_, i) => new Date().getFullYear() + 1 - i).map((year) => (
                             <SelectItem key={year} value={year.toString()}>
                               {year}
                             </SelectItem>

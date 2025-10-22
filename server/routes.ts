@@ -3,6 +3,7 @@ import express from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import { promises as fs } from "fs";
+import { readFileSync, unlinkSync, readdirSync, statSync, existsSync } from "fs";
 import multer from "multer";
 import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
@@ -14,6 +15,7 @@ import {
   requireRole, 
   requireParkAccess, 
   requireLotAccess, 
+  requireCompanyAccess,
   generateTokens, 
   hashPassword, 
   comparePassword,
@@ -23,6 +25,8 @@ import { calendarService } from "./calendar";
 import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
+import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
+import { sendLotCreationNotification } from "./email";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -68,19 +72,15 @@ const getFrontendBaseUrl = () => {
 
 const FRONTEND_BASE_URL = getFrontendBaseUrl();
 
-// Function to generate absolute photo URLs
+// Function to generate photo URLs - use relative paths for better compatibility
 const getPhotoUrl = (req: Request, filename: string): string => {
-  // Get the base URL from the request
-  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:5000';
-  const baseUrl = `${protocol}://${host}`;
-  
-  return `${baseUrl}/static/uploads/${filename}`;
+  // Use relative paths that work in both development and production
+  return `/static/uploads/${filename}`;
 };
 
-// Configure multer for file uploads
+// Configure multer for file uploads (using memory storage for S3)
 const upload = multer({
-  dest: path.join(process.cwd(), 'static/uploads'),
+  storage: multer.memoryStorage(), // Guardar en memoria para subir a S3
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -100,15 +100,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Serve static files - ensure this is before any other middleware
-  app.use('/static', express.static(path.join(process.cwd(), 'static'), {
+  // Use a more explicit configuration for static file serving
+  const staticOptions = {
     maxAge: '1d', // Cache for 1 day
     etag: true,
-    lastModified: true
-  }));
+    lastModified: true,
+    setHeaders: (res: any, path: string) => {
+      // Add CORS headers for static files
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      // Ensure proper content type for images
+      if (path.endsWith('.jpg') || path.endsWith('.jpeg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (path.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (path.endsWith('.gif')) {
+        res.setHeader('Content-Type', 'image/gif');
+      } else if (path.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      }
+    }
+  };
+  
+  app.use('/static', express.static(path.join(process.cwd(), 'static'), staticOptions));
 
   // Health check
   app.get('/api/healthz', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Debug endpoint to test static file serving
+  app.get('/api/debug/static', (req, res) => {
+    const uploadsPath = path.join(process.cwd(), 'static/uploads');
+    
+    try {
+      const files = readdirSync(uploadsPath);
+      const fileInfo = files.map((filename: string) => {
+        const filePath = path.join(uploadsPath, filename);
+        const stats = statSync(filePath);
+        return {
+          filename,
+          size: stats.size,
+          url: `/static/uploads/${filename}`,
+          exists: existsSync(filePath)
+        };
+      });
+      
+      res.json({
+        uploadsPath,
+        fileCount: files.length,
+        files: fileInfo.slice(0, 5) // Show first 5 files
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        error: 'Failed to read uploads directory',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Serve photos from database
+  app.get('/api/photos/:filename', async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      
+      // Find photo by filename in urlOrPath
+      const photos = await storage.getPhotosByFilename(filename);
+      if (!photos || photos.length === 0) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+      
+      const photo = photos[0];
+      
+      // Convert base64 back to buffer
+      const imageBuffer = Buffer.from(photo.imageData || '', 'base64');
+      
+      // Set appropriate headers
+      res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      res.setHeader('Content-Length', imageBuffer.length);
+      
+      // Send the image data
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error('Error serving photo:', error);
+      res.status(500).json({ message: 'Error serving photo' });
+    }
   });
 
 
@@ -206,19 +284,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Manager not found' });
       }
       
-      // Allow updating fullName and companyId
+      // Allow updating fullName and/or companyId
       const { fullName, companyId } = req.body;
-      if (!fullName || typeof fullName !== 'string' || fullName.trim() === '') {
-        return res.status(400).json({ message: 'Full name is required' });
+      
+      const updateData: any = {};
+      
+      // Update fullName if provided
+      if (fullName !== undefined) {
+        if (typeof fullName !== 'string' || fullName.trim() === '') {
+          return res.status(400).json({ message: 'Full name cannot be empty' });
+        }
+        updateData.fullName = fullName.trim();
       }
       
-      const updateData: any = {
-        fullName: fullName.trim()
-      };
-      
-      // Only update companyId if provided and user is ADMIN
-      if (companyId && manager.role === 'ADMIN') {
+      // Update companyId if provided (allowed for both MANAGER and ADMIN roles)
+      if (companyId !== undefined) {
         updateData.companyId = companyId;
+      }
+      
+      // Ensure at least one field is being updated
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: 'No valid fields to update' });
       }
       
       const updatedManager = await storage.updateUser(req.params.id, updateData);
@@ -247,25 +333,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Company manager must be assigned to a company' });
       }
       
-      const { parks } = await storage.getParksByCompany(req.user!.companyId);
+      const result = await storage.getParksByCompany(req.user!.companyId);
+      const parks = result?.parks || [];
       
       // Parse amenities from JSON strings back to objects
-      parks.forEach((park: any) => {
-        if (park.amenities && Array.isArray(park.amenities)) {
-          park.amenities = park.amenities.map((amenity: any) => {
-            if (!amenity) return amenity;
-            try {
-              if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
-                return JSON.parse(amenity);
+      if (Array.isArray(parks)) {
+        parks.forEach((park: any) => {
+          if (park.amenities && Array.isArray(park.amenities)) {
+            park.amenities = park.amenities.map((amenity: any) => {
+              if (!amenity) return amenity;
+              try {
+                if (typeof amenity === 'string' && amenity.trim().startsWith('{')) {
+                  return JSON.parse(amenity);
+                }
+                return amenity;
+              } catch (e) {
+                console.error('Failed to parse amenity:', amenity, e);
+                return amenity;
               }
-              return amenity;
-            } catch (e) {
-              console.error('Failed to parse amenity:', amenity, e);
-              return amenity;
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+      }
       
       res.json({ parks });
     } catch (error) {
@@ -358,6 +447,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lotData = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(lotData);
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName: park.name,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user!.fullName
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
@@ -1095,6 +1203,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lotData = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(lotData);
+      
+      // Get park name for notification
+      const park = await storage.getPark(req.body.parkId);
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName: park?.name,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user!.fullName
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
@@ -2424,6 +2554,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(410).json({ message: 'Invite has expired' });
       }
 
+      // Determine the companyId for the user
+      let userCompanyId = invite.companyId;
+      
+      // For MANAGER role with a park assignment, get the company from the park
+      if (invite.role === 'MANAGER' && invite.parkId && !userCompanyId) {
+        try {
+          const park = await storage.getPark(invite.parkId);
+          if (park) {
+            userCompanyId = park.companyId;
+            console.log(`Setting MANAGER companyId to ${userCompanyId} from park ${invite.parkId}`);
+          }
+        } catch (parkError) {
+          console.error('Failed to fetch park for companyId:', parkError);
+        }
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(invite.email);
       let user;
@@ -2445,6 +2591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           user = await storage.updateUser(existingUser.id, {
             passwordHash,
             fullName: finalFullName,
+            companyId: userCompanyId,
             isActive: true
           });
         } else {
@@ -2469,7 +2616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           passwordHash,
           fullName: finalFullName,
           role: invite.role,
-          companyId: invite.companyId, // Set companyId for ADMIN
+          companyId: userCompanyId,
           isActive: true
         });
       }
@@ -2502,9 +2649,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // If this is an ADMIN, automatically assign all company parks
-      if (invite.role === 'ADMIN' && invite.companyId) {
+      if (invite.role === 'ADMIN' && userCompanyId) {
         try {
-          const companyParks = await storage.getParks({ companyId: invite.companyId });
+          const companyParks = await storage.getParks({ companyId: userCompanyId });
           for (const park of companyParks.parks) {
             await storage.assignManagerToPark(user.id, park.id);
           }
@@ -2600,8 +2747,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:id/photos', authenticateToken, requireRole('MHP_LORD'), upload.fields([
-    { name: 'photos', maxCount: 10 },
+  app.post('/api/companies/:id/photos', authenticateToken, requireCompanyAccess, upload.fields([
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
@@ -2646,13 +2793,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Company photo ${i} caption:`, caption);
         
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'companies');
+        console.log('Uploaded to S3:', s3Result.url);
+        
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'COMPANY',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
         photos.push(photo);
       }
 
@@ -2900,7 +3055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/parks/:id/photos', authenticateToken, requireParkAccess, upload.fields([
-    { name: 'photos', maxCount: 10 },
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
@@ -2945,13 +3100,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Photo ${i} caption:`, caption);
         
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'parks');
+        console.log('Uploaded to S3:', s3Result.url);
+        
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'PARK',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
         photos.push(photo);
       }
 
@@ -3046,7 +3209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (req.user?.role === 'MANAGER') {
         const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
         hasAccess = managerAssignments.length > 0;
-      } else if (req.user?.role === 'MHP_LORD') {
+      } else if (req.user?.role === 'ADMIN') {
         if (!req.user.companyId) {
           return res.status(403).json({ message: 'Company manager must be assigned to a company' });
         }
@@ -3089,7 +3252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (req.user?.role === 'MANAGER') {
         const managerAssignments = await storage.getManagerAssignments(req.user.id, existingStatus.parkId);
         hasAccess = managerAssignments.length > 0;
-      } else if (req.user?.role === 'MHP_LORD') {
+      } else if (req.user?.role === 'ADMIN') {
         if (!req.user.companyId) {
           return res.status(403).json({ message: 'Company manager must be assigned to a company' });
         }
@@ -3265,6 +3428,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: newLot.id,
             nameOrNumber: newLot.nameOrNumber
           });
+          
+          // Get park name for notification if parkId exists
+          let parkNameForEmail: string | undefined;
+          if (newLot.parkId) {
+            const park = await storage.getPark(newLot.parkId);
+            parkNameForEmail = park?.name;
+          }
+          
+          // Send notification email (don't fail the upload if email fails)
+          try {
+            await sendLotCreationNotification(
+              {
+                id: newLot.id,
+                nameOrNumber: newLot.nameOrNumber,
+                parkName: parkNameForEmail,
+                status: newLot.status || [],
+                description: newLot.description || undefined,
+                bedrooms: newLot.bedrooms,
+                bathrooms: newLot.bathrooms,
+              },
+              req.user!.fullName
+            );
+          } catch (emailError) {
+            console.error(`Failed to send lot creation notification for lot ${newLot.nameOrNumber}:`, emailError);
+          }
           
           // Add warning if lot was created without park assignment
           if (!newLot.parkId) {
@@ -3448,6 +3636,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: newLot.id,
             nameOrNumber: newLot.nameOrNumber
           });
+          
+          // Get park name for notification if parkId exists
+          let parkNameForEmail: string | undefined;
+          if (newLot.parkId) {
+            const park = await storage.getPark(newLot.parkId);
+            parkNameForEmail = park?.name;
+          }
+          
+          // Send notification email (don't fail the upload if email fails)
+          try {
+            await sendLotCreationNotification(
+              {
+                id: newLot.id,
+                nameOrNumber: newLot.nameOrNumber,
+                parkName: parkNameForEmail,
+                status: newLot.status || [],
+                description: newLot.description || undefined,
+                bedrooms: newLot.bedrooms,
+                bathrooms: newLot.bathrooms,
+              },
+              req.user!.fullName
+            );
+          } catch (emailError) {
+            console.error(`Failed to send lot creation notification for lot ${newLot.nameOrNumber}:`, emailError);
+          }
           
           // Add warning if lot was created without park assignment
           if (!newLot.parkId) {
@@ -3679,10 +3892,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/lots', authenticateToken, requireLotAccess, async (req, res) => {
+  app.post('/api/lots', authenticateToken, requireLotAccess, async (req: AuthRequest, res) => {
     try {
       const parsed = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(parsed);
+      
+      // Get park name for notification if parkId exists
+      let parkName: string | undefined;
+      if (lot.parkId) {
+        const park = await storage.getPark(lot.parkId);
+        parkName = park?.name;
+      }
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user?.fullName || 'Sistema'
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
@@ -3862,7 +4101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/lots/:id/photos', authenticateToken, requireLotAccess, upload.fields([
-    { name: 'photos', maxCount: 10 },
+    { name: 'photos', maxCount: 20 },
     { name: 'photo', maxCount: 1 }
   ]), async (req, res) => {
     try {
@@ -3907,13 +4146,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Lot photo ${i} caption:`, caption);
         
+        // Upload to S3
+        const s3Result = await uploadToS3(file, 'lots');
+        console.log('Uploaded to S3:', s3Result.url);
+        
+        // Save metadata to database (without base64 data)
         const photo = await storage.createPhoto({
           entityType: 'LOT',
           entityId: req.params.id,
-          urlOrPath: getPhotoUrl(req, file.filename),
+          urlOrPath: s3Result.url, // URL de S3
+          imageData: null, // Ya no guardamos base64
+          mimeType: file.mimetype || 'image/jpeg',
           caption: caption,
           sortOrder: currentPhotoCount + i
         });
+        
         photos.push(photo);
       }
 
@@ -5347,6 +5594,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Photo reordering route (MUST be before /api/photos/:id routes)
+  app.patch('/api/photos/reorder', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      console.log('Photo reorder request:', { 
+        body: req.body, 
+        user: { id: req.user?.id, role: req.user?.role, companyId: req.user?.companyId }
+      });
+      
+      const { entityType, entityId, photoOrders } = req.body;
+
+      if (!entityType || !entityId || !Array.isArray(photoOrders)) {
+        console.log('Missing required fields:', { entityType, entityId, photoOrders });
+        return res.status(400).json({ message: 'Missing required fields: entityType, entityId, photoOrders' });
+      }
+
+      // Validate entityType
+      if (!['COMPANY', 'PARK', 'LOT'].includes(entityType)) {
+        console.log('Invalid entity type:', entityType);
+        return res.status(400).json({ message: 'Invalid entityType. Must be COMPANY, PARK, or LOT' });
+      }
+
+      // Check permissions based on entity type
+      if (entityType === 'LOT') {
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo reorder permissions for role:', req.user?.role);
+        
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can reorder any lot photos
+          console.log('MHP_LORD: Access granted');
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can reorder lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
+          
+          if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const lot = await storage.getLotAny(entityId);
+          if (!lot) {
+            console.log('ADMIN: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
+          // If lot has no park, deny access for company managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const park = await storage.getPark(lot.parkId);
+          console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+          
+          if (!park || park.companyId !== req.user.companyId) {
+            console.log('ADMIN: Park does not belong to user company');
+            return res.status(403).json({ message: 'Access denied to this lot' });
+          }
+          
+          console.log('ADMIN: Access granted');
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can reorder lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
+        } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else if (entityType === 'PARK') {
+        // For park photos, allow admins and managers with park access
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can reorder any park photos
+        } else if (req.user?.role === 'MANAGER') {
+          // Check if manager has access to this park
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === entityId);
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied' });
+          }
+        } else if (req.user?.role === 'ADMIN') {
+          // Check if company manager has access to this park
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          const park = await storage.getPark(entityId);
+          if (!park || park.companyId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied to this park' });
+          }
+        } else {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      } else {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can reorder any company photos
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can reorder their company's photos
+          // Additional permission checks could be added here if needed
+        } else {
+          return res.status(403).json({ message: 'Admin access required' });
+        }
+      }
+
+      // Validate photoOrders array
+      for (const item of photoOrders) {
+        if (!item.id || typeof item.sortOrder !== 'number') {
+          return res.status(400).json({ message: 'Each item in photoOrders must have id and sortOrder' });
+        }
+      }
+
+      // Reorder photos
+      console.log('Calling storage.reorderPhotos with:', { entityType, entityId, photoOrders });
+      await storage.reorderPhotos(entityType, entityId, photoOrders);
+      
+      // Return updated photos
+      console.log('Getting updated photos...');
+      const updatedPhotos = await storage.getPhotos(entityType, entityId);
+      console.log('Photos reordered successfully, returning', updatedPhotos.length, 'photos');
+      res.json(updatedPhotos);
+    } catch (error) {
+      console.error('Reorder photos error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ message: 'Internal server error', error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Delete photo (works for all entity types)
   app.delete('/api/photos/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
@@ -5369,37 +5765,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow admins, managers, and company managers with lot access
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo deletion permissions for role:', req.user?.role);
+        
         if (req.user?.role === 'MHP_LORD') {
-          // Admin can delete any lot photo
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(photo.entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
+          // Super admin can delete any lot photo
+          console.log('MHP_LORD: Access granted');
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can delete lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
           
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
-        } else if (req.user?.role === 'MHP_LORD') {
-          // Check if company manager has access to this lot
           if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const lot = await storage.getLotAny(photo.entityId);
           if (!lot) {
+            console.log('ADMIN: Lot not found');
             return res.status(404).json({ message: 'Lot not found' });
           }
           
-          const park = await storage.getPark(lot.parkId);
-          if (!park || park.companyId !== req.user.companyId) {
-            return res.status(403).json({ message: 'Access denied to this lot' });
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
+          // If lot has no park, allow access for company managers to manage unassigned lots
+          if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
+            // Allow ADMIN to manage photos for unassigned lots
+            console.log('ADMIN: Access granted for unassigned lot');
+          } else {
+            const park = await storage.getPark(lot.parkId);
+            console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+            
+            if (!park || park.companyId !== req.user.companyId) {
+              console.log('ADMIN: Park does not belong to user company');
+              return res.status(403).json({ message: 'Access denied to this lot' });
+            }
+            
+            console.log('ADMIN: Access granted');
           }
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can delete lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
         } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
@@ -5413,7 +5844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
           }
-        } else if (req.user?.role === 'MHP_LORD') {
+        } else if (req.user?.role === 'ADMIN') {
           // Check if company manager has access to this park
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5427,25 +5858,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else {
-        // For company photos, only admins can delete
-        if (req.user?.role !== 'ADMIN') {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can delete any company photo
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can delete their company's photos
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          if (photo.entityId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied - you can only delete your own company photos' });
+          }
+        } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
 
       console.log('Permission checks passed, proceeding with deletion');
 
-      // Delete the file from filesystem
-      try {
-        console.log('Photo urlOrPath:', photo.urlOrPath);
-        const filePath = path.join(process.cwd(), photo.urlOrPath.replace(/^\//, ''));
-        console.log('Attempting to delete file at:', filePath);
-        await fs.unlink(filePath);
-        console.log('File deleted successfully');
-      } catch (fileError) {
-        console.error('Failed to delete file:', fileError);
-        console.error('File path was:', path.join(process.cwd(), photo.urlOrPath.replace(/^\//, '')));
-        // Continue with DB deletion even if file deletion fails
+      // Extract S3 key from URL and delete from S3
+      const s3Key = extractS3KeyFromUrl(photo.urlOrPath);
+      if (s3Key) {
+        try {
+          console.log('Deleting photo from S3:', s3Key);
+          await deleteFromS3(s3Key);
+          console.log('Photo deleted successfully from S3');
+        } catch (s3Error) {
+          console.error('Failed to delete from S3 (continuing with DB deletion):', s3Error);
+          // Continue with database deletion even if S3 deletion fails
+        }
+      } else {
+        console.log('Photo not stored in S3 or legacy format, skipping S3 deletion');
       }
 
       console.log('Deleting photo from database');
@@ -5481,37 +5925,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check permissions based on entity type
       if (photo.entityType === 'LOT') {
-        // For lots, allow admins, managers, and company managers with lot access
+        // For lots, allow MHP_LORD (super admin), ADMIN (company manager), and MANAGER (park manager) with lot access
+        console.log('Checking lot photo caption update permissions for role:', req.user?.role);
+        
         if (req.user?.role === 'MHP_LORD') {
-          // Admin can update any lot photo
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(photo.entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
+          // Super admin can update any lot photo
+          console.log('MHP_LORD: Access granted');
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can update lot photos in their company's parks
+          console.log('ADMIN: Checking company access');
           
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
-        } else if (req.user?.role === 'MHP_LORD') {
-          // Check if company manager has access to this lot
           if (!req.user.companyId) {
+            console.log('ADMIN: No companyId assigned');
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
           }
           
           const lot = await storage.getLotAny(photo.entityId);
           if (!lot) {
+            console.log('ADMIN: Lot not found');
             return res.status(404).json({ message: 'Lot not found' });
           }
           
-          const park = await storage.getPark(lot.parkId);
-          if (!park || park.companyId !== req.user.companyId) {
-            return res.status(403).json({ message: 'Access denied to this lot' });
+          console.log('ADMIN: Lot found, parkId:', lot.parkId);
+          
+          // If lot has no park, allow access for company managers to manage unassigned lots
+          if (!lot.parkId) {
+            console.log('ADMIN: Lot not assigned to park');
+            // Allow ADMIN to manage photos for unassigned lots
+            console.log('ADMIN: Access granted for unassigned lot');
+          } else {
+            const park = await storage.getPark(lot.parkId);
+            console.log('ADMIN: Park found:', !!park, 'Park companyId:', park?.companyId, 'User companyId:', req.user.companyId);
+            
+            if (!park || park.companyId !== req.user.companyId) {
+              console.log('ADMIN: Park does not belong to user company');
+              return res.status(403).json({ message: 'Access denied to this lot' });
+            }
+            
+            console.log('ADMIN: Access granted');
           }
+        } else if (req.user?.role === 'MANAGER') {
+          // Park manager can update lot photos in parks they manage
+          console.log('MANAGER: Checking park access');
+          
+          const lot = await storage.getLotAny(photo.entityId);
+          if (!lot) {
+            console.log('MANAGER: Lot not found');
+            return res.status(404).json({ message: 'Lot not found' });
+          }
+          
+          // If lot has no park, deny access for managers (only MHP_LORD can manage unassigned lots)
+          if (!lot.parkId) {
+            console.log('MANAGER: Lot not assigned to park');
+            return res.status(403).json({ message: 'Access denied - lot not assigned to a park' });
+          }
+          
+          const assignments = await storage.getManagerAssignments(req.user.id);
+          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
+          console.log('MANAGER: Has access to park:', hasAccess);
+          
+          if (!hasAccess) {
+            return res.status(403).json({ message: 'Access denied - you are not assigned to this park' });
+          }
+          
+          console.log('MANAGER: Access granted');
         } else {
+          console.log('Unknown role or access denied, role:', req.user?.role);
           return res.status(403).json({ message: 'Access denied' });
         }
       } else if (photo.entityType === 'PARK') {
@@ -5525,7 +6004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!hasAccess) {
             return res.status(403).json({ message: 'Access denied' });
           }
-        } else if (req.user?.role === 'MHP_LORD') {
+        } else if (req.user?.role === 'ADMIN') {
           // Check if company manager has access to this park
           if (!req.user.companyId) {
             return res.status(403).json({ message: 'Company manager must be assigned to a company' });
@@ -5539,8 +6018,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: 'Access denied' });
         }
       } else {
-        // For company photos, only admins can update
-        if (req.user?.role !== 'ADMIN') {
+        // For company photos, allow MHP_LORD (super admin) and ADMIN (company manager)
+        if (req.user?.role === 'MHP_LORD') {
+          // Super admin can update any company photo
+        } else if (req.user?.role === 'ADMIN') {
+          // Company manager can update their company's photos
+          if (!req.user.companyId) {
+            return res.status(403).json({ message: 'Company manager must be assigned to a company' });
+          }
+          
+          if (photo.entityId !== req.user.companyId) {
+            return res.status(403).json({ message: 'Access denied - you can only update your own company photos' });
+          }
+        } else {
           return res.status(403).json({ message: 'Admin access required' });
         }
       }
@@ -5551,80 +6041,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedPhoto);
     } catch (error) {
       console.error('Update photo error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  });
-
-  // Photo reordering route
-  app.patch('/api/photos/reorder', authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const { entityType, entityId, photoOrders } = req.body;
-
-      if (!entityType || !entityId || !Array.isArray(photoOrders)) {
-        return res.status(400).json({ message: 'Missing required fields: entityType, entityId, photoOrders' });
-      }
-
-      // Validate entityType
-      if (!['COMPANY', 'PARK', 'LOT'].includes(entityType)) {
-        return res.status(400).json({ message: 'Invalid entityType. Must be COMPANY, PARK, or LOT' });
-      }
-
-      // Check permissions based on entity type
-      if (entityType === 'LOT') {
-        // For lots, allow both admins and managers with lot access
-        if (req.user?.role === 'MHP_LORD') {
-          // Admin can reorder any lot photos
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this lot
-          const lot = await storage.getLotAny(entityId);
-          if (!lot) {
-            return res.status(404).json({ message: 'Lot not found' });
-          }
-          
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === lot.parkId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
-        } else {
-          return res.status(403).json({ message: 'Access denied' });
-        }
-      } else if (entityType === 'PARK') {
-        // For park photos, allow admins and managers with park access
-        if (req.user?.role === 'MHP_LORD') {
-          // Admin can reorder any park photos
-        } else if (req.user?.role === 'MANAGER') {
-          // Check if manager has access to this park
-          const assignments = await storage.getManagerAssignments(req.user.id);
-          const hasAccess = assignments.some((assignment: any) => assignment.parkId === entityId);
-          if (!hasAccess) {
-            return res.status(403).json({ message: 'Access denied' });
-          }
-        } else {
-          return res.status(403).json({ message: 'Access denied' });
-        }
-      } else {
-        // For company photos, only admins can reorder
-        if (req.user?.role !== 'ADMIN') {
-          return res.status(403).json({ message: 'Admin access required' });
-        }
-      }
-
-      // Validate photoOrders array
-      for (const item of photoOrders) {
-        if (!item.id || typeof item.sortOrder !== 'number') {
-          return res.status(400).json({ message: 'Each item in photoOrders must have id and sortOrder' });
-        }
-      }
-
-      // Reorder photos
-      await storage.reorderPhotos(entityType, entityId, photoOrders);
-      
-      // Return updated photos
-      const updatedPhotos = await storage.getPhotos(entityType, entityId);
-      res.json(updatedPhotos);
-    } catch (error) {
-      console.error('Reorder photos error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   });

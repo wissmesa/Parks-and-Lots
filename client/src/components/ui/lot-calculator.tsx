@@ -6,8 +6,17 @@ import { MoneyInput } from './money-input';
 import { Label } from './label';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
-import { Calculator, Target, AlertCircle, CheckCircle } from 'lucide-react';
+import { Calculator, Target, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from './alert';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from './alert-dialog';
 
 interface LotCalculatorProps {
   isOpen: boolean;
@@ -68,6 +77,9 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
     securityDeposit: 1000,
     totalOneTime: 0,
   });
+
+  // Disclaimer state
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
 
   // Goal Seek state
   const [showGoalSeek, setShowGoalSeek] = useState(false);
@@ -318,16 +330,28 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            Contract For Deed Calculator - {lotName}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="w-5 h-5" />
+              Contract For Deed Calculator - {lotName}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6">
+          {/* Disclaimer Alert */}
+          <Alert 
+            className="bg-amber-50 border-amber-300 cursor-pointer hover:bg-amber-100 transition-colors"
+            onClick={() => setShowDisclaimer(true)}
+          >
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 font-medium">
+              <span className="font-semibold">Disclaimer:</span> Click here to read important information about these calculations
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-6">
           {/* Contract for title items */}
           <Card>
             <CardHeader>
@@ -630,5 +654,37 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Disclaimer Dialog */}
+    <AlertDialog open={showDisclaimer} onOpenChange={setShowDisclaimer}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
+            <AlertTriangle className="w-5 h-5" />
+            Disclaimer
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-base space-y-3 pt-2">
+            <p className="text-gray-700">
+              The calculations provided by this Contract For Deed Calculator are <strong>estimates only</strong> and may not be completely accurate or precise.
+            </p>
+            <p className="text-gray-700">
+              We make no guarantees regarding the accuracy, completeness, or reliability of the information and calculations displayed. The results should be used for informational purposes only.
+            </p>
+            <p className="text-gray-700">
+              <strong>We are not responsible</strong> for any decisions made based on the information shown in these calculations. We strongly recommend consulting with qualified financial professionals, accountants, or legal advisors before making any financial commitments or decisions.
+            </p>
+            <p className="text-gray-700 text-sm italic">
+              By using this calculator, you acknowledge that you understand these limitations and accept full responsibility for any decisions you make based on the results.
+            </p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => setShowDisclaimer(false)}>
+            I Understand
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

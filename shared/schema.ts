@@ -9,7 +9,8 @@ import {
   integer,
   pgEnum,
   index,
-  unique
+  unique,
+  bytea
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
@@ -160,6 +161,8 @@ export const photos = pgTable("photos", {
   entityType: entityTypeEnum("entity_type").notNull(),
   entityId: varchar("entity_id").notNull(),
   urlOrPath: varchar("url_or_path").notNull(),
+  imageData: text("image_data"), // Store image as base64 text
+  mimeType: varchar("mime_type"), // Store MIME type
   caption: varchar("caption"),
   sortOrder: integer("sort_order").default(0),
 });
