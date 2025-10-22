@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { AuthManager } from "@/lib/auth";
-import { Upload, Trash2, Edit, Camera, GripVertical } from "lucide-react";
+import { Upload, Trash2, Edit, Camera, GripVertical, Download } from "lucide-react";
+import JSZip from "jszip";
 
 interface Photo {
   id: string;
@@ -35,6 +37,9 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [draggedPhoto, setDraggedPhoto] = useState<Photo | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const endpointBase = entityType === 'COMPANY' ? 'companies' : entityType === 'PARK' ? 'parks' : 'lots';
 
@@ -59,7 +64,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
       // Debug: Log FormData contents
       console.log('FormData entries:');
-      for (let [key, value] of formData.entries()) {
+      for (const [key, value] of Array.from(formData.entries())) {
         console.log(`${key}:`, value);
       }
       
@@ -182,9 +187,8 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
+  // Shared validation function for file selection
+  const validateAndSetFiles = (files: File[]) => {
     // Check if user is trying to upload more than 20 photos
     if (files.length > 20) {
       toast({
@@ -192,8 +196,6 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         description: `You can only upload up to 20 photos at a time. You selected ${files.length} photos.`,
         variant: "destructive",
       });
-      // Reset the input
-      e.target.value = '';
       return;
     }
     
@@ -232,6 +234,13 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    validateAndSetFiles(files);
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
+  };
+
   const handleUpload = () => {
     if (selectedFiles.length === 0) return;
     
@@ -262,7 +271,199 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     }
   };
 
-  // Drag and drop handlers
+  // Download handlers
+  const downloadSinglePhoto = async (photo: Photo) => {
+    try {
+      // Use the dedicated download endpoint
+      const response = await fetch(`/api/photos/${photo.id}/download`, {
+        credentials: 'include',
+        headers: {
+          ...AuthManager.getAuthHeaders()
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch photo: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const extension = photo.urlOrPath.split('.').pop()?.split('?')[0] || 'jpg';
+      const sanitizedCaption = photo.caption?.replace(/[^a-zA-Z0-9-_]/g, '_') || photo.id;
+      const fileName = photo.caption 
+        ? `${entityName}-${sanitizedCaption}.${extension}`
+        : `${entityName}-${photo.id}.${extension}`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: "Photo downloaded successfully",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Error",
+        description: `Failed to download photo: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadMultiplePhotos = async (photosToDownload: Photo[]) => {
+    if (photosToDownload.length === 0) return;
+    
+    setIsDownloading(true);
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(entityName);
+      
+      if (!folder) {
+        throw new Error('Failed to create ZIP folder');
+      }
+      
+      // Track successful downloads
+      let successCount = 0;
+      
+      // Download all photos and add them to the zip
+      for (let i = 0; i < photosToDownload.length; i++) {
+        const photo = photosToDownload[i];
+        try {
+          console.log(`Downloading photo ${i + 1}/${photosToDownload.length}:`, photo.id);
+          
+          // Use the dedicated download endpoint
+          const response = await fetch(`/api/photos/${photo.id}/download`, {
+            credentials: 'include',
+            headers: {
+              ...AuthManager.getAuthHeaders()
+            }
+          });
+          
+          if (!response.ok) {
+            console.error(`Failed to fetch photo ${photo.id}: ${response.status}`);
+            continue;
+          }
+          
+          const blob = await response.blob();
+          
+          if (blob.size === 0) {
+            console.error(`Photo ${photo.id} has zero size`);
+            continue;
+          }
+          
+          const extension = photo.urlOrPath.split('.').pop()?.split('?')[0] || 'jpg';
+          // Sanitize caption for filename (remove special characters)
+          const sanitizedCaption = photo.caption?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'photo';
+          const fileName = photo.caption 
+            ? `${i + 1}-${sanitizedCaption}.${extension}`
+            : `${i + 1}-photo.${extension}`;
+          
+          folder.file(fileName, blob);
+          successCount++;
+          console.log(`Added photo to ZIP: ${fileName} (${blob.size} bytes)`);
+        } catch (error) {
+          console.error(`Failed to download photo ${photo.id}:`, error);
+        }
+      }
+      
+      if (successCount === 0) {
+        throw new Error('No photos could be downloaded');
+      }
+      
+      // Generate and download the zip
+      console.log('Generating ZIP file with', successCount, 'photos...');
+      const zipBlob = await zip.generateAsync({ 
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: {
+          level: 6
+        }
+      });
+      
+      console.log('ZIP generated, size:', zipBlob.size);
+      
+      const url = window.URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${entityName.replace(/[^a-zA-Z0-9-_]/g, '_')}-photos.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Success",
+        description: `Downloaded ${successCount} of ${photosToDownload.length} photo(s) as ZIP`,
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Error",
+        description: `Failed to download photos: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const togglePhotoSelection = (photoId: string) => {
+    setSelectedPhotoIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(photoId)) {
+        newSet.delete(photoId);
+      } else {
+        newSet.add(photoId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPhotoIds.size === photos.length) {
+      setSelectedPhotoIds(new Set());
+    } else {
+      setSelectedPhotoIds(new Set(photos.map(p => p.id)));
+    }
+  };
+
+  const handleDownloadSelected = () => {
+    const selectedPhotos = photos.filter(p => selectedPhotoIds.has(p.id));
+    downloadMultiplePhotos(selectedPhotos);
+  };
+
+  const handleDownloadAll = () => {
+    downloadMultiplePhotos(photos);
+  };
+
+  // Drag and drop handlers for file upload
+  const handleFileDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleFileDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    validateAndSetFiles(files);
+  };
+
+  // Drag and drop handlers for photo reordering
   const handleDragStart = (e: React.DragEvent, photo: Photo) => {
     setDraggedPhoto(photo);
     e.dataTransfer.effectAllowed = 'move';
@@ -342,23 +543,78 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5" />
             Photos ({photos.length})
           </div>
-          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" data-testid="button-add-photo">
-                <Upload className="w-4 h-4 mr-2" />
-                Add Photo
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-wrap items-center gap-2">
+            {photos.length > 0 && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={toggleSelectAll}
+                  data-testid="button-toggle-select-all"
+                >
+                  {selectedPhotoIds.size === photos.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                {selectedPhotoIds.size > 0 && (
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={handleDownloadSelected}
+                    disabled={isDownloading}
+                    data-testid="button-download-selected"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Selected ({selectedPhotoIds.size})
+                  </Button>
+                )}
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleDownloadAll}
+                  disabled={isDownloading}
+                  data-testid="button-download-all"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download All
+                </Button>
+              </>
+            )}
+            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" data-testid="button-add-photo">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add Photo
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Upload Photo for {entityName}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Drag and Drop Zone */}
+                <div
+                  onDragOver={handleFileDragOver}
+                  onDragLeave={handleFileDragLeave}
+                  onDrop={handleFileDrop}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging 
+                      ? 'border-primary bg-primary/5' 
+                      : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                  }`}
+                >
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-sm font-medium mb-1">
+                    Drag and drop images here
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    or use the button below
+                  </p>
+                </div>
+                
                 <div>
                   <Label htmlFor="photo-files">Select Images</Label>
                   <Input
@@ -370,7 +626,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                     data-testid="input-photo-files"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    You can select multiple images at once
+                    You can select multiple images at once (max 20, max 10MB each)
                   </p>
                 </div>
                 {selectedFiles.length > 0 && (
@@ -428,6 +684,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -460,7 +717,18 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                   onDrop={(e) => handleDrop(e, index)}
                   data-testid={`photo-item-${photo.id}`}
                 >
-                  <div className="absolute top-2 left-2 z-10 bg-white/80 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Checkbox for selection */}
+                  <div className="absolute top-2 left-2 z-20 bg-white rounded p-1">
+                    <Checkbox
+                      checked={selectedPhotoIds.has(photo.id)}
+                      onCheckedChange={() => togglePhotoSelection(photo.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`checkbox-photo-${photo.id}`}
+                    />
+                  </div>
+                  
+                  {/* Drag handle */}
+                  <div className="absolute top-2 right-2 z-10 bg-white/80 rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <GripVertical className="w-4 h-4 text-gray-600" />
                   </div>
                   <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center relative">
@@ -488,11 +756,21 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                     <Button
                       size="sm"
                       variant="secondary"
+                      onClick={() => downloadSinglePhoto(photo)}
+                      data-testid={`button-download-photo-${photo.id}`}
+                      title="Download photo"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={() => {
                         setEditingPhoto(photo);
                         setEditCaption(photo.caption);
                       }}
                       data-testid={`button-edit-photo-${photo.id}`}
+                      title="Edit caption"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -501,6 +779,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                       variant="destructive"
                       onClick={() => handleDelete(photo.id)}
                       data-testid={`button-delete-photo-${photo.id}`}
+                      title="Delete photo"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

@@ -189,6 +189,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Download photo by ID endpoint
+  app.get('/api/photos/:photoId/download', authenticateToken, async (req, res) => {
+    try {
+      const photoId = req.params.photoId;
+      
+      // Get photo from database
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      // If photo has imageData (base64), serve it directly
+      if (photo.imageData) {
+        const imageBuffer = Buffer.from(photo.imageData, 'base64');
+        res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+        res.setHeader('Content-Disposition', 'attachment');
+        res.setHeader('Content-Length', imageBuffer.length);
+        return res.send(imageBuffer);
+      }
+
+      // If photo is stored in local filesystem
+      if (photo.urlOrPath && photo.urlOrPath.startsWith('/')) {
+        const filePath = path.join(process.cwd(), 'static', photo.urlOrPath);
+        if (existsSync(filePath)) {
+          res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+          res.setHeader('Content-Disposition', 'attachment');
+          return res.sendFile(filePath);
+        }
+      }
+
+      // If photo is on S3 or external URL
+      if (photo.urlOrPath && (photo.urlOrPath.startsWith('http://') || photo.urlOrPath.startsWith('https://'))) {
+        // Fetch from S3/external URL and pipe to response
+        const https = await import('https');
+        const http = await import('http');
+        const protocol = photo.urlOrPath.startsWith('https') ? https : http;
+        
+        protocol.get(photo.urlOrPath, (imageRes) => {
+          res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+          res.setHeader('Content-Disposition', 'attachment');
+          imageRes.pipe(res);
+        }).on('error', (error) => {
+          console.error('Error fetching photo from URL:', error);
+          res.status(500).json({ message: 'Failed to fetch photo' });
+        });
+        return;
+      }
+
+      res.status(404).json({ message: 'Photo file not found' });
+    } catch (error) {
+      console.error('Error downloading photo:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
 
   // Admin Stats Endpoint
   app.get('/api/admin/stats', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
