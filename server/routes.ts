@@ -26,6 +26,7 @@ import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
+import { sendLotCreationNotification } from "./email";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -446,6 +447,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lotData = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(lotData);
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName: park.name,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user!.fullName
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
@@ -1183,6 +1203,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lotData = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(lotData);
+      
+      // Get park name for notification
+      const park = await storage.getPark(req.body.parkId);
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName: park?.name,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user!.fullName
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
@@ -3370,6 +3412,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             nameOrNumber: newLot.nameOrNumber
           });
           
+          // Get park name for notification if parkId exists
+          let parkNameForEmail: string | undefined;
+          if (newLot.parkId) {
+            const park = await storage.getPark(newLot.parkId);
+            parkNameForEmail = park?.name;
+          }
+          
+          // Send notification email (don't fail the upload if email fails)
+          try {
+            await sendLotCreationNotification(
+              {
+                id: newLot.id,
+                nameOrNumber: newLot.nameOrNumber,
+                parkName: parkNameForEmail,
+                status: newLot.status || [],
+                description: newLot.description || undefined,
+                bedrooms: newLot.bedrooms,
+                bathrooms: newLot.bathrooms,
+              },
+              req.user!.fullName
+            );
+          } catch (emailError) {
+            console.error(`Failed to send lot creation notification for lot ${newLot.nameOrNumber}:`, emailError);
+          }
+          
           // Add warning if lot was created without park assignment
           if (!newLot.parkId) {
             results.warnings!.push({
@@ -3552,6 +3619,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: newLot.id,
             nameOrNumber: newLot.nameOrNumber
           });
+          
+          // Get park name for notification if parkId exists
+          let parkNameForEmail: string | undefined;
+          if (newLot.parkId) {
+            const park = await storage.getPark(newLot.parkId);
+            parkNameForEmail = park?.name;
+          }
+          
+          // Send notification email (don't fail the upload if email fails)
+          try {
+            await sendLotCreationNotification(
+              {
+                id: newLot.id,
+                nameOrNumber: newLot.nameOrNumber,
+                parkName: parkNameForEmail,
+                status: newLot.status || [],
+                description: newLot.description || undefined,
+                bedrooms: newLot.bedrooms,
+                bathrooms: newLot.bathrooms,
+              },
+              req.user!.fullName
+            );
+          } catch (emailError) {
+            console.error(`Failed to send lot creation notification for lot ${newLot.nameOrNumber}:`, emailError);
+          }
           
           // Add warning if lot was created without park assignment
           if (!newLot.parkId) {
@@ -3783,10 +3875,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/lots', authenticateToken, requireLotAccess, async (req, res) => {
+  app.post('/api/lots', authenticateToken, requireLotAccess, async (req: AuthRequest, res) => {
     try {
       const parsed = insertLotSchema.parse(req.body);
       const lot = await storage.createLot(parsed);
+      
+      // Get park name for notification if parkId exists
+      let parkName: string | undefined;
+      if (lot.parkId) {
+        const park = await storage.getPark(lot.parkId);
+        parkName = park?.name;
+      }
+      
+      // Send notification email (don't fail the request if email fails)
+      try {
+        await sendLotCreationNotification(
+          {
+            id: lot.id,
+            nameOrNumber: lot.nameOrNumber,
+            parkName,
+            status: lot.status || [],
+            description: lot.description || undefined,
+            bedrooms: lot.bedrooms,
+            bathrooms: lot.bathrooms,
+          },
+          req.user?.fullName || 'Sistema'
+        );
+      } catch (emailError) {
+        console.error('Failed to send lot creation notification email:', emailError);
+      }
+      
       res.status(201).json(lot);
     } catch (error) {
       console.error('Create lot error:', error);
