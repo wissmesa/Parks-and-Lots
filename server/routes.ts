@@ -81,7 +81,7 @@ const getPhotoUrl = (req: Request, filename: string): string => {
 // Configure multer for file uploads (using memory storage for S3)
 const upload = multer({
   storage: multer.memoryStorage(), // Guardar en memoria para subir a S3
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB (aumentado porque optimizamos las imágenes)
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
