@@ -26,7 +26,7 @@ import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
-import { sendLotCreationNotification } from "./email";
+import { sendLotCreationNotification, sendLotReactivationNotification } from "./email";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -81,7 +81,7 @@ const getPhotoUrl = (req: Request, filename: string): string => {
 // Configure multer for file uploads (using memory storage for S3)
 const upload = multer({
   storage: multer.memoryStorage(), // Guardar en memoria para subir a S3
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB (aumentado porque optimizamos las imágenes)
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -186,6 +186,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error serving photo:', error);
       res.status(500).json({ message: 'Error serving photo' });
+    }
+  });
+
+  // Download photo by ID endpoint
+  app.get('/api/photos/:photoId/download', authenticateToken, async (req, res) => {
+    try {
+      const photoId = req.params.photoId;
+      
+      // Get photo from database
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      // If photo has imageData (base64), serve it directly
+      if (photo.imageData) {
+        const imageBuffer = Buffer.from(photo.imageData, 'base64');
+        res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+        res.setHeader('Content-Disposition', 'attachment');
+        res.setHeader('Content-Length', imageBuffer.length);
+        return res.send(imageBuffer);
+      }
+
+      // If photo is stored in local filesystem
+      if (photo.urlOrPath && photo.urlOrPath.startsWith('/')) {
+        const filePath = path.join(process.cwd(), 'static', photo.urlOrPath);
+        if (existsSync(filePath)) {
+          res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+          res.setHeader('Content-Disposition', 'attachment');
+          return res.sendFile(filePath);
+        }
+      }
+
+      // If photo is on S3 or external URL
+      if (photo.urlOrPath && (photo.urlOrPath.startsWith('http://') || photo.urlOrPath.startsWith('https://'))) {
+        // Fetch from S3/external URL and pipe to response
+        const https = await import('https');
+        const http = await import('http');
+        const protocol = photo.urlOrPath.startsWith('https') ? https : http;
+        
+        protocol.get(photo.urlOrPath, (imageRes) => {
+          res.setHeader('Content-Type', photo.mimeType || 'image/jpeg');
+          res.setHeader('Content-Disposition', 'attachment');
+          imageRes.pipe(res);
+        }).on('error', (error) => {
+          console.error('Error fetching photo from URL:', error);
+          res.status(500).json({ message: 'Failed to fetch photo' });
+        });
+        return;
+      }
+
+      res.status(404).json({ message: 'Photo file not found' });
+    } catch (error) {
+      console.error('Error downloading photo:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   });
 
@@ -493,6 +548,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Lot not found' });
       }
       
+      // Store original isActive status to detect reactivation
+      const wasInactive = lot.isActive === false;
+      
       const park = await storage.getPark(lot.parkId);
       if (!park || park.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'You can only update lots in your company parks' });
@@ -525,6 +583,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedLot = await storage.updateLot(req.params.id, validation.data);
       console.log('✅ Database update successful');
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      console.log('🔍 [COMPANY MANAGER] Reactivation check:', { 
+        wasInactive, 
+        newIsActive: validation.data.isActive,
+        isBeingReactivated: wasInactive && validation.data.isActive === true 
+      });
+      const isBeingReactivated = wasInactive && validation.data.isActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [COMPANY MANAGER] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          await sendLotReactivationNotification(
+            {
+              id: updatedLot.id,
+              nameOrNumber: updatedLot.nameOrNumber,
+              parkName: park.name,
+              status: updatedLot.status || [],
+              description: updatedLot.description || undefined,
+              bedrooms: updatedLot.bedrooms,
+              bathrooms: updatedLot.bathrooms,
+            },
+            req.user?.fullName || 'Sistema'
+          );
+        } catch (emailError) {
+          console.error('Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(updatedLot);
     } catch (error) {
       console.error('Update lot error:', error);
@@ -3962,8 +4050,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('✅ Schema validation passed');
       console.log('Validated updates:', JSON.stringify(validation.data, null, 2));
       
+      // Fetch the current lot to check if it's being reactivated
+      const currentLot = await storage.getLotAny(req.params.id);
+      if (!currentLot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      const wasInactive = currentLot.isActive === false;
+      
       const lot = await storage.updateLot(req.params.id, validation.data);
       console.log('✅ Database update successful');
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      console.log('🔍 [ADMIN] Reactivation check:', { 
+        wasInactive, 
+        newIsActive: validation.data.isActive,
+        isBeingReactivated: wasInactive && validation.data.isActive === true 
+      });
+      const isBeingReactivated = wasInactive && validation.data.isActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [ADMIN] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          let parkName: string | undefined;
+          if (lot.parkId) {
+            const park = await storage.getPark(lot.parkId);
+            parkName = park?.name;
+          }
+          
+          await sendLotReactivationNotification(
+            {
+              id: lot.id,
+              nameOrNumber: lot.nameOrNumber,
+              parkName,
+              status: lot.status || [],
+              description: lot.description || undefined,
+              bedrooms: lot.bedrooms,
+              bathrooms: lot.bathrooms,
+            },
+            (req as AuthRequest).user?.fullName || 'Sistema'
+          );
+        } catch (emailError) {
+          console.error('Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(lot);
     } catch (error) {
       console.error('❌ Update lot error:', error);
@@ -4178,9 +4309,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lot) {
         return res.status(404).json({ message: 'Lot not found' });
       }
-      const updatedLot = await storage.updateLot(req.params.id, {
-        isActive: !lot.isActive
+      
+      // Store original isActive status to detect reactivation
+      const wasInactive = lot.isActive === false;
+      const newIsActive = !lot.isActive;
+      
+      console.log('🔍 [TOGGLE] Reactivation check:', { 
+        lotId: lot.id,
+        lotName: lot.nameOrNumber,
+        wasInactive, 
+        newIsActive,
+        isBeingReactivated: wasInactive && newIsActive === true 
       });
+      
+      const updatedLot = await storage.updateLot(req.params.id, {
+        isActive: newIsActive
+      });
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      const isBeingReactivated = wasInactive && newIsActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [TOGGLE] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          let parkName: string | undefined;
+          if (updatedLot.parkId) {
+            const park = await storage.getPark(updatedLot.parkId);
+            parkName = park?.name;
+          }
+          
+          await sendLotReactivationNotification(
+            {
+              id: updatedLot.id,
+              nameOrNumber: updatedLot.nameOrNumber,
+              parkName,
+              status: updatedLot.status || [],
+              description: updatedLot.description || undefined,
+              bedrooms: updatedLot.bedrooms,
+              bathrooms: updatedLot.bathrooms,
+            },
+            (req as AuthRequest).user?.fullName || 'Sistema'
+          );
+          console.log('✅ [TOGGLE] Reactivation email sent successfully');
+        } catch (emailError) {
+          console.error('❌ [TOGGLE] Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(updatedLot);
     } catch (error) {
       console.error('Toggle lot active error:', error);

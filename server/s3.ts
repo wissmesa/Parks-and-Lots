@@ -3,6 +3,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { optimizeImage } from './image-optimizer';
 
 // Check if AWS S3 is configured
 const isS3ConfiguredInEnv = Boolean(
@@ -48,10 +49,39 @@ export interface UploadResult {
  */
 export async function uploadToS3(
   file: Express.Multer.File,
-  folder: 'companies' | 'parks' | 'lots' = 'lots'
+  folder: 'companies' | 'parks' | 'lots' = 'lots',
+  optimize: boolean = true
 ): Promise<UploadResult> {
-  const fileExtension = file.originalname.split('.').pop();
-  const fileName = `${uuidv4()}.${fileExtension}`;
+  let fileExtension = file.originalname.split('.').pop();
+  let fileName = `${uuidv4()}.${fileExtension}`;
+  
+  // Optimizar la imagen si está habilitado y es una imagen
+  let fileBuffer = file.buffer;
+  let fileMimetype = file.mimetype;
+  
+  if (optimize && file.mimetype.startsWith('image/')) {
+    console.log('🔄 Optimizando imagen antes de subir...');
+    try {
+      const optimized = await optimizeImage(file.buffer, file.mimetype, {
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: 85,
+        convertToWebP: false // Cambiar a true si quieres usar WebP
+      });
+      fileBuffer = optimized.buffer;
+      fileMimetype = optimized.mimetype;
+      
+      // Actualizar el nombre del archivo si cambió el formato
+      if (optimized.mimetype === 'image/webp' && !fileName.endsWith('.webp')) {
+        fileName = fileName.replace(/\.[^.]+$/, '.webp');
+      } else if (optimized.mimetype === 'image/jpeg' && !fileName.match(/\.(jpg|jpeg)$/)) {
+        fileName = fileName.replace(/\.[^.]+$/, '.jpg');
+      }
+    } catch (error) {
+      console.error('⚠️  Error al optimizar imagen, usando original:', error);
+      // Continuar con la imagen original si falla la optimización
+    }
+  }
   
   // Determine environment (declared once for the entire function)
   const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
@@ -65,8 +95,8 @@ export async function uploadToS3(
       const command = new PutObjectCommand({
         Bucket: BUCKET_NAME,
         Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Body: fileBuffer,
+        ContentType: fileMimetype,
       });
 
       await s3Client.send(command);
@@ -105,7 +135,7 @@ export async function uploadToS3(
   }
 
   const filePath = path.join(uploadDir, fileName);
-  fs.writeFileSync(filePath, file.buffer);
+  fs.writeFileSync(filePath, fileBuffer);
 
   const url = `/uploads/${environment}/${folder}/${fileName}`;
   console.log('✅ Uploaded to local storage:', url);
