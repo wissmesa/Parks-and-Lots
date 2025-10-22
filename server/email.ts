@@ -48,12 +48,12 @@ export async function sendPasswordResetEmail(
   userName: string,
   fromEmail: string = 'support@bluepaperclip.com'
 ): Promise<boolean> {
-  const subject = 'Password Reset - Parks & Lots Booking System';
+  const subject = 'Password Reset - MHP Sales Manager App';
   
   const text = `
 Hello ${userName},
 
-We received a request to reset your password for Parks & Lots Booking System.
+We received a request to reset your password for the MHP Sales Manager App.
 
 Click the link below to reset your password:
 ${resetUrl}
@@ -63,7 +63,7 @@ This link will expire in 24 hours for security reasons.
 If you did not request this password reset, please ignore this email and your password will remain unchanged.
 
 Best regards,
-Parks & Lots Team
+MHP Sales Manager team
   `;
 
   const html = `
@@ -72,7 +72,7 @@ Parks & Lots Team
       
       <p>Hello ${userName},</p>
       
-      <p>We received a request to reset your password for Parks & Lots Booking System.</p>
+      <p>We received a request to reset your password for MHP Sales Manager App.</p>
       
       <div style="margin: 30px 0; text-align: center;">
         <a href="${resetUrl}" 
@@ -96,7 +96,7 @@ Parks & Lots Team
       
       <p style="color: #999; font-size: 12px;">
         Best regards,<br>
-        Parks & Lots Team
+        MHP Sales Manager team
       </p>
     </div>
   `;
@@ -116,12 +116,12 @@ export async function sendInviteEmail(
   invitedByName: string,
   fromEmail: string = 'support@bluepaperclip.com'
 ): Promise<boolean> {
-  const subject = 'You\'re invited to join Parks & Lots Booking System';
+  const subject = 'You\'re invited to the MHP Sales Manager App';
   
   const text = `
 Hello,
 
-You've been invited by ${invitedByName} to join the Parks & Lots Booking System as a manager.
+You've been invited by ${invitedByName} to join the MHP Sales Manager App.
 
 Click the link below to accept your invitation and set up your account:
 ${inviteUrl}
@@ -129,16 +129,16 @@ ${inviteUrl}
 This invitation will expire in 7 days.
 
 Best regards,
-Parks & Lots Team
+MHP Sales Manager team
   `;
 
   const html = `
     <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2 style="color: #333;">You're invited to Parks & Lots!</h2>
+      <h2 style="color: #333;">You're invited to the MHP Sales Manager App</h2>
       
       <p>Hello,</p>
       
-      <p>You've been invited by <strong>${invitedByName}</strong> to join the Parks & Lots Booking System as a manager.</p>
+      <p>You've been invited by <strong>${invitedByName}</strong> to join the MHP Sales Manager App</p>
       
       <div style="margin: 30px 0; text-align: center;">
         <a href="${inviteUrl}" 
@@ -158,7 +158,7 @@ Parks & Lots Team
       
       <p style="color: #999; font-size: 12px;">
         Best regards,<br>
-        Parks & Lots Team
+        MHP Sales Manager team
       </p>
     </div>
   `;
@@ -180,12 +180,12 @@ export async function sendTenantInviteEmail(
   createdByName: string,
   fromEmail: string = 'support@bluepaperclip.com'
 ): Promise<boolean> {
-  const subject = 'Welcome to Parks & Lots - Set Up Your Tenant Account';
+  const subject = 'Welcome the MHP Sales Manager App - Set Up Your Tenant Account';
   
   const text = `
 Hello ${tenantName},
 
-Welcome to Parks & Lots! Your tenancy has been set up by ${createdByName}.
+Welcome the MHP Sales Manager App! Your tenancy has been set up by ${createdByName}.
 
 You've been assigned to ${lotInfo}.
 
@@ -203,7 +203,7 @@ This invitation will expire in 7 days.
 If you have any questions, please contact your property manager.
 
 Best regards,
-Parks & Lots Team
+MHP Sales Manager team
   `;
 
   const html = `
