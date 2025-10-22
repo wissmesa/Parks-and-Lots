@@ -26,7 +26,7 @@ import { googleCalendarService } from "./google-calendar";
 import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
-import { sendLotCreationNotification } from "./email";
+import { sendLotCreationNotification, sendLotReactivationNotification } from "./email";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -548,6 +548,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Lot not found' });
       }
       
+      // Store original isActive status to detect reactivation
+      const wasInactive = lot.isActive === false;
+      
       const park = await storage.getPark(lot.parkId);
       if (!park || park.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'You can only update lots in your company parks' });
@@ -580,6 +583,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedLot = await storage.updateLot(req.params.id, validation.data);
       console.log('✅ Database update successful');
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      console.log('🔍 [COMPANY MANAGER] Reactivation check:', { 
+        wasInactive, 
+        newIsActive: validation.data.isActive,
+        isBeingReactivated: wasInactive && validation.data.isActive === true 
+      });
+      const isBeingReactivated = wasInactive && validation.data.isActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [COMPANY MANAGER] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          await sendLotReactivationNotification(
+            {
+              id: updatedLot.id,
+              nameOrNumber: updatedLot.nameOrNumber,
+              parkName: park.name,
+              status: updatedLot.status || [],
+              description: updatedLot.description || undefined,
+              bedrooms: updatedLot.bedrooms,
+              bathrooms: updatedLot.bathrooms,
+            },
+            req.user?.fullName || 'Sistema'
+          );
+        } catch (emailError) {
+          console.error('Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(updatedLot);
     } catch (error) {
       console.error('Update lot error:', error);
@@ -4017,8 +4050,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('✅ Schema validation passed');
       console.log('Validated updates:', JSON.stringify(validation.data, null, 2));
       
+      // Fetch the current lot to check if it's being reactivated
+      const currentLot = await storage.getLotAny(req.params.id);
+      if (!currentLot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      const wasInactive = currentLot.isActive === false;
+      
       const lot = await storage.updateLot(req.params.id, validation.data);
       console.log('✅ Database update successful');
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      console.log('🔍 [ADMIN] Reactivation check:', { 
+        wasInactive, 
+        newIsActive: validation.data.isActive,
+        isBeingReactivated: wasInactive && validation.data.isActive === true 
+      });
+      const isBeingReactivated = wasInactive && validation.data.isActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [ADMIN] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          let parkName: string | undefined;
+          if (lot.parkId) {
+            const park = await storage.getPark(lot.parkId);
+            parkName = park?.name;
+          }
+          
+          await sendLotReactivationNotification(
+            {
+              id: lot.id,
+              nameOrNumber: lot.nameOrNumber,
+              parkName,
+              status: lot.status || [],
+              description: lot.description || undefined,
+              bedrooms: lot.bedrooms,
+              bathrooms: lot.bathrooms,
+            },
+            (req as AuthRequest).user?.fullName || 'Sistema'
+          );
+        } catch (emailError) {
+          console.error('Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(lot);
     } catch (error) {
       console.error('❌ Update lot error:', error);
@@ -4233,9 +4309,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!lot) {
         return res.status(404).json({ message: 'Lot not found' });
       }
-      const updatedLot = await storage.updateLot(req.params.id, {
-        isActive: !lot.isActive
+      
+      // Store original isActive status to detect reactivation
+      const wasInactive = lot.isActive === false;
+      const newIsActive = !lot.isActive;
+      
+      console.log('🔍 [TOGGLE] Reactivation check:', { 
+        lotId: lot.id,
+        lotName: lot.nameOrNumber,
+        wasInactive, 
+        newIsActive,
+        isBeingReactivated: wasInactive && newIsActive === true 
       });
+      
+      const updatedLot = await storage.updateLot(req.params.id, {
+        isActive: newIsActive
+      });
+      
+      // Check if lot was reactivated (changed from inactive to active)
+      const isBeingReactivated = wasInactive && newIsActive === true;
+      
+      if (isBeingReactivated) {
+        console.log('✅ [TOGGLE] Lot is being reactivated, sending email...');
+        // Send reactivation notification (don't fail the request if email fails)
+        try {
+          let parkName: string | undefined;
+          if (updatedLot.parkId) {
+            const park = await storage.getPark(updatedLot.parkId);
+            parkName = park?.name;
+          }
+          
+          await sendLotReactivationNotification(
+            {
+              id: updatedLot.id,
+              nameOrNumber: updatedLot.nameOrNumber,
+              parkName,
+              status: updatedLot.status || [],
+              description: updatedLot.description || undefined,
+              bedrooms: updatedLot.bedrooms,
+              bathrooms: updatedLot.bathrooms,
+            },
+            (req as AuthRequest).user?.fullName || 'Sistema'
+          );
+          console.log('✅ [TOGGLE] Reactivation email sent successfully');
+        } catch (emailError) {
+          console.error('❌ [TOGGLE] Failed to send lot reactivation notification email:', emailError);
+        }
+      }
+      
       res.json(updatedLot);
     } catch (error) {
       console.error('Toggle lot active error:', error);

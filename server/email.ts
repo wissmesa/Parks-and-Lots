@@ -275,36 +275,36 @@ export async function sendLotCreationNotification(
 ): Promise<boolean> {
   const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com'];
   
-  const subject = `Nuevo Lote Creado: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
+  const subject = `New Lot Created: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
   
   const statusText = lotData.status.join(', ');
   const bedroomsBathrooms = lotData.bedrooms || lotData.bathrooms 
-    ? `${lotData.bedrooms || 'N/A'} habitaciones, ${lotData.bathrooms || 'N/A'} baños`
-    : 'No especificado';
+    ? `${lotData.bedrooms || 'N/A'} Bedrooms, ${lotData.bathrooms || 'N/A'} bathrooms`
+    : 'Not specified';
   
   const text = `
-Se ha creado un nuevo lote en Parks & Lots
+A new lot has been created in the MHP Sales Manager App
 
-Detalles del Lote:
+Lot Details:
 - ID: ${lotData.id}
-- Lote #: ${lotData.nameOrNumber}
-${lotData.parkName ? `- Parque: ${lotData.parkName}` : ''}
-- Estado: ${statusText}
-- Habitaciones/Baños: ${bedroomsBathrooms}
-${lotData.description ? `- Descripción: ${lotData.description}` : ''}
+- Lot #: ${lotData.nameOrNumber}
+${lotData.parkName ? `- Park: ${lotData.parkName}` : ''}
+- Status: ${statusText}
+- Bedrooms/Bathrooms: ${bedroomsBathrooms}
+${lotData.description ? `- Description: ${lotData.description}` : ''}
 
-Creado por: ${createdByName}
+Created by: ${createdByName}
 
-Saludos,
-Sistema Parks & Lots
+Best regards,
+MHP Sales Manager team
   `;
 
   const html = `
     <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">🏠 Nuevo Lote Creado</h2>
+      <h2 style="color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px;">🏠 New Lot Created</h2>
       
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #007bff; margin-top: 0;">Detalles del Lote</h3>
+        <h3 style="color: #007bff; margin-top: 0;">Lot Details</h3>
         
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
@@ -312,26 +312,26 @@ Sistema Parks & Lots
             <td style="padding: 8px 0; color: #333;">${lotData.id}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; font-weight: bold; color: #555;">Lote #:</td>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Lot #:</td>
             <td style="padding: 8px 0; color: #333; font-size: 18px; font-weight: bold;">${lotData.nameOrNumber}</td>
           </tr>
           ${lotData.parkName ? `
           <tr>
-            <td style="padding: 8px 0; font-weight: bold; color: #555;">Parque:</td>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Park:</td>
             <td style="padding: 8px 0; color: #333;">${lotData.parkName}</td>
           </tr>
           ` : ''}
           <tr>
-            <td style="padding: 8px 0; font-weight: bold; color: #555;">Estado:</td>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Status:</td>
             <td style="padding: 8px 0; color: #333;">${statusText}</td>
           </tr>
           <tr>
-            <td style="padding: 8px 0; font-weight: bold; color: #555;">Habitaciones/Baños:</td>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Bedrooms/Bathrooms:</td>
             <td style="padding: 8px 0; color: #333;">${bedroomsBathrooms}</td>
           </tr>
           ${lotData.description ? `
           <tr>
-            <td style="padding: 8px 0; font-weight: bold; color: #555; vertical-align: top;">Descripción:</td>
+            <td style="padding: 8px 0; font-weight: bold; color: #555; vertical-align: top;">Description:</td>
             <td style="padding: 8px 0; color: #333;">${lotData.description}</td>
           </tr>
           ` : ''}
@@ -339,14 +339,14 @@ Sistema Parks & Lots
       </div>
       
       <p style="color: #666; font-size: 14px; margin-top: 20px;">
-        <strong>Creado por:</strong> ${createdByName}
+        <strong>Created by:</strong> ${createdByName}
       </p>
       
       <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
       
       <p style="color: #999; font-size: 12px;">
-        Saludos,<br>
-        Sistema Parks & Lots
+        Best regards,<br>
+        MHP Sales Manager team
       </p>
     </div>
   `;
@@ -367,6 +367,121 @@ Sistema Parks & Lots
     return true;
   } catch (error) {
     console.error('Error sending lot creation notifications:', error);
+    return false;
+  }
+}
+
+export async function sendLotReactivationNotification(
+  lotData: {
+    id: string;
+    nameOrNumber: string;
+    parkName?: string;
+    status: string[];
+    description?: string;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+  },
+  reactivatedByName: string,
+  fromEmail: string = 'support@bluepaperclip.com'
+): Promise<boolean> {
+  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com'];
+  
+  const subject = `Lot Reactivated: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
+  
+  const statusText = lotData.status.join(', ');
+  const bedroomsBathrooms = lotData.bedrooms || lotData.bathrooms 
+    ? `${lotData.bedrooms || 'N/A'} Bedrooms, ${lotData.bathrooms || 'N/A'} bathrooms`
+    : 'Not specified';
+  
+  const text = `
+A lot has been reactivated and placed back on market in the MHP Sales Manager App
+
+Lot Details:
+- ID: ${lotData.id}
+- Lot #: ${lotData.nameOrNumber}
+${lotData.parkName ? `- Park: ${lotData.parkName}` : ''}
+- Status: ${statusText}
+- Bedrooms/Bathrooms: ${bedroomsBathrooms}
+${lotData.description ? `- Description: ${lotData.description}` : ''}
+
+Reactivated by: ${reactivatedByName}
+
+Best regards,
+MHP Sales Manager team
+  `;
+
+  const html = `
+    <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px;">🔄 Lot Reactivated</h2>
+      
+      <p style="color: #555; font-size: 16px; background-color: #d4edda; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745;">
+        This lot has been placed back on the market.
+      </p>
+      
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #28a745; margin-top: 0;">Lot Details</h3>
+        
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">ID:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Lot #:</td>
+            <td style="padding: 8px 0; color: #333; font-size: 18px; font-weight: bold;">${lotData.nameOrNumber}</td>
+          </tr>
+          ${lotData.parkName ? `
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Park:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.parkName}</td>
+          </tr>
+          ` : ''}
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Status:</td>
+            <td style="padding: 8px 0; color: #333;">${statusText}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555;">Bedrooms/Bathrooms:</td>
+            <td style="padding: 8px 0; color: #333;">${bedroomsBathrooms}</td>
+          </tr>
+          ${lotData.description ? `
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; color: #555; vertical-align: top;">Description:</td>
+            <td style="padding: 8px 0; color: #333;">${lotData.description}</td>
+          </tr>
+          ` : ''}
+        </table>
+      </div>
+      
+      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+        <strong>Reactivated by:</strong> ${reactivatedByName}
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+      
+      <p style="color: #999; font-size: 12px;">
+        Best regards,<br>
+        MHP Sales Manager team
+      </p>
+    </div>
+  `;
+
+  // Send to all recipients
+  const promises = recipients.map(recipient => 
+    sendEmail({
+      to: recipient,
+      from: fromEmail,
+      subject,
+      text,
+      html
+    })
+  );
+
+  try {
+    await Promise.all(promises);
+    return true;
+  } catch (error) {
+    console.error('Error sending lot reactivation notifications:', error);
     return false;
   }
 }
