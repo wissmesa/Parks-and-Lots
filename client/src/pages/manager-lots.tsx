@@ -2120,7 +2120,6 @@ export default function ManagerLots() {
                     <TableHead>Status</TableHead>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
-                    <TableHead>Price</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -2189,37 +2188,6 @@ export default function ManagerLots() {
                         <Badge variant={lot.isActive ? 'default' : 'destructive'}>
                           {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span>$
-                            {(() => {
-                              const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                              
-                              // Show pricing based on status and availability
-                              if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
-                                return `${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
-                              }
-                              if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
-                                return `${parseFloat(lot.priceForSale).toLocaleString()}`;
-                              }
-                              if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
-                                return `${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
-                              }
-                              if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
-                                return `${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
-                              }
-                              
-                              // Fallback to legacy price if no specific pricing is available
-                              if (lot.price) {
-                                const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
-                                return `${parseFloat(lot.price).toLocaleString()}${suffix}`;
-                              }
-                              
-                              return 'TBD';
-                            })()}
-                          </span>
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
