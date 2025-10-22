@@ -23,7 +23,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
   const [clientPhone, setClientPhone] = useState("");
   const [selectedDate, setSelectedDate] = useState(selectedSlot?.date || "");
   const [selectedTime, setSelectedTime] = useState(selectedSlot?.time || "");
-  const [reminderPreference, setReminderPreference] = useState<"SMS" | "EMAIL" | "BOTH">("SMS");
+  const [reminderPreference, setReminderPreference] = useState<"SMS" | "EMAIL" | "BOTH">("BOTH");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -285,29 +285,6 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
           </div>
           
           <div>
-            <Label htmlFor="clientEmail">Email <span className="text-muted-foreground text-sm">(Optional)</span></Label>
-            <Input
-              id="clientEmail"
-              type="email"
-              value={clientEmail}
-              onChange={(e) => {
-                setClientEmail(e.target.value);
-                validateField('clientEmail', e.target.value);
-              }}
-              onBlur={(e) => validateField('clientEmail', e.target.value)}
-              placeholder="your@email.com"
-              data-testid="input-client-email"
-              className={validationErrors.clientEmail ? 'border-red-500' : ''}
-            />
-            {validationErrors.clientEmail && (
-              <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                {validationErrors.clientEmail}
-              </p>
-            )}
-          </div>
-          
-          <div>
             <Label htmlFor="clientPhone">Phone</Label>
             <Input
               id="clientPhone"
@@ -332,33 +309,26 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
           </div>
           
           <div>
-            <Label>Reminder Preference</Label>
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              <Button
-                type="button"
-                variant={reminderPreference === "SMS" ? "default" : "outline"}
-                onClick={() => setReminderPreference("SMS")}
-                className="w-full"
-              >
-                SMS
-              </Button>
-              <Button
-                type="button"
-                variant={reminderPreference === "EMAIL" ? "default" : "outline"}
-                onClick={() => setReminderPreference("EMAIL")}
-                className="w-full"
-              >
-                Email
-              </Button>
-              <Button
-                type="button"
-                variant={reminderPreference === "BOTH" ? "default" : "outline"}
-                onClick={() => setReminderPreference("BOTH")}
-                className="w-full"
-              >
-                Both
-              </Button>
-            </div>
+            <Label htmlFor="clientEmail">Email <span className="text-muted-foreground text-sm">(Optional)</span></Label>
+            <Input
+              id="clientEmail"
+              type="email"
+              value={clientEmail}
+              onChange={(e) => {
+                setClientEmail(e.target.value);
+                validateField('clientEmail', e.target.value);
+              }}
+              onBlur={(e) => validateField('clientEmail', e.target.value)}
+              placeholder="your@email.com"
+              data-testid="input-client-email"
+              className={validationErrors.clientEmail ? 'border-red-500' : ''}
+            />
+            {validationErrors.clientEmail && (
+              <p className="text-sm text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {validationErrors.clientEmail}
+              </p>
+            )}
           </div>
           
           <div className="space-y-3">
@@ -405,6 +375,36 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+          
+          <div>
+            <Label>Reminder Preference</Label>
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <Button
+                type="button"
+                variant={reminderPreference === "SMS" ? "default" : "outline"}
+                onClick={() => setReminderPreference("SMS")}
+                className="w-full"
+              >
+                SMS
+              </Button>
+              <Button
+                type="button"
+                variant={reminderPreference === "EMAIL" ? "default" : "outline"}
+                onClick={() => setReminderPreference("EMAIL")}
+                className="w-full"
+              >
+                Email
+              </Button>
+              <Button
+                type="button"
+                variant={reminderPreference === "BOTH" ? "default" : "outline"}
+                onClick={() => setReminderPreference("BOTH")}
+                className="w-full"
+              >
+                Both
+              </Button>
             </div>
           </div>
           
