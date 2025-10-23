@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Briefcase, Building2, MessageSquare, CheckSquare } from "lucide-react";
 
 import CrmContacts from "./crm-contacts";
+import CrmContactDetail from "./crm-contact-detail";
 import CrmDeals from "./crm-deals";
 import CrmUnits from "./crm-units";
 import CrmMessages from "./crm-messages";
@@ -57,6 +58,7 @@ export default function CrmLayout() {
       {/* Main Content Area */}
       <main className="flex-1">
         {location === '/crm' && <CrmContacts />}
+        {location.startsWith('/crm/contacts/') && <CrmContactDetail />}
         {location === '/crm/deals' && <CrmDeals />}
         {location === '/crm/units' && <CrmUnits />}
         {location === '/crm/messages' && <CrmMessages />}

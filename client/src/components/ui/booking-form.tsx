@@ -15,9 +15,13 @@ interface BookingFormProps {
   selectedSlot?: { date: string; time: string } | null;
   onSlotUsed?: () => void;
   onSuccess?: () => void;
+  parkName?: string;
+  parkAddress?: string;
+  lotName?: string;
+  onShowConfirmation?: (details: { date: string; time: string; parkName: string; parkAddress: string; lotNumber: string }) => void;
 }
 
-export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: BookingFormProps) {
+export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess, parkName, parkAddress, lotName, onShowConfirmation }: BookingFormProps) {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -94,6 +98,17 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess }: Book
           ? "Your showing has been scheduled and added to the manager's calendar."
           : "Your showing has been scheduled. Calendar sync may have failed.",
       });
+      
+      // Show confirmation dialog with booking details
+      if (onShowConfirmation && parkName && parkAddress && lotName) {
+        onShowConfirmation({
+          date: selectedDate,
+          time: selectedTime,
+          parkName: parkName,
+          parkAddress: parkAddress,
+          lotNumber: lotName,
+        });
+      }
       
       // Reset form
       setClientName("");

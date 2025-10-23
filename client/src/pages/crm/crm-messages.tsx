@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, MessageSquare } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { io, Socket } from "socket.io-client";
+import { AuthManager } from "@/lib/auth";
 
 interface Message {
   id: string;
@@ -59,7 +60,10 @@ export default function CrmMessages() {
   const { data: usersData } = useQuery({
     queryKey: ["/api/crm/company-users"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/company-users", { credentials: "include" });
+      const res = await fetch("/api/crm/company-users", { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
@@ -71,7 +75,10 @@ export default function CrmMessages() {
     queryKey: ["/api/crm/messages", selectedUserId],
     queryFn: async () => {
       const params = selectedUserId ? `?otherUserId=${selectedUserId}` : "";
-      const res = await fetch(`/api/crm/messages${params}`, { credentials: "include" });
+      const res = await fetch(`/api/crm/messages${params}`, { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
       if (!res.ok) throw new Error("Failed to fetch messages");
       return res.json();
     },

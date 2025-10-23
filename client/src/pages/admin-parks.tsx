@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,6 +33,7 @@ interface Park {
   state: string;
   zip: string;
   companyId: string;
+  lotRent?: string;
   createdAt: string;
   amenities?: AmenityType[];
   company?: {
@@ -75,8 +78,11 @@ export default function AdminParks() {
     state: "",
     zip: "",
     companyId: "",
+    lotRent: "",
     amenities: [] as AmenityType[]
   });
+  const [originalLotRent, setOriginalLotRent] = useState<string>("");
+  const [showLotRentConfirm, setShowLotRentConfirm] = useState(false);
   const [newAmenity, setNewAmenity] = useState({ name: '', icon: 'check' });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [assigningLots, setAssigningLots] = useState<Park | null>(null);
@@ -289,8 +295,12 @@ export default function AdminParks() {
     mutationFn: async (data: typeof formData) => {
       return apiRequest("PATCH", `/api/parks/${editingPark?.id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
+    onSuccess: async () => {
+      // Force immediate refetch of queries before closing dialog
+      await queryClient.refetchQueries({ queryKey: ["/api/parks"] });
+      // Invalidate lots queries for real-time updates when lot rent changes
+      await queryClient.refetchQueries({ queryKey: ["/api/lots"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/company-manager/lots"] });
       setEditingPark(null);
       resetForm();
       toast({
@@ -364,8 +374,10 @@ export default function AdminParks() {
       state: "",
       zip: "",
       companyId: "",
+      lotRent: "",
       amenities: []
     });
+    setOriginalLotRent("");
     setNewAmenity({ name: '', icon: 'check' });
   };
 
@@ -423,6 +435,10 @@ export default function AdminParks() {
       // Fallback for unexpected types
       return { name: '', icon: 'check' };
     });
+    
+    // Ensure lotRent is properly converted to string
+    const lotRentValue = park.lotRent ? String(park.lotRent) : "";
+    
     setFormData({
       name: park.name,
       description: park.description,
@@ -432,8 +448,10 @@ export default function AdminParks() {
       state: park.state,
       zip: park.zip,
       companyId: park.companyId,
+      lotRent: lotRentValue,
       amenities: convertedAmenities
     });
+    setOriginalLotRent(lotRentValue);
     setNewAmenity({ name: '', icon: 'check' });
   };
 
@@ -452,11 +470,22 @@ export default function AdminParks() {
       setNewAmenity({ name: '', icon: 'check' }); // Clear the input
     }
     
+    // Check if lot rent has changed and we're editing
+    if (editingPark && finalFormData.lotRent !== originalLotRent) {
+      setShowLotRentConfirm(true);
+      return;
+    }
+    
     if (editingPark) {
       updateMutation.mutate(finalFormData);
     } else {
       createMutation.mutate(finalFormData);
     }
+  };
+
+  const handleConfirmLotRentUpdate = () => {
+    setShowLotRentConfirm(false);
+    updateMutation.mutate(formData);
   };
 
   const handleAssignLots = (park: Park) => {
@@ -716,6 +745,15 @@ export default function AdminParks() {
                       id="zip"
                       value={formData.zip}
                       onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lotRent">Default Lot Rent ($/month)</Label>
+                    <MoneyInput
+                      id="lotRent"
+                      value={formData.lotRent}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
+                      placeholder="Monthly lot rent for all lots in this park"
                     />
                   </div>
                   <div className="flex justify-end space-x-2">
@@ -1191,6 +1229,20 @@ export default function AdminParks() {
                   onChange={(e) => setFormData(prev => ({ ...prev, zip: e.target.value }))}
                 />
               </div>
+              <div>
+                <Label htmlFor="edit-lotRent">Default Lot Rent ($/month)</Label>
+                <MoneyInput
+                  id="edit-lotRent"
+                  value={formData.lotRent}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lotRent: e.target.value }))}
+                  placeholder="Monthly lot rent for all lots in this park"
+                />
+                {editingPark && formData.lotRent !== originalLotRent && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    ⚠️ Changing this will update the lot rent for all lots in this park.
+                  </p>
+                )}
+              </div>
               
               {/* Amenities Section */}
               <div>
@@ -1655,6 +1707,25 @@ export default function AdminParks() {
           userId={user?.id}
         />
       </div>
+
+      {/* Lot Rent Confirmation Dialog */}
+      <AlertDialog open={showLotRentConfirm} onOpenChange={setShowLotRentConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Lot Rent for All Lots?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing the lot rent of the park will change the lot rent of every lot in this park.
+              This action will update all {lotsByParkId.get(editingPark?.id || "")?.length || 0} lot(s) in {editingPark?.name}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmLotRentUpdate}>
+              Update All Lots
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

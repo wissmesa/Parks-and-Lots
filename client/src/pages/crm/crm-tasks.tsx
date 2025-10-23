@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, CheckSquare } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AuthManager } from "@/lib/auth";
 
 interface Task {
   id: string;
@@ -38,7 +39,10 @@ export default function CrmTasks() {
     queryKey: ["/api/crm/tasks", statusFilter],
     queryFn: async () => {
       const params = statusFilter !== "all" ? `?status=${statusFilter}` : "";
-      const res = await fetch(`/api/crm/tasks${params}`, { credentials: "include" });
+      const res = await fetch(`/api/crm/tasks${params}`, { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
@@ -49,7 +53,10 @@ export default function CrmTasks() {
     mutationFn: async (data: any) => {
       const res = await fetch("/api/crm/tasks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
         credentials: "include",
         body: JSON.stringify({ ...data, assignedTo: user?.id }),
       });
@@ -71,7 +78,10 @@ export default function CrmTasks() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await fetch(`/api/crm/tasks/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
         credentials: "include",
         body: JSON.stringify({ status }),
       });

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, DollarSign, Bed, Bath } from "lucide-react";
+import { AuthManager } from "@/lib/auth";
 
 interface Unit {
   id: string;
@@ -17,7 +18,10 @@ export default function CrmUnits() {
   const { data: unitsData, isLoading } = useQuery({
     queryKey: ["/api/crm/units"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/units", { credentials: "include" });
+      const res = await fetch("/api/crm/units", { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
       if (!res.ok) throw new Error("Failed to fetch units");
       return res.json();
     },

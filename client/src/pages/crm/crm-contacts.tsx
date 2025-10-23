@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Mail, Phone, Users } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Search, Mail, Phone, Users, Edit2, Save, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AuthManager } from "@/lib/auth";
 
 interface Contact {
   id: string;
@@ -24,8 +26,11 @@ interface Contact {
 export default function CrmContacts() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Contact>>({});
   const [newContact, setNewContact] = useState({
     firstName: "",
     lastName: "",
@@ -40,12 +45,13 @@ export default function CrmContacts() {
     queryFn: async () => {
       const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : "";
       const res = await fetch(`/api/crm/contacts${params}`, {
+        headers: AuthManager.getAuthHeaders(),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch contacts");
       return res.json();
     },
-    refetchInterval: 30000, // Real-time updates
+    refetchInterval: 30000,
   });
 
   // Create contact mutation
@@ -53,7 +59,10 @@ export default function CrmContacts() {
     mutationFn: async (data: typeof newContact) => {
       const res = await fetch("/api/crm/contacts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
         credentials: "include",
         body: JSON.stringify(data),
       });
@@ -71,7 +80,67 @@ export default function CrmContacts() {
     },
   });
 
+  // Update contact mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Contact> }) => {
+      const res = await fetch(`/api/crm/contacts/${id}`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update contact");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
+      toast({ title: "Success", description: "Contact updated successfully" });
+      setEditingId(null);
+      setEditForm({});
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update contact", variant: "destructive" });
+    },
+  });
+
   const contacts: Contact[] = contactsData?.contacts || [];
+
+  const handleRowClick = (contactId: string) => {
+    if (editingId === null) {
+      setLocation(`/crm/contacts/${contactId}`);
+    }
+  };
+
+  const startEditing = (contact: Contact, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(contact.id);
+    setEditForm({
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      email: contact.email || "",
+      phone: contact.phone || "",
+      source: contact.source || "",
+    });
+  };
+
+  const cancelEditing = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(null);
+    setEditForm({});
+  };
+
+  const saveEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editingId && editForm.firstName && editForm.lastName) {
+      updateMutation.mutate({
+        id: editingId,
+        data: editForm,
+      });
+    }
+  };
 
   return (
     <div className="p-6">
@@ -166,41 +235,137 @@ export default function CrmContacts() {
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {contacts.map((contact) => (
-            <Card key={contact.id} className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  {contact.firstName} {contact.lastName}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {contact.email && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    {contact.email}
-                  </div>
-                )}
-                {contact.phone && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                    {contact.phone}
-                  </div>
-                )}
-                {contact.source && (
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Source:</span> {contact.source}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+      ) : contacts.length > 0 ? (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contacts.map((contact) => (
+                <TableRow
+                  key={contact.id}
+                  className={`cursor-pointer hover:bg-muted/50 ${editingId === contact.id ? 'bg-muted' : ''}`}
+                  onClick={() => handleRowClick(contact.id)}
+                >
+                  <TableCell className="font-medium">
+                    {editingId === contact.id ? (
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editForm.firstName || ""}
+                          onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                          placeholder="First Name"
+                          className="h-8"
+                        />
+                        <Input
+                          value={editForm.lastName || ""}
+                          onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                          placeholder="Last Name"
+                          className="h-8"
+                        />
+                      </div>
+                    ) : (
+                      `${contact.firstName} ${contact.lastName}`
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === contact.id ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editForm.email || ""}
+                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                          placeholder="email@example.com"
+                          className="h-8"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {contact.email && (
+                          <>
+                            <Mail className="h-4 w-4 text-muted-foreground" />
+                            <span>{contact.email}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === contact.id ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editForm.phone || ""}
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                          placeholder="(555) 123-4567"
+                          className="h-8"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {contact.phone && (
+                          <>
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span>{contact.phone}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingId === contact.id ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={editForm.source || ""}
+                          onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
+                          placeholder="Source"
+                          className="h-8"
+                        />
+                      </div>
+                    ) : (
+                      contact.source
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {editingId === contact.id ? (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={saveEdit}
+                          disabled={updateMutation.isPending}
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={cancelEditing}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => startEditing(contact, e)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      )}
-
-      {!isLoading && contacts.length === 0 && (
-        <div className="text-center py-12">
+      ) : (
+        <div className="text-center py-12 border rounded-lg">
           <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No contacts found</h3>
           <p className="text-muted-foreground mb-4">
@@ -211,4 +376,3 @@ export default function CrmContacts() {
     </div>
   );
 }
-

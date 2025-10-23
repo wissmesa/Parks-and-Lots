@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { PhotoManagement } from "@/components/ui/photo-management";
@@ -77,6 +77,7 @@ interface Park {
   id: string;
   name: string;
   companyId: string;
+  lotRent?: string;
 }
 
 interface Company {
@@ -423,6 +424,16 @@ export default function AdminLots() {
     queryKey: ["/api/parks"],
     enabled: user?.role === 'MHP_LORD',
   });
+
+  // Pre-fill lot rent from park when parkId changes (only for new lots)
+  useEffect(() => {
+    if (formData.parkId && !editingLot && parks?.parks) {
+      const selectedPark = parks.parks.find((p: Park) => p.id === formData.parkId);
+      if (selectedPark?.lotRent) {
+        setFormData(prev => ({ ...prev, lotRent: selectedPark.lotRent || "" }));
+      }
+    }
+  }, [formData.parkId, editingLot, parks]);
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],

@@ -111,6 +111,7 @@ export const parks = pgTable("parks", {
   description: text("description"),
   meetingPlace: text("meeting_place"),
   amenities: text("amenities").array(),
+  lotRent: decimal("lot_rent", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

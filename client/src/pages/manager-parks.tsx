@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +33,7 @@ interface Park {
   state: string;
   zip: string;
   companyId: string;
+  lotRent?: string;
   createdAt: string;
   amenities?: AmenityType[];
   company?: {
@@ -69,8 +72,11 @@ export default function ManagerParks() {
     city: "",
     state: "",
     zip: "",
+    lotRent: "",
     amenities: [] as AmenityType[]
   });
+  const [originalLotRent, setOriginalLotRent] = useState<string>("");
+  const [showLotRentConfirm, setShowLotRentConfirm] = useState(false);
   const [newAmenity, setNewAmenity] = useState({ name: '', icon: 'check' });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
   const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
@@ -270,10 +276,14 @@ export default function ManagerParks() {
     mutationFn: async (data: typeof formData) => {
       return apiRequest("PATCH", `/api/parks/${editingPark?.id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/parks"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/parks"] });
+    onSuccess: async () => {
+      // Force immediate refetch of queries before closing dialog
+      await queryClient.refetchQueries({ queryKey: ["/api/manager/assignments"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/parks"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/company-manager/parks"] });
+      // Invalidate lots queries for real-time updates when lot rent changes
+      await queryClient.refetchQueries({ queryKey: ["/api/manager/lots"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/company-manager/lots"] });
       setEditingPark(null);
       resetForm();
       toast({
@@ -321,9 +331,11 @@ export default function ManagerParks() {
       city: "",
       state: "",
       zip: "",
+      lotRent: "",
       amenities: []
     });
-    setNewAmenity('');
+    setOriginalLotRent("");
+    setNewAmenity({ name: '', icon: 'check' });
   };
 
   const availableColors = [
@@ -380,6 +392,10 @@ export default function ManagerParks() {
       // Fallback for unexpected types
       return { name: '', icon: 'check' };
     });
+    
+    // Ensure lotRent is properly converted to string
+    const lotRentValue = park.lotRent ? String(park.lotRent) : "";
+    
     setFormData({
       name: park.name,
       description: park.description,
@@ -388,8 +404,10 @@ export default function ManagerParks() {
       city: park.city,
       state: park.state,
       zip: park.zip,
+      lotRent: lotRentValue,
       amenities: convertedAmenities
     });
+    setOriginalLotRent(lotRentValue);
     setNewAmenity({ name: '', icon: 'check' });
   };
 
@@ -408,11 +426,22 @@ export default function ManagerParks() {
       setNewAmenity({ name: '', icon: 'check' }); // Clear the input
     }
     
+    // Check if lot rent has changed and we're editing
+    if (editingPark && finalFormData.lotRent !== originalLotRent) {
+      setShowLotRentConfirm(true);
+      return;
+    }
+    
     if (editingPark) {
       updateMutation.mutate(finalFormData);
     } else {
       createMutation.mutate(finalFormData);
     }
+  };
+
+  const handleConfirmLotRentUpdate = () => {
+    setShowLotRentConfirm(false);
+    updateMutation.mutate(formData);
   };
 
   const handleStatusSubmit = (e: React.FormEvent) => {
@@ -1232,6 +1261,21 @@ export default function ManagerParks() {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <Label htmlFor="lotRent">Default Lot Rent ($/month)</Label>
+                  <MoneyInput
+                    id="lotRent"
+                    value={formData.lotRent}
+                    onChange={(e) => setFormData({ ...formData, lotRent: e.target.value })}
+                    placeholder="Monthly lot rent for all lots in this park"
+                  />
+                  {editingPark && formData.lotRent !== originalLotRent && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      ⚠️ Changing this will update the lot rent for all lots in this park.
+                    </p>
+                  )}
+                </div>
                 
                 {/* Amenities Section */}
                 <div>
@@ -1639,6 +1683,24 @@ export default function ManagerParks() {
             parkId={facebookPostDialog.park?.id}
             userId={user?.id}
           />
+
+          {/* Lot Rent Confirmation Dialog */}
+          <AlertDialog open={showLotRentConfirm} onOpenChange={setShowLotRentConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Update Lot Rent for All Lots?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Changing the lot rent of the park will change the lot rent of every lot in this park.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmLotRentUpdate}>
+                  Update All Lots
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </div>

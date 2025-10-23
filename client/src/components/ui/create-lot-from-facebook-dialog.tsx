@@ -129,6 +129,28 @@ export function CreateLotFromFacebookDialog({
     }
   }, [isOpen, parkId, prefilledDescription, facebookPostId]);
 
+  // Pre-fill lot rent from park when dialog opens
+  useEffect(() => {
+    if (parkId && isOpen) {
+      const fetchParkDetails = async () => {
+        try {
+          const response = await fetch(`/api/parks/${parkId}`, {
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const park = await response.json();
+            if (park?.lotRent) {
+              setFormData(prev => ({ ...prev, lotRent: park.lotRent || "" }));
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch park details:', error);
+        }
+      };
+      fetchParkDetails();
+    }
+  }, [parkId, isOpen]);
+
   // Google Sheets status query
   const { data: sheetsStatus, refetch: refetchSheetsStatus } = useQuery<SheetsStatus>({
     queryKey: ['/api/auth/google-sheets/status'],
