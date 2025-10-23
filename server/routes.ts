@@ -10,7 +10,7 @@ import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
 import { db } from "./db";
 import { invites, users } from "@shared/schema";
-import { and, isNull, inArray } from "drizzle-orm";
+import { and, isNull, inArray, eq, ne } from "drizzle-orm";
 import { 
   authenticateToken, 
   requireRole, 
@@ -2134,10 +2134,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       id: req.user!.id,
       email: req.user!.email,
       fullName: req.user!.fullName,
+      phone: req.user!.phone,
       role: req.user!.role,
       tenantId: req.user!.tenantId,
       companyId: req.user!.companyId
     });
+  });
+
+  // Update current user's profile
+  app.patch('/api/users/me/profile', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { fullName, email, phone } = req.body;
+
+      // Validate the input
+      const validation = insertUserSchema.partial().safeParse({ fullName, email, phone });
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Validation failed', 
+          errors: validation.error.errors 
+        });
+      }
+
+      // Check if email is being changed and if it's already taken
+      if (email && email !== req.user!.email) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(and(eq(users.email, email), ne(users.id, userId)))
+          .limit(1);
+
+        if (existingUser) {
+          return res.status(400).json({ 
+            message: 'Email address is already in use by another account' 
+          });
+        }
+      }
+
+      // Update the user profile
+      const updatedUser = await storage.updateUser(userId, {
+        fullName: validation.data.fullName,
+        email: validation.data.email,
+        phone: validation.data.phone === '' ? null : validation.data.phone
+      });
+
+      // Emit real-time update event
+      io.emit('user:updated', { userId, user: updatedUser });
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        phone: updatedUser.phone,
+        role: updatedUser.role,
+        tenantId: updatedUser.tenantId,
+        companyId: updatedUser.companyId
+      });
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
   });
 
   // User-Tenant Association routes
