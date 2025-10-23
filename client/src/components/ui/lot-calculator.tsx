@@ -6,8 +6,9 @@ import { MoneyInput } from './money-input';
 import { Label } from './label';
 import { Card, CardContent, CardHeader, CardTitle } from './card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
-import { Calculator, Target, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Calculator, Target, AlertCircle, CheckCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Alert, AlertDescription } from './alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './collapsible';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -80,6 +81,9 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
 
   // Disclaimer state
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+
+  // Advanced settings state
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   // Goal Seek state
   const [showGoalSeek, setShowGoalSeek] = useState(false);
@@ -370,17 +374,6 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                   />
                 </div>
                 <div>
-                  <Label>Months</Label>
-                  <Input
-                    value={data.years * 12}
-                    disabled
-                    className="mt-1 bg-gray-50"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <Label htmlFor="interestRate">Interest rate (%)</Label>
                   <Input
                     id="interestRate"
@@ -389,14 +382,6 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                     value={data.interestRate}
                     onChange={(e) => handleInputChange('interestRate', e.target.value)}
                     className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Monthly Interest rate</Label>
-                  <Input
-                    value={formatPercentage(data.monthlyInterestRate)}
-                    disabled
-                    className="mt-1 bg-gray-50"
                   />
                 </div>
               </div>
@@ -422,110 +407,147 @@ export function LotCalculator({ isOpen, onClose, lotPrice, lotName }: LotCalcula
                 </div>
               </div>
 
-              <div>
-                <Label>Financed amount</Label>
-                <Input
-                  value={formatCurrency(data.financedAmount)}
-                  disabled
-                  className="mt-1 bg-gray-50"
-                />
-              </div>
+              {/* Advanced Settings Collapsible */}
+              <Collapsible open={showAdvancedSettings} onOpenChange={setShowAdvancedSettings}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center justify-between"
+                    type="button"
+                  >
+                    <span>Advanced Settings</span>
+                    {showAdvancedSettings ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  {/* Calculated Fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Months</Label>
+                      <Input
+                        value={data.years * 12}
+                        disabled
+                        className="mt-1 bg-gray-50"
+                      />
+                    </div>
+                    <div>
+                      <Label>Monthly Interest rate</Label>
+                      <Input
+                        value={formatPercentage(data.monthlyInterestRate)}
+                        disabled
+                        className="mt-1 bg-gray-50"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="taxes">Taxes</Label>
-                  <MoneyInput
-                    id="taxes"
-                    value={data.taxes}
-                    onChange={(e) => handleInputChange('taxes', e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="insurance">Insurance</Label>
-                  <MoneyInput
-                    id="insurance"
-                    value={data.insurance}
-                    onChange={(e) => handleInputChange('insurance', e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
+                  <div>
+                    <Label>Financed amount</Label>
+                    <Input
+                      value={formatCurrency(data.financedAmount)}
+                      disabled
+                      className="mt-1 bg-gray-50"
+                    />
+                  </div>
 
-              <div className="space-y-2 pt-2 border-t">
-                <div>
-                  <Label>Finance payment</Label>
-                  <Input
-                    value={formatCurrency(data.financePayment)}
-                    disabled
-                    className="mt-1 bg-red-50 text-red-700 font-semibold"
-                  />
-                </div>
+                  {/* Input Fields */}
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                    <div>
+                      <Label htmlFor="taxes">Taxes</Label>
+                      <MoneyInput
+                        id="taxes"
+                        value={data.taxes}
+                        onChange={(e) => handleInputChange('taxes', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="insurance">Insurance</Label>
+                      <MoneyInput
+                        id="insurance"
+                        value={data.insurance}
+                        onChange={(e) => handleInputChange('insurance', e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
 
-                <div>
-                  <Label htmlFor="lotRent">Lot rent</Label>
-                  <MoneyInput
-                    id="lotRent"
-                    value={data.lotRent}
-                    onChange={(e) => handleInputChange('lotRent', e.target.value)}
-                    className="mt-1"
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="lotRent">Lot rent</Label>
+                    <MoneyInput
+                      id="lotRent"
+                      value={data.lotRent}
+                      onChange={(e) => handleInputChange('lotRent', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
 
-                <div>
-                  <Label>Taxes Insurance</Label>
-                  <Input
-                    value={formatCurrency(data.taxesInsurance)}
-                    disabled
-                    className="mt-1 bg-red-50 text-red-700 font-semibold"
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="securityDeposit">Security deposit</Label>
+                    <MoneyInput
+                      id="securityDeposit"
+                      value={data.securityDeposit}
+                      onChange={(e) => handleInputChange('securityDeposit', e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
 
-                <div>
-                  <Label>Total Monthly</Label>
-                  <Input
-                    value={formatCurrency(data.totalMonthly)}
-                    disabled
-                    className="mt-1 bg-red-50 text-red-700 font-bold text-lg"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  {/* Finance Results */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <div>
+                      <Label>Finance payment</Label>
+                      <Input
+                        value={formatCurrency(data.financePayment)}
+                        disabled
+                        className="mt-1 bg-red-50 text-red-700 font-semibold"
+                      />
+                    </div>
 
-          {/* Upfront section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Upfront</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Downpayment</Label>
-                <Input
-                  value={formatCurrency(data.upfrontDownpayment)}
-                  disabled
-                  className="mt-1 bg-gray-50"
-                />
-              </div>
+                    <div>
+                      <Label>Taxes Insurance</Label>
+                      <Input
+                        value={formatCurrency(data.taxesInsurance)}
+                        disabled
+                        className="mt-1 bg-red-50 text-red-700 font-semibold"
+                      />
+                    </div>
 
-              <div>
-                <Label htmlFor="securityDeposit">Security deposit</Label>
-                <MoneyInput
-                  id="securityDeposit"
-                  value={data.securityDeposit}
-                  onChange={(e) => handleInputChange('securityDeposit', e.target.value)}
-                  className="mt-1"
-                />
-              </div>
+                    <div>
+                      <Label>Total Monthly</Label>
+                      <Input
+                        value={formatCurrency(data.totalMonthly)}
+                        disabled
+                        className="mt-1 bg-red-50 text-red-700 font-bold text-lg"
+                      />
+                    </div>
+                  </div>
 
-              <div>
-                <Label>Total 1 time</Label>
-                <Input
-                  value={formatCurrency(data.totalOneTime)}
-                  disabled
-                  className="mt-1 bg-blue-50 text-blue-700 font-bold text-lg"
-                />
-              </div>
+                  {/* Upfront Section */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <div className="font-semibold text-lg mb-2">Upfront</div>
+                    <div>
+                      <Label>Downpayment</Label>
+                      <Input
+                        value={formatCurrency(data.upfrontDownpayment)}
+                        disabled
+                        className="mt-1 bg-gray-50"
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Total 1 time</Label>
+                      <Input
+                        value={formatCurrency(data.totalOneTime)}
+                        disabled
+                        className="mt-1 bg-blue-50 text-blue-700 font-bold text-lg"
+                      />
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
 
