@@ -274,7 +274,7 @@ export class GoogleSheetsService {
       try {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${sheetName}!A1:P1`,
+          range: `${sheetName}!A1:Y1`,
         });
         hasHeaders = !!(response.data.values && response.data.values.length > 0);
       } catch (error) {
@@ -282,22 +282,31 @@ export class GoogleSheetsService {
       }
 
       const headers = [
-        'Facebook Post ID',
-        'Park Name',
-        'Address',
-        'Lot Number',
-        'Lot Rent',
-        'Sale Price',
-        'Promotional Price',
-        'Rent Price',
-        'Estimated Payment',
-        'Available Date',
-        'Status',
-        'Mobile Home Year',
-        'Mobile Home Size',
-        'Mobile Home SqFt',
-        'Bedrooms',
-        'Bathrooms'
+        'Property ID',           // Column A
+        'Park Name',             // Column B
+        'Address',               // Column C
+        'Lot #',                 // Column D
+        'Lot Rent',              // Column E
+        'Mobile Home Price',     // Column F
+        'Promotional Price',     // Column G
+        'Rent',                  // Column H
+        'Estimated Payment',     // Column I
+        'Available Date',        // Column J
+        'Lot Status',            // Column K
+        '',                      // Column L (empty)
+        '',                      // Column M (empty)
+        'Mobile Home Year',      // Column N
+        'Mobile Home Size',      // Column O
+        'Mobile Home Sq Ft',     // Column P
+        'Beds',                  // Column Q
+        'Baths',                 // Column R
+        '',                      // Column S (empty)
+        '',                      // Column T (empty)
+        '',                      // Column U (empty)
+        '',                      // Column V (empty)
+        '',                      // Column W (empty)
+        '',                      // Column X (empty)
+        'Showing Link'           // Column Y
       ];
 
       // Format status array to string
@@ -316,29 +325,38 @@ export class GoogleSheetsService {
       }
 
       const lotRow = [
-        facebookPostId,
-        lot.park?.name || '',
-        lot.park?.address || '',
-        lot.nameOrNumber || '',
-        lot.lotRent || '',
-        lot.priceForSale || '',
-        lot.promotionalPrice || '',
-        lot.priceForRent || '',
-        lot.estimatedPayment || '',
-        availableDateStr,
-        statusStr,
-        lot.mobileHomeYear?.toString() || '',
-        lot.mobileHomeSize || '',
-        lot.sqFt?.toString() || '',
-        lot.bedrooms?.toString() || '',
-        lot.bathrooms?.toString() || ''
+        facebookPostId,                      // Column A - Property ID (Facebook Post ID)
+        lot.park?.name || '',                // Column B - Park Name
+        lot.park?.address || '',             // Column C - Address
+        lot.nameOrNumber || '',              // Column D - Lot #
+        lot.lotRent || '',                   // Column E - Lot Rent
+        lot.priceForSale || '',              // Column F - Mobile Home Price
+        lot.promotionalPrice || '',          // Column G - Promotional Price
+        lot.priceForRent || '',              // Column H - Rent
+        lot.estimatedPayment || '',          // Column I - Estimated Payment
+        availableDateStr,                    // Column J - Available Date
+        statusStr,                           // Column K - Lot Status
+        '',                                  // Column L - (empty)
+        '',                                  // Column M - (empty)
+        lot.mobileHomeYear?.toString() || '', // Column N - Mobile Home Year
+        lot.mobileHomeSize || '',            // Column O - Mobile Home Size
+        lot.sqFt?.toString() || '',          // Column P - Mobile Home Sq Ft
+        lot.bedrooms?.toString() || '',      // Column Q - Beds
+        lot.bathrooms?.toString() || '',     // Column R - Baths
+        '',                                  // Column S - (empty)
+        '',                                  // Column T - (empty)
+        '',                                  // Column U - (empty)
+        '',                                  // Column V - (empty)
+        '',                                  // Column W - (empty)
+        '',                                  // Column X - (empty)
+        lot.showingLink || ''                // Column Y - Showing Link
       ];
 
       // If no headers, add them first
       if (!hasHeaders) {
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${sheetName}!A1:P1`,
+          range: `${sheetName}!A1:Y1`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [headers]
@@ -349,7 +367,7 @@ export class GoogleSheetsService {
       // Append the lot data
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${sheetName}!A:P`,
+        range: `${sheetName}!A:Y`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {
@@ -399,7 +417,7 @@ export class GoogleSheetsService {
       try {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId,
-          range: `${sheetName}!A1:P1`,
+          range: `${sheetName}!A1:Y1`,
         });
         hasHeaders = !!(response.data.values && response.data.values.length > 0);
       } catch (error) {
@@ -407,22 +425,31 @@ export class GoogleSheetsService {
       }
 
       const headers = [
-        'Facebook Post ID',
-        'Park Name',
-        'Address',
-        'Lot Number',
-        'Lot Rent',
-        'Sale Price',
-        'Promotional Price',
-        'Rent Price',
-        'Estimated Payment',
-        'Available Date',
-        'Status',
-        'Mobile Home Year',
-        'Mobile Home Size',
-        'Mobile Home SqFt',
-        'Bedrooms',
-        'Bathrooms'
+        'Property ID',           // Column A
+        'Park Name',             // Column B
+        'Address',               // Column C
+        'Lot #',                 // Column D
+        'Lot Rent',              // Column E
+        'Mobile Home Price',     // Column F
+        'Promotional Price',     // Column G
+        'Rent',                  // Column H
+        'Estimated Payment',     // Column I
+        'Available Date',        // Column J
+        'Lot Status',            // Column K
+        '',                      // Column L (empty)
+        '',                      // Column M (empty)
+        'Mobile Home Year',      // Column N
+        'Mobile Home Size',      // Column O
+        'Mobile Home Sq Ft',     // Column P
+        'Beds',                  // Column Q
+        'Baths',                 // Column R
+        '',                      // Column S (empty)
+        '',                      // Column T (empty)
+        '',                      // Column U (empty)
+        '',                      // Column V (empty)
+        '',                      // Column W (empty)
+        '',                      // Column X (empty)
+        'Showing Link'           // Column Y
       ];
 
       // Fetch Facebook post IDs for all lots (with park name grouping for efficiency)
@@ -451,22 +478,31 @@ export class GoogleSheetsService {
         }
 
         return [
-          facebookPostId,
-          lot.park?.name || '',
-          lot.park?.address || '',
-          lot.nameOrNumber || '',
-          lot.lotRent || '',
-          lot.priceForSale || '',
-          lot.promotionalPrice || '',
-          lot.priceForRent || '',
-          lot.estimatedPayment || '',
-          availableDateStr,
-          statusStr,
-          lot.mobileHomeYear?.toString() || '',
-          lot.mobileHomeSize || '',
-          lot.sqFt?.toString() || '',
-          lot.bedrooms?.toString() || '',
-          lot.bathrooms?.toString() || ''
+          facebookPostId,                      // Column A - Property ID (Facebook Post ID)
+          lot.park?.name || '',                // Column B - Park Name
+          lot.park?.address || '',             // Column C - Address
+          lot.nameOrNumber || '',              // Column D - Lot #
+          lot.lotRent || '',                   // Column E - Lot Rent
+          lot.priceForSale || '',              // Column F - Mobile Home Price
+          lot.promotionalPrice || '',          // Column G - Promotional Price
+          lot.priceForRent || '',              // Column H - Rent
+          lot.estimatedPayment || '',          // Column I - Estimated Payment
+          availableDateStr,                    // Column J - Available Date
+          statusStr,                           // Column K - Lot Status
+          '',                                  // Column L - (empty)
+          '',                                  // Column M - (empty)
+          lot.mobileHomeYear?.toString() || '', // Column N - Mobile Home Year
+          lot.mobileHomeSize || '',            // Column O - Mobile Home Size
+          lot.sqFt?.toString() || '',          // Column P - Mobile Home Sq Ft
+          lot.bedrooms?.toString() || '',      // Column Q - Beds
+          lot.bathrooms?.toString() || '',     // Column R - Baths
+          '',                                  // Column S - (empty)
+          '',                                  // Column T - (empty)
+          '',                                  // Column U - (empty)
+          '',                                  // Column V - (empty)
+          '',                                  // Column W - (empty)
+          '',                                  // Column X - (empty)
+          lot.showingLink || ''                // Column Y - Showing Link
         ];
       }));
 
@@ -474,7 +510,7 @@ export class GoogleSheetsService {
       if (!hasHeaders) {
         await sheets.spreadsheets.values.update({
           spreadsheetId,
-          range: `${sheetName}!A1:P1`,
+          range: `${sheetName}!A1:Y1`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [headers]
@@ -485,7 +521,7 @@ export class GoogleSheetsService {
       // Append all lot data
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${sheetName}!A:P`,
+        range: `${sheetName}!A:Y`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: {

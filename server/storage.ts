@@ -634,6 +634,7 @@ export class DatabaseStorage implements IStorage {
       park: {
         id: parks.id,
         name: parks.name,
+        address: parks.address,
         city: parks.city,
         state: parks.state
       },
