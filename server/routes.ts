@@ -6222,10 +6222,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== CRM ROUTES =====
+  // ===== CRM ROUTES (BETA - MHP_LORD ONLY) =====
   
   // CRM Contacts
-  app.get('/api/crm/contacts', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/contacts', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6241,7 +6241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/contacts/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const contact = await storage.getCrmContact(req.params.id);
       if (!contact) {
@@ -6260,7 +6260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/crm/contacts', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.post('/api/crm/contacts', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6292,7 +6292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.patch('/api/crm/contacts/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const contact = await storage.getCrmContact(req.params.id);
       if (!contact) {
@@ -6322,7 +6322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.delete('/api/crm/contacts/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const contact = await storage.getCrmContact(req.params.id);
       if (!contact) {
@@ -6342,7 +6342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Deals
-  app.get('/api/crm/deals', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/deals', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6363,7 +6363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/deals/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const deal = await storage.getCrmDeal(req.params.id);
       if (!deal) {
@@ -6381,7 +6381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/crm/deals', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.post('/api/crm/deals', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6413,7 +6413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.patch('/api/crm/deals/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const deal = await storage.getCrmDeal(req.params.id);
       if (!deal) {
@@ -6455,7 +6455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.delete('/api/crm/deals/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const deal = await storage.getCrmDeal(req.params.id);
       if (!deal) {
@@ -6475,7 +6475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Tasks
-  app.get('/api/crm/tasks', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/tasks', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6497,7 +6497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/crm/tasks', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.post('/api/crm/tasks', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6531,7 +6531,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/crm/tasks/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.patch('/api/crm/tasks/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const task = await storage.getCrmTask(req.params.id);
       if (!task) {
@@ -6564,7 +6564,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/crm/tasks/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.delete('/api/crm/tasks/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const task = await storage.getCrmTask(req.params.id);
       if (!task) {
@@ -6584,7 +6584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Notes
-  app.get('/api/crm/notes', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/notes', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { entityType, entityId } = req.query;
       if (!entityType || !entityId) {
@@ -6599,7 +6599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/crm/notes', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.post('/api/crm/notes', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6631,7 +6631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/crm/notes/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.delete('/api/crm/notes/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const note = await storage.getCrmNote(req.params.id);
       if (!note) {
@@ -6651,7 +6651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Activities
-  app.get('/api/crm/activities', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/activities', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { entityType, entityId } = req.query;
       if (!entityType || !entityId) {
@@ -6667,7 +6667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Messages
-  app.get('/api/crm/messages', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/messages', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { otherUserId } = req.query;
       const messages = await storage.getCrmMessages(req.user!.id, otherUserId as string);
@@ -6678,7 +6678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/crm/messages/unread-count', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/messages/unread-count', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const count = await storage.getUnreadMessageCount(req.user!.id);
       res.json({ count });
@@ -6688,7 +6688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/crm/conversations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/conversations', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const conversations = await storage.getConversations(req.user!.id);
       res.json({ conversations });
@@ -6699,7 +6699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Associations
-  app.get('/api/crm/associations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/associations', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const { sourceType, sourceId } = req.query;
       if (!sourceType || !sourceId) {
@@ -6714,7 +6714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/crm/associations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.post('/api/crm/associations', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6746,7 +6746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/crm/associations/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.delete('/api/crm/associations/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       await storage.deleteCrmAssociation(req.params.id);
       res.json({ message: 'Association deleted successfully' });
@@ -6757,7 +6757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get company users for CRM messaging
-  app.get('/api/crm/company-users', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/company-users', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {
@@ -6783,7 +6783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // CRM Units (Lots in CRM context)
-  app.get('/api/crm/units', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+  app.get('/api/crm/units', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const companyId = req.user!.companyId;
       if (!companyId) {

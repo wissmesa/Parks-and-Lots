@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   LogOut,
-  Activity
+  Activity,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -75,6 +76,26 @@ export function AdminSidebar() {
             </Link>
           );
         })}
+
+        {/* CRM Section - Only for MHP_LORD */}
+        {user?.role === 'MHP_LORD' && (
+          <div className="pt-4 mt-4 border-t border-border">
+            <Link href="/crm">
+              <div
+                className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all ${
+                  location.startsWith('/crm')
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    : 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border border-blue-200 hover:from-blue-100 hover:to-purple-100 hover:shadow-md'
+                }`}
+                data-testid="nav-crm"
+                onClick={() => setIsOpen(false)}
+              >
+                <Briefcase className="w-5 h-5" />
+                <span className="font-semibold">CRM</span>
+              </div>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Mobile-only user actions */}

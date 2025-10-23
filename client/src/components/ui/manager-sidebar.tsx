@@ -83,23 +83,25 @@ export function ManagerSidebar() {
           );
         })}
 
-        {/* CRM Section - Separated */}
-        <div className="pt-4 mt-4 border-t border-border">
-          <Link href={crmItem.href}>
-            <div 
-              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors font-semibold ${
-                location.startsWith('/crm')
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
-                  : 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 hover:from-blue-100 hover:to-purple-100 border border-blue-200'
-              }`} 
-              data-testid="nav-manager-crm"
-              onClick={() => setIsOpen(false)}
-            >
-              <crmItem.icon className="w-5 h-5" />
-              <span>{crmItem.label}</span>
-            </div>
-          </Link>
-        </div>
+        {/* CRM Section - Separated (Only for MHP_LORD) */}
+        {user?.role === 'MHP_LORD' && (
+          <div className="pt-4 mt-4 border-t border-border">
+            <Link href={crmItem.href}>
+              <div 
+                className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors font-semibold ${
+                  location.startsWith('/crm')
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                    : 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 hover:from-blue-100 hover:to-purple-100 border border-blue-200'
+                }`} 
+                data-testid="nav-manager-crm"
+                onClick={() => setIsOpen(false)}
+              >
+                <crmItem.icon className="w-5 h-5" />
+                <span>{crmItem.label}</span>
+              </div>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Mobile-only user actions */}
