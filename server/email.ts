@@ -273,7 +273,7 @@ export async function sendLotCreationNotification(
   createdByName: string,
   fromEmail: string = 'hi@mhpsalesmanager.com'
 ): Promise<boolean> {
-  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com'];
+  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com', 'chris@mhpsalesmanager.com'];
   
   const subject = `New Lot Created: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
   
@@ -384,7 +384,7 @@ export async function sendLotReactivationNotification(
   reactivatedByName: string,
   fromEmail: string = 'hi@mhpsalesmanager.com'
 ): Promise<boolean> {
-  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com'];
+  const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com','chris@mhpsalesmanager.com'];
   
   const subject = `Lot Reactivated: ${lotData.nameOrNumber}${lotData.parkName ? ` - ${lotData.parkName}` : ''}`;
   

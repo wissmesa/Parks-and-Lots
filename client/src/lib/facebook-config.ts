@@ -10,51 +10,51 @@ export const FACEBOOK_WEBHOOK_URL = 'https://hook.us2.make.com/6layguqfpk3i6imvy
 
 export const FACEBOOK_PARK_MAPPINGS: FacebookParkConfig[] = [
   {
-    parkName: 'Richmond Mobile Home Park',
+    parkName: 'Richmond',
     facebookId: '321325917734508'
   },
   {
-    parkName: 'Aberdeen Mobile Home Park',
+    parkName: 'Aberdeen Estates',
     facebookId: '240633272475459'
   },
   {
-    parkName: 'Amelia Mobile Home Park',
+    parkName: 'Amelia Estates',
     facebookId: '114923781526224'
   },
   {
-    parkName: 'Aurora Mobile Home Park',
+    parkName: 'Aurora Estates',
     facebookId: '620221604502913'
   },
   {
-    parkName: 'CreekSide Mobile Home Park',
+    parkName: 'Creekside Crossing',
     facebookId: '319339847930489'
   },
   {
-    parkName: 'Deluxe Mobile Home Park',
+    parkName: 'Deluxe',
     facebookId: '353098991211829'
   },
   {
-    parkName: 'Eastlane Mobile Home Park',
+    parkName: 'Eastlane',
     facebookId: '103477896023777'
   },
   {
-    parkName: 'Ontario Mobile Home Park',
+    parkName: 'Ontario Place',
     facebookId: '694757763724654'
   },
   {
-    parkName: 'High Meadows Mobile Home Park',
+    parkName: 'High Meadows MHP',
     facebookId: '427458087107212'
   },
   {
-    parkName: 'Three Rivers Mobile Home Park',
+    parkName: 'Three Rivers',
     facebookId: '692084087327854'
   },
   {
-    parkName: 'Rustic Mobile Home Park',
+    parkName: 'Rustic Acres',
     facebookId: '738689052659408'
   },
   {
-    parkName: 'Homestead Mobile Home Park',
+    parkName: 'Homestead Village',
     facebookId: '100815996313376'
   }
 ];
