@@ -61,6 +61,7 @@ export const users = pgTable("users", {
   email: varchar("email").notNull().unique(),
   passwordHash: varchar("password_hash").notNull(),
   fullName: varchar("full_name").notNull(),
+  phone: varchar("phone"),
   role: userRoleEnum("role").notNull(),
   tenantId: varchar("tenant_id").references(() => tenants.id),
   companyId: varchar("company_id").references(() => companies.id), // For ADMIN role
@@ -672,6 +673,10 @@ export const crmAssociationsRelations = relations(crmAssociations, ({ one }) => 
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Please enter a valid email address"),
+  phone: z.string().regex(
+    /^(\+1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$/,
+    "Please enter a valid US phone number (e.g., (555) 123-4567 or 555-123-4567)"
+  ).optional().nullable().or(z.literal('')),
 }).omit({
   id: true,
   createdAt: true,

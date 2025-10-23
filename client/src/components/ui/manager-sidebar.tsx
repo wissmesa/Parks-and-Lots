@@ -12,7 +12,8 @@ import {
   Shield,
   Users,
   UserPlus,
-  Briefcase
+  Briefcase,
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -36,6 +37,7 @@ export function ManagerSidebar() {
       { href: `${basePath}/bookings`, icon: Calendar, label: "Bookings" }
     ]),
     ...(isCompanyManager ? [{ href: `${basePath}/invites`, icon: UserPlus, label: "Manager Invites" }] : []),
+    { href: `${basePath}/my-info`, icon: UserCircle, label: "My Info" },
   ];
 
   const crmItem = { href: '/crm', icon: Briefcase, label: "CRM" };

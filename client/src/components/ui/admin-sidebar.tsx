@@ -13,7 +13,8 @@ import {
   X,
   LogOut,
   Activity,
-  Briefcase
+  Briefcase,
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -34,6 +35,7 @@ export function AdminSidebar() {
     { href: "/admin/bookings", icon: Calendar, label: "Bookings" },
     { href: "/admin/invites", icon: UserPlus, label: "Invites" },
     { href: "/admin/login-activity", icon: Activity, label: "Login Activity" },
+    { href: "/admin/my-info", icon: UserCircle, label: "My Info" },
   ];
 
   const handleLogout = async () => {

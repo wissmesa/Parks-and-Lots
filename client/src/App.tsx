@@ -31,6 +31,7 @@ import ManagerBookings from "@/pages/manager-bookings";
 import ManagerInvites from "@/pages/manager-invites";
 import TenantPanel from "@/pages/tenant-panel";
 import CrmLayout from "@/pages/crm/crm-layout";
+import MyInfo from "@/pages/my-info";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -77,6 +78,9 @@ function Router() {
         <Route path="/admin/login-activity" component={() => (
           <RequireRole role="MHP_LORD"><AdminLoginActivity /></RequireRole>
         )} />
+        <Route path="/admin/my-info" component={() => (
+          <RequireRole role="MHP_LORD"><MyInfo /></RequireRole>
+        )} />
         
         {/* Protected manager routes - accessible by MANAGER, ADMIN (company admin), and MHP_LORD */}
         <Route path="/manager" component={() => (
@@ -96,6 +100,9 @@ function Router() {
         )} />
         <Route path="/manager/invites" component={() => (
           <RequireRole role={['ADMIN', 'MHP_LORD'] as const}><ManagerInvites /></RequireRole>
+        )} />
+        <Route path="/manager/my-info" component={() => (
+          <RequireRole role={['MANAGER', 'ADMIN', 'MHP_LORD'] as const}><MyInfo /></RequireRole>
         )} />
         
         {/* Protected CRM routes - Beta: MHP_LORD only */}
