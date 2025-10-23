@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
+import { Server as SocketIOServer } from "socket.io";
 import path from "path";
 import { promises as fs } from "fs";
 import { readFileSync, unlinkSync, readdirSync, statSync, existsSync } from "fs";
@@ -6221,6 +6222,591 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== CRM ROUTES =====
+  
+  // CRM Contacts
+  app.get('/api/crm/contacts', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const { q } = req.query;
+      const contacts = await storage.getCrmContacts(companyId, { q: q as string });
+      res.json({ contacts });
+    } catch (error) {
+      console.error('Get CRM contacts error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const contact = await storage.getCrmContact(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      // Verify access
+      if (contact.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      console.error('Get CRM contact error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/contacts', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const contactData = {
+        ...req.body,
+        companyId,
+        createdBy: req.user!.id
+      };
+
+      const contact = await storage.createCrmContact(contactData);
+      
+      // Log activity
+      await storage.createCrmActivity({
+        type: 'CREATED',
+        description: `Contact created: ${contact.firstName} ${contact.lastName}`,
+        entityType: 'CONTACT',
+        entityId: contact.id,
+        userId: req.user!.id,
+        companyId
+      });
+
+      res.json(contact);
+    } catch (error) {
+      console.error('Create CRM contact error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.patch('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const contact = await storage.getCrmContact(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      if (contact.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const updated = await storage.updateCrmContact(req.params.id, req.body);
+      
+      // Log activity
+      await storage.createCrmActivity({
+        type: 'UPDATED',
+        description: `Contact updated`,
+        entityType: 'CONTACT',
+        entityId: updated.id,
+        userId: req.user!.id,
+        companyId: contact.companyId
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Update CRM contact error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/crm/contacts/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const contact = await storage.getCrmContact(req.params.id);
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      if (contact.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteCrmContact(req.params.id);
+      res.json({ message: 'Contact deleted successfully' });
+    } catch (error) {
+      console.error('Delete CRM contact error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Deals
+  app.get('/api/crm/deals', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const { stage, assignedTo, contactId } = req.query;
+      const deals = await storage.getCrmDeals(companyId, {
+        stage: stage as string,
+        assignedTo: assignedTo as string,
+        contactId: contactId as string
+      });
+      
+      res.json({ deals });
+    } catch (error) {
+      console.error('Get CRM deals error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const deal = await storage.getCrmDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ message: 'Deal not found' });
+      }
+
+      if (deal.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      res.json(deal);
+    } catch (error) {
+      console.error('Get CRM deal error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/deals', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const dealData = {
+        ...req.body,
+        companyId,
+        createdBy: req.user!.id
+      };
+
+      const deal = await storage.createCrmDeal(dealData);
+      
+      // Log activity
+      await storage.createCrmActivity({
+        type: 'CREATED',
+        description: `Deal created: ${deal.title}`,
+        entityType: 'DEAL',
+        entityId: deal.id,
+        userId: req.user!.id,
+        companyId
+      });
+
+      res.json(deal);
+    } catch (error) {
+      console.error('Create CRM deal error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.patch('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const deal = await storage.getCrmDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ message: 'Deal not found' });
+      }
+
+      if (deal.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const oldStage = deal.stage;
+      const updated = await storage.updateCrmDeal(req.params.id, req.body);
+      
+      // Log activity
+      if (req.body.stage && req.body.stage !== oldStage) {
+        await storage.createCrmActivity({
+          type: 'STAGE_CHANGED',
+          description: `Deal stage changed from ${oldStage} to ${req.body.stage}`,
+          entityType: 'DEAL',
+          entityId: updated.id,
+          userId: req.user!.id,
+          companyId: deal.companyId
+        });
+      } else {
+        await storage.createCrmActivity({
+          type: 'UPDATED',
+          description: `Deal updated`,
+          entityType: 'DEAL',
+          entityId: updated.id,
+          userId: req.user!.id,
+          companyId: deal.companyId
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Update CRM deal error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/crm/deals/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const deal = await storage.getCrmDeal(req.params.id);
+      if (!deal) {
+        return res.status(404).json({ message: 'Deal not found' });
+      }
+
+      if (deal.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteCrmDeal(req.params.id);
+      res.json({ message: 'Deal deleted successfully' });
+    } catch (error) {
+      console.error('Delete CRM deal error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Tasks
+  app.get('/api/crm/tasks', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const { assignedTo, status, entityType, entityId } = req.query;
+      const tasks = await storage.getCrmTasks(companyId, {
+        assignedTo: assignedTo as string,
+        status: status as string,
+        entityType: entityType as string,
+        entityId: entityId as string
+      });
+      
+      res.json({ tasks });
+    } catch (error) {
+      console.error('Get CRM tasks error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/tasks', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const taskData = {
+        ...req.body,
+        companyId,
+        createdBy: req.user!.id
+      };
+
+      const task = await storage.createCrmTask(taskData);
+      
+      // Log activity if task is associated with an entity
+      if (task.entityType && task.entityId) {
+        await storage.createCrmActivity({
+          type: 'TASK_ADDED',
+          description: `Task created: ${task.title}`,
+          entityType: task.entityType,
+          entityId: task.entityId,
+          userId: req.user!.id,
+          companyId
+        });
+      }
+
+      res.json(task);
+    } catch (error) {
+      console.error('Create CRM task error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.patch('/api/crm/tasks/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const task = await storage.getCrmTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+
+      if (task.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const oldStatus = task.status;
+      const updated = await storage.updateCrmTask(req.params.id, req.body);
+      
+      // Log activity if status changed and task is associated with an entity
+      if (req.body.status && req.body.status !== oldStatus && task.entityType && task.entityId) {
+        await storage.createCrmActivity({
+          type: 'STATUS_CHANGED',
+          description: `Task "${task.title}" status changed from ${oldStatus} to ${req.body.status}`,
+          entityType: task.entityType,
+          entityId: task.entityId,
+          userId: req.user!.id,
+          companyId: task.companyId
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Update CRM task error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/crm/tasks/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const task = await storage.getCrmTask(req.params.id);
+      if (!task) {
+        return res.status(404).json({ message: 'Task not found' });
+      }
+
+      if (task.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteCrmTask(req.params.id);
+      res.json({ message: 'Task deleted successfully' });
+    } catch (error) {
+      console.error('Delete CRM task error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Notes
+  app.get('/api/crm/notes', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const { entityType, entityId } = req.query;
+      if (!entityType || !entityId) {
+        return res.status(400).json({ message: 'entityType and entityId are required' });
+      }
+
+      const notes = await storage.getCrmNotes(entityType as string, entityId as string);
+      res.json({ notes });
+    } catch (error) {
+      console.error('Get CRM notes error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/notes', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const noteData = {
+        ...req.body,
+        companyId,
+        createdBy: req.user!.id
+      };
+
+      const note = await storage.createCrmNote(noteData);
+      
+      // Log activity
+      await storage.createCrmActivity({
+        type: 'NOTE_ADDED',
+        description: `Note added`,
+        entityType: note.entityType,
+        entityId: note.entityId,
+        userId: req.user!.id,
+        companyId
+      });
+
+      res.json(note);
+    } catch (error) {
+      console.error('Create CRM note error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/crm/notes/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const note = await storage.getCrmNote(req.params.id);
+      if (!note) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+
+      if (note.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      await storage.deleteCrmNote(req.params.id);
+      res.json({ message: 'Note deleted successfully' });
+    } catch (error) {
+      console.error('Delete CRM note error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Activities
+  app.get('/api/crm/activities', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const { entityType, entityId } = req.query;
+      if (!entityType || !entityId) {
+        return res.status(400).json({ message: 'entityType and entityId are required' });
+      }
+
+      const activities = await storage.getCrmActivities(entityType as string, entityId as string);
+      res.json({ activities });
+    } catch (error) {
+      console.error('Get CRM activities error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Messages
+  app.get('/api/crm/messages', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const { otherUserId } = req.query;
+      const messages = await storage.getCrmMessages(req.user!.id, otherUserId as string);
+      res.json({ messages });
+    } catch (error) {
+      console.error('Get CRM messages error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/crm/messages/unread-count', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const count = await storage.getUnreadMessageCount(req.user!.id);
+      res.json({ count });
+    } catch (error) {
+      console.error('Get unread message count error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/crm/conversations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const conversations = await storage.getConversations(req.user!.id);
+      res.json({ conversations });
+    } catch (error) {
+      console.error('Get conversations error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Associations
+  app.get('/api/crm/associations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const { sourceType, sourceId } = req.query;
+      if (!sourceType || !sourceId) {
+        return res.status(400).json({ message: 'sourceType and sourceId are required' });
+      }
+
+      const associations = await storage.getCrmAssociations(sourceType as string, sourceId as string);
+      res.json({ associations });
+    } catch (error) {
+      console.error('Get CRM associations error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/associations', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const associationData = {
+        ...req.body,
+        companyId,
+        createdBy: req.user!.id
+      };
+
+      const association = await storage.createCrmAssociation(associationData);
+      
+      // Log activity
+      await storage.createCrmActivity({
+        type: 'ASSOCIATION_ADDED',
+        description: `Associated ${association.targetType} with ${association.sourceType}`,
+        entityType: association.sourceType,
+        entityId: association.sourceId,
+        userId: req.user!.id,
+        companyId
+      });
+
+      res.json(association);
+    } catch (error) {
+      console.error('Create CRM association error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.delete('/api/crm/associations/:id', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteCrmAssociation(req.params.id);
+      res.json({ message: 'Association deleted successfully' });
+    } catch (error) {
+      console.error('Delete CRM association error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // Get company users for CRM messaging
+  app.get('/api/crm/company-users', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const users = await storage.getUsers();
+      const companyUsers = users.filter(u => u.companyId === companyId && u.isActive);
+      
+      // Return users without sensitive data
+      const safeUsers = companyUsers.map(u => ({
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        role: u.role
+      }));
+
+      res.json({ users: safeUsers });
+    } catch (error) {
+      console.error('Get company users error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  // CRM Units (Lots in CRM context)
+  app.get('/api/crm/units', authenticateToken, requireRole(['MANAGER', 'ADMIN', 'MHP_LORD']), async (req: AuthRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) {
+        return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      // Get company parks then get their lots
+      const { parks } = await storage.getParksByCompany(companyId);
+      const parkIds = parks.map(p => p.id);
+      
+      let lots = [];
+      for (const parkId of parkIds) {
+        const parkLots = await storage.getLots({ parkId });
+        lots.push(...parkLots);
+      }
+
+      res.json({ units: lots });
+    } catch (error) {
+      console.error('Get CRM units error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Tenant routes
   app.get('/api/tenant/me', authenticateToken, requireRole('TENANT'), async (req: AuthRequest, res) => {
     try {
@@ -6315,5 +6901,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Setup Socket.IO for real-time messaging
+  const io = new SocketIOServer(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  // Socket.IO authentication middleware
+  io.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      if (!token) {
+        return next(new Error('Authentication error'));
+      }
+
+      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const user = await storage.getUser(decoded.userId);
+      
+      if (!user) {
+        return next(new Error('User not found'));
+      }
+
+      socket.data.user = user;
+      next();
+    } catch (error) {
+      next(new Error('Authentication error'));
+    }
+  });
+
+  // Socket.IO connection handling
+  io.on('connection', (socket) => {
+    const user = socket.data.user;
+    console.log(`User connected: ${user.fullName} (${user.id})`);
+
+    // Join user to their own room
+    socket.join(`user:${user.id}`);
+
+    // Handle sending messages
+    socket.on('send_message', async (data: { receiverId: string; content: string }) => {
+      try {
+        const message = await storage.createCrmMessage({
+          senderId: user.id,
+          receiverId: data.receiverId,
+          content: data.content,
+          companyId: user.companyId!
+        });
+
+        // Send to receiver
+        io.to(`user:${data.receiverId}`).emit('new_message', message);
+        
+        // Send back to sender (for confirmation)
+        socket.emit('message_sent', message);
+      } catch (error) {
+        console.error('Error sending message:', error);
+        socket.emit('error', { message: 'Failed to send message' });
+      }
+    });
+
+    // Handle typing indicator
+    socket.on('typing', (data: { receiverId: string }) => {
+      io.to(`user:${data.receiverId}`).emit('user_typing', { userId: user.id });
+    });
+
+    // Handle stop typing
+    socket.on('stop_typing', (data: { receiverId: string }) => {
+      io.to(`user:${data.receiverId}`).emit('user_stop_typing', { userId: user.id });
+    });
+
+    // Handle mark message as read
+    socket.on('mark_read', async (data: { messageId: string }) => {
+      try {
+        await storage.markMessageAsRead(data.messageId);
+        const message = await storage.getCrmMessage(data.messageId);
+        if (message) {
+          io.to(`user:${message.senderId}`).emit('message_read', { messageId: data.messageId });
+        }
+      } catch (error) {
+        console.error('Error marking message as read:', error);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log(`User disconnected: ${user.fullName} (${user.id})`);
+    });
+  });
+
   return httpServer;
 }

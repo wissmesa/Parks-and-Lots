@@ -14,6 +14,13 @@ import {
   tenants,
   payments,
   loginLogs,
+  crmContacts,
+  crmDeals,
+  crmTasks,
+  crmNotes,
+  crmActivities,
+  crmMessages,
+  crmAssociations,
   type User, 
   type InsertUser,
   type Company,
@@ -40,7 +47,21 @@ import {
   type InsertPayment,
   type LoginLog,
   type InsertLoginLog,
-  type OAuthAccount
+  type OAuthAccount,
+  type CrmContact,
+  type InsertCrmContact,
+  type CrmDeal,
+  type InsertCrmDeal,
+  type CrmTask,
+  type InsertCrmTask,
+  type CrmNote,
+  type InsertCrmNote,
+  type CrmActivity,
+  type InsertCrmActivity,
+  type CrmMessage,
+  type InsertCrmMessage,
+  type CrmAssociation,
+  type InsertCrmAssociation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -173,6 +194,51 @@ export interface IStorage {
   createLoginLog(log: InsertLoginLog): Promise<LoginLog>;
   getLoginLogs(filters?: { userId?: string; role?: string; days?: number; success?: boolean; page?: number; limit?: number }): Promise<{ logs: any[]; totalCount: number }>;
   cleanOldLoginLogs(): Promise<void>;
+  
+  // CRM Contact operations
+  getCrmContacts(companyId: string, filters?: { q?: string }): Promise<CrmContact[]>;
+  getCrmContact(id: string): Promise<CrmContact | undefined>;
+  createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
+  updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
+  deleteCrmContact(id: string): Promise<void>;
+  
+  // CRM Deal operations
+  getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<CrmDeal[]>;
+  getCrmDeal(id: string): Promise<CrmDeal | undefined>;
+  createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
+  updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal>;
+  deleteCrmDeal(id: string): Promise<void>;
+  
+  // CRM Task operations
+  getCrmTasks(companyId: string, filters?: { assignedTo?: string; status?: string; entityType?: string; entityId?: string }): Promise<CrmTask[]>;
+  getCrmTask(id: string): Promise<CrmTask | undefined>;
+  createCrmTask(task: InsertCrmTask): Promise<CrmTask>;
+  updateCrmTask(id: string, updates: Partial<InsertCrmTask>): Promise<CrmTask>;
+  deleteCrmTask(id: string): Promise<void>;
+  
+  // CRM Note operations
+  getCrmNotes(entityType: string, entityId: string): Promise<CrmNote[]>;
+  getCrmNote(id: string): Promise<CrmNote | undefined>;
+  createCrmNote(note: InsertCrmNote): Promise<CrmNote>;
+  updateCrmNote(id: string, updates: Partial<InsertCrmNote>): Promise<CrmNote>;
+  deleteCrmNote(id: string): Promise<void>;
+  
+  // CRM Activity operations
+  getCrmActivities(entityType: string, entityId: string): Promise<CrmActivity[]>;
+  createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity>;
+  
+  // CRM Message operations
+  getCrmMessages(userId: string, otherUserId?: string): Promise<CrmMessage[]>;
+  getCrmMessage(id: string): Promise<CrmMessage | undefined>;
+  createCrmMessage(message: InsertCrmMessage): Promise<CrmMessage>;
+  markMessageAsRead(id: string): Promise<void>;
+  getUnreadMessageCount(userId: string): Promise<number>;
+  getConversations(userId: string): Promise<any[]>;
+  
+  // CRM Association operations
+  getCrmAssociations(sourceType: string, sourceId: string): Promise<CrmAssociation[]>;
+  createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation>;
+  deleteCrmAssociation(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1845,6 +1911,323 @@ export class DatabaseStorage implements IStorage {
     
     await db.delete(loginLogs).where(lte(loginLogs.createdAt, cutoffDate));
     console.log(`[Storage] Cleaned login logs older than 90 days (before ${cutoffDate.toISOString()})`);
+  }
+
+  // CRM Contact operations
+  async getCrmContacts(companyId: string, filters?: { q?: string }): Promise<CrmContact[]> {
+    const conditions = [eq(crmContacts.companyId, companyId)];
+    
+    if (filters?.q) {
+      const search = `%${filters.q}%`;
+      conditions.push(
+        or(
+          ilike(crmContacts.firstName, search),
+          ilike(crmContacts.lastName, search),
+          ilike(crmContacts.email, search),
+          ilike(crmContacts.phone, search)
+        ) as any
+      );
+    }
+
+    const results = await db.select()
+      .from(crmContacts)
+      .where(and(...conditions))
+      .orderBy(desc(crmContacts.createdAt));
+
+    return results;
+  }
+
+  async getCrmContact(id: string): Promise<CrmContact | undefined> {
+    const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, id));
+    return contact;
+  }
+
+  async createCrmContact(contact: InsertCrmContact): Promise<CrmContact> {
+    const [result] = await db.insert(crmContacts).values(contact).returning();
+    return result;
+  }
+
+  async updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact> {
+    const [result] = await db.update(crmContacts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(crmContacts.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteCrmContact(id: string): Promise<void> {
+    await db.delete(crmContacts).where(eq(crmContacts.id, id));
+  }
+
+  // CRM Deal operations
+  async getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<CrmDeal[]> {
+    const conditions = [eq(crmDeals.companyId, companyId)];
+
+    if (filters?.stage) {
+      conditions.push(eq(crmDeals.stage, filters.stage as any));
+    }
+
+    if (filters?.assignedTo) {
+      conditions.push(eq(crmDeals.assignedTo, filters.assignedTo));
+    }
+
+    if (filters?.contactId) {
+      conditions.push(eq(crmDeals.contactId, filters.contactId));
+    }
+
+    const results = await db.select()
+      .from(crmDeals)
+      .where(and(...conditions))
+      .orderBy(desc(crmDeals.createdAt));
+
+    return results;
+  }
+
+  async getCrmDeal(id: string): Promise<CrmDeal | undefined> {
+    const [deal] = await db.select().from(crmDeals).where(eq(crmDeals.id, id));
+    return deal;
+  }
+
+  async createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal> {
+    const [result] = await db.insert(crmDeals).values(deal).returning();
+    return result;
+  }
+
+  async updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal> {
+    const [result] = await db.update(crmDeals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(crmDeals.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteCrmDeal(id: string): Promise<void> {
+    await db.delete(crmDeals).where(eq(crmDeals.id, id));
+  }
+
+  // CRM Task operations
+  async getCrmTasks(companyId: string, filters?: { assignedTo?: string; status?: string; entityType?: string; entityId?: string }): Promise<CrmTask[]> {
+    const conditions = [eq(crmTasks.companyId, companyId)];
+
+    if (filters?.assignedTo) {
+      conditions.push(eq(crmTasks.assignedTo, filters.assignedTo));
+    }
+
+    if (filters?.status) {
+      conditions.push(eq(crmTasks.status, filters.status as any));
+    }
+
+    if (filters?.entityType && filters?.entityId) {
+      conditions.push(eq(crmTasks.entityType, filters.entityType as any));
+      conditions.push(eq(crmTasks.entityId, filters.entityId));
+    }
+
+    const results = await db.select()
+      .from(crmTasks)
+      .where(and(...conditions))
+      .orderBy(asc(crmTasks.dueDate));
+
+    return results;
+  }
+
+  async getCrmTask(id: string): Promise<CrmTask | undefined> {
+    const [task] = await db.select().from(crmTasks).where(eq(crmTasks.id, id));
+    return task;
+  }
+
+  async createCrmTask(task: InsertCrmTask): Promise<CrmTask> {
+    const [result] = await db.insert(crmTasks).values(task).returning();
+    return result;
+  }
+
+  async updateCrmTask(id: string, updates: Partial<InsertCrmTask>): Promise<CrmTask> {
+    const [result] = await db.update(crmTasks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(crmTasks.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteCrmTask(id: string): Promise<void> {
+    await db.delete(crmTasks).where(eq(crmTasks.id, id));
+  }
+
+  // CRM Note operations
+  async getCrmNotes(entityType: string, entityId: string): Promise<CrmNote[]> {
+    const results = await db.select()
+      .from(crmNotes)
+      .where(
+        and(
+          eq(crmNotes.entityType, entityType as any),
+          eq(crmNotes.entityId, entityId)
+        )
+      )
+      .orderBy(desc(crmNotes.createdAt));
+
+    return results;
+  }
+
+  async getCrmNote(id: string): Promise<CrmNote | undefined> {
+    const [note] = await db.select().from(crmNotes).where(eq(crmNotes.id, id));
+    return note;
+  }
+
+  async createCrmNote(note: InsertCrmNote): Promise<CrmNote> {
+    const [result] = await db.insert(crmNotes).values(note).returning();
+    return result;
+  }
+
+  async updateCrmNote(id: string, updates: Partial<InsertCrmNote>): Promise<CrmNote> {
+    const [result] = await db.update(crmNotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(crmNotes.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteCrmNote(id: string): Promise<void> {
+    await db.delete(crmNotes).where(eq(crmNotes.id, id));
+  }
+
+  // CRM Activity operations
+  async getCrmActivities(entityType: string, entityId: string): Promise<CrmActivity[]> {
+    const results = await db.select()
+      .from(crmActivities)
+      .where(
+        and(
+          eq(crmActivities.entityType, entityType as any),
+          eq(crmActivities.entityId, entityId)
+        )
+      )
+      .orderBy(desc(crmActivities.createdAt));
+
+    return results;
+  }
+
+  async createCrmActivity(activity: InsertCrmActivity): Promise<CrmActivity> {
+    const [result] = await db.insert(crmActivities).values(activity).returning();
+    return result;
+  }
+
+  // CRM Message operations
+  async getCrmMessages(userId: string, otherUserId?: string): Promise<CrmMessage[]> {
+    let conditions;
+    
+    if (otherUserId) {
+      // Get messages between two specific users
+      conditions = or(
+        and(
+          eq(crmMessages.senderId, userId),
+          eq(crmMessages.receiverId, otherUserId)
+        ),
+        and(
+          eq(crmMessages.senderId, otherUserId),
+          eq(crmMessages.receiverId, userId)
+        )
+      );
+    } else {
+      // Get all messages for user
+      conditions = or(
+        eq(crmMessages.senderId, userId),
+        eq(crmMessages.receiverId, userId)
+      );
+    }
+
+    const results = await db.select()
+      .from(crmMessages)
+      .where(conditions)
+      .orderBy(asc(crmMessages.createdAt));
+
+    return results;
+  }
+
+  async getCrmMessage(id: string): Promise<CrmMessage | undefined> {
+    const [message] = await db.select().from(crmMessages).where(eq(crmMessages.id, id));
+    return message;
+  }
+
+  async createCrmMessage(message: InsertCrmMessage): Promise<CrmMessage> {
+    const [result] = await db.insert(crmMessages).values(message).returning();
+    return result;
+  }
+
+  async markMessageAsRead(id: string): Promise<void> {
+    await db.update(crmMessages)
+      .set({ read: true, readAt: new Date() })
+      .where(eq(crmMessages.id, id));
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(crmMessages)
+      .where(
+        and(
+          eq(crmMessages.receiverId, userId),
+          eq(crmMessages.read, false)
+        )
+      );
+
+    return Number(count);
+  }
+
+  async getConversations(userId: string): Promise<any[]> {
+    // Get unique users who have messages with this user
+    const sentMessages = await db.select({
+      userId: crmMessages.receiverId,
+      lastMessage: crmMessages.content,
+      lastMessageAt: crmMessages.createdAt,
+      read: crmMessages.read
+    })
+    .from(crmMessages)
+    .where(eq(crmMessages.senderId, userId))
+    .orderBy(desc(crmMessages.createdAt));
+
+    const receivedMessages = await db.select({
+      userId: crmMessages.senderId,
+      lastMessage: crmMessages.content,
+      lastMessageAt: crmMessages.createdAt,
+      read: crmMessages.read
+    })
+    .from(crmMessages)
+    .where(eq(crmMessages.receiverId, userId))
+    .orderBy(desc(crmMessages.createdAt));
+
+    // Combine and get unique users with their last message
+    const conversationsMap = new Map();
+    
+    [...sentMessages, ...receivedMessages].forEach(msg => {
+      if (!conversationsMap.has(msg.userId) || 
+          conversationsMap.get(msg.userId).lastMessageAt < msg.lastMessageAt) {
+        conversationsMap.set(msg.userId, msg);
+      }
+    });
+
+    return Array.from(conversationsMap.values());
+  }
+
+  // CRM Association operations
+  async getCrmAssociations(sourceType: string, sourceId: string): Promise<CrmAssociation[]> {
+    const results = await db.select()
+      .from(crmAssociations)
+      .where(
+        and(
+          eq(crmAssociations.sourceType, sourceType as any),
+          eq(crmAssociations.sourceId, sourceId)
+        )
+      )
+      .orderBy(desc(crmAssociations.createdAt));
+
+    return results;
+  }
+
+  async createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation> {
+    const [result] = await db.insert(crmAssociations).values(association).returning();
+    return result;
+  }
+
+  async deleteCrmAssociation(id: string): Promise<void> {
+    await db.delete(crmAssociations).where(eq(crmAssociations.id, id));
   }
 }
 

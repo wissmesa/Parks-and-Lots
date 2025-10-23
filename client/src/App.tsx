@@ -30,6 +30,7 @@ import ManagerTenants from "@/pages/manager-tenants";
 import ManagerBookings from "@/pages/manager-bookings";
 import ManagerInvites from "@/pages/manager-invites";
 import TenantPanel from "@/pages/tenant-panel";
+import CrmLayout from "@/pages/crm/crm-layout";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -97,6 +98,13 @@ function Router() {
           <RequireRole role={['ADMIN', 'MHP_LORD'] as const}><ManagerInvites /></RequireRole>
         )} />
         
+        {/* Protected CRM routes */}
+        <Route path="/crm" component={() => (
+          <RequireRole role={['MANAGER', 'ADMIN', 'MHP_LORD'] as const}><CrmLayout /></RequireRole>
+        )} />
+        <Route path="/crm/:section" component={() => (
+          <RequireRole role={['MANAGER', 'ADMIN', 'MHP_LORD'] as const}><CrmLayout /></RequireRole>
+        )} />
         
         {/* Protected TENANT routes */}
         <Route path="/tenant" component={() => (
