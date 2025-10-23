@@ -10,6 +10,7 @@ import { Plus, DollarSign } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AuthManager } from "@/lib/auth";
 
 interface Deal {
   id: string;
@@ -47,7 +48,10 @@ export default function CrmDeals() {
   const { data: dealsData, isLoading } = useQuery({
     queryKey: ["/api/crm/deals"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/deals", { credentials: "include" });
+      const res = await fetch("/api/crm/deals", { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
       if (!res.ok) throw new Error("Failed to fetch deals");
       return res.json();
     },
@@ -58,7 +62,10 @@ export default function CrmDeals() {
     mutationFn: async (data: any) => {
       const res = await fetch("/api/crm/deals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
         credentials: "include",
         body: JSON.stringify({
           ...data,

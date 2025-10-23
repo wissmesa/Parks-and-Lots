@@ -105,6 +105,9 @@ function Router() {
         <Route path="/crm/:section" component={() => (
           <RequireRole role="MHP_LORD"><CrmLayout /></RequireRole>
         )} />
+        <Route path="/crm/:section/:id" component={() => (
+          <RequireRole role="MHP_LORD"><CrmLayout /></RequireRole>
+        )} />
         
         {/* Protected TENANT routes */}
         <Route path="/tenant" component={() => (
