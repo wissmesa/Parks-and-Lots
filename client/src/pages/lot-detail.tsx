@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BookingForm } from "@/components/ui/booking-form";
+import { BookingConfirmationDialog } from "@/components/ui/booking-confirmation-dialog";
 import { LotCalculator } from "@/components/ui/lot-calculator";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -95,6 +96,16 @@ export default function LotDetail() {
   
   // Booking dialog state
   const [showBookingDialog, setShowBookingDialog] = useState<boolean>(false);
+  
+  // Confirmation dialog state
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState<boolean>(false);
+  const [confirmationDetails, setConfirmationDetails] = useState<{
+    date: string;
+    time: string;
+    parkName: string;
+    parkAddress: string;
+    lotNumber: string;
+  } | null>(null);
   
   // State to track open tooltips for clickable info icons
   const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
@@ -603,6 +614,9 @@ export default function LotDetail() {
               <BookingForm 
                 lotId={lot.id} 
                 selectedSlot={selectedSlot}
+                parkName={park?.name}
+                parkAddress={park?.address}
+                lotName={lot.nameOrNumber}
                 onSlotUsed={() => setSelectedSlot(null)}
                 onSuccess={() => {
                   toast({
@@ -611,7 +625,11 @@ export default function LotDetail() {
                   });
                   // REMOVED: No longer invalidating showings - Google Calendar is source of truth
                   setSelectedSlot(null);
-                }} 
+                }}
+                onShowConfirmation={(details) => {
+                  setConfirmationDetails(details);
+                  setShowConfirmationDialog(true);
+                }}
               />
             </div>
           </div>
@@ -631,6 +649,9 @@ export default function LotDetail() {
             <BookingForm 
               lotId={lot?.id || ''} 
               selectedSlot={selectedSlot}
+              parkName={park?.name}
+              parkAddress={park?.address}
+              lotName={lot?.nameOrNumber}
               onSlotUsed={() => setSelectedSlot(null)}
               onSuccess={() => {
                 toast({
@@ -639,7 +660,11 @@ export default function LotDetail() {
                 });
                 setSelectedSlot(null);
                 setShowBookingDialog(false);
-              }} 
+              }}
+              onShowConfirmation={(details) => {
+                setConfirmationDetails(details);
+                setShowConfirmationDialog(true);
+              }}
             />
           </div>
         </DialogContent>
@@ -713,6 +738,15 @@ export default function LotDetail() {
           onClose={() => setShowCalculator(false)}
           lotPrice={parseFloat(lot.price || '0')}
           lotName={lot.nameOrNumber || 'Lot'}
+        />
+      )}
+
+      {/* Booking Confirmation Dialog */}
+      {confirmationDetails && (
+        <BookingConfirmationDialog
+          isOpen={showConfirmationDialog}
+          onClose={() => setShowConfirmationDialog(false)}
+          showingDetails={confirmationDetails}
         />
       )}
     </div>

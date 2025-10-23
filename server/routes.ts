@@ -3096,6 +3096,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/parks/:id', authenticateToken, requireParkAccess, async (req, res) => {
     try {
       const updates = insertParkSchema.partial().parse(req.body);
+      
+      // Check if lotRent is being updated
+      if (updates.lotRent !== undefined) {
+        // Update all lots in this park with the new lot rent
+        await storage.updateLotRentForPark(req.params.id, updates.lotRent as any);
+      }
+      
       // Schema already transforms amenity objects to JSON strings
       const park = await storage.updatePark(req.params.id, updates);
       

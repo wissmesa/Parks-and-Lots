@@ -98,6 +98,7 @@ export interface IStorage {
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: string, updates: Partial<InsertLot>): Promise<Lot>;
   deleteLot(id: string): Promise<void>;
+  updateLotRentForPark(parkId: string, lotRent: string): Promise<void>;
   
   // Special Status operations
   getSpecialStatuses(parkId: string, includeInactive?: boolean): Promise<SpecialStatus[]>;
@@ -466,6 +467,7 @@ export class DatabaseStorage implements IStorage {
       description: row.parks.description,
       meetingPlace: row.parks.meetingPlace,
       amenities: row.parks.amenities,
+      lotRent: row.parks.lotRent,
       isActive: row.parks.isActive,
       createdAt: row.parks.createdAt,
       company: {
@@ -846,6 +848,12 @@ export class DatabaseStorage implements IStorage {
   async updateLot(id: string, updates: Partial<InsertLot>): Promise<Lot> {
     const [lot] = await db.update(lots).set(updates).where(eq(lots.id, id)).returning();
     return lot;
+  }
+
+  async updateLotRentForPark(parkId: string, lotRent: string): Promise<void> {
+    await db.update(lots)
+      .set({ lotRent })
+      .where(eq(lots.parkId, parkId));
   }
 
   async deleteLot(id: string): Promise<void> {
@@ -1641,6 +1649,7 @@ export class DatabaseStorage implements IStorage {
       description: row.parks.description,
       meetingPlace: row.parks.meetingPlace,
       amenities: row.parks.amenities,
+      lotRent: row.parks.lotRent,
       isActive: row.parks.isActive,
       createdAt: row.parks.createdAt,
       company: {

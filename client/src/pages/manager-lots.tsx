@@ -280,6 +280,28 @@ export default function ManagerLots() {
     }
   }, [user]);
 
+  // Pre-fill lot rent from park when parkId changes (only for new lots)
+  useEffect(() => {
+    if (formData.parkId && !editingLot) {
+      const fetchParkDetails = async () => {
+        try {
+          const response = await fetch(`/api/parks/${formData.parkId}`, {
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const park = await response.json();
+            if (park?.lotRent) {
+              setFormData(prev => ({ ...prev, lotRent: park.lotRent || "" }));
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch park details:', error);
+        }
+      };
+      fetchParkDetails();
+    }
+  }, [formData.parkId, editingLot]);
+
   const isCompanyManager = user?.role === 'ADMIN';
 
   // Fetch manager assignments (parks)
