@@ -491,16 +491,39 @@ export default function AdminLots() {
         description: data.description?.trim() || null,
         isActive: true
       };
-      return apiRequest("POST", "/api/lots", payload);
+      const response = await apiRequest("POST", "/api/lots", payload);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       setIsCreateModalOpen(false);
       resetForm();
-      toast({
-        title: "Success",
-        description: "Lot created successfully",
-      });
+      
+      // Handle Google Sheets export status
+      if (data.sheetsExportSuccess) {
+        toast({
+          title: "Success",
+          description: "Lot created and exported to Google Sheets successfully!",
+        });
+      } else if (data.sheetsExportError) {
+        // Show success for lot creation
+        toast({
+          title: "Success",
+          description: "Lot created successfully",
+        });
+        // Show separate warning for export failure
+        toast({
+          title: "Google Sheets Export",
+          description: `Lot was created successfully, but it has not been exported to Google Sheets. Please verify the Google Sheets connection and the linked spreadsheet ID. ${data.sheetsExportError}`,
+          variant: "destructive",
+        });
+      } else {
+        // No export attempted, just show success
+        toast({
+          title: "Success",
+          description: "Lot created successfully",
+        });
+      }
     },
     onError: () => {
       toast({

@@ -522,8 +522,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to send lot creation notification email:', emailError);
       }
       
-      res.status(201).json(lot);
-    } catch (error) {
+      // Attempt to export to Google Sheets (don't fail the request if export fails)
+      let sheetsExportSuccess = false;
+      let sheetsExportError: string | null = null;
+      let spreadsheetUrl: string | null = null;
+      
+      try {
+        const userId = req.user!.id;
+        // Check if user has Google Sheets connected
+        const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
+        
+        if (!oauthAccount) {
+          sheetsExportError = 'Please connect your Google account in settings.';
+        } else if (!oauthAccount.spreadsheetId) {
+          sheetsExportError = 'Please link a spreadsheet in settings.';
+        } else {
+          // Prepare lot data with park information
+          const lotWithPark = {
+            ...lot,
+            park: park
+          };
+          
+          const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
+          sheetsExportSuccess = true;
+          spreadsheetUrl = exportResult.spreadsheetUrl;
+        }
+      } catch (exportError: unknown) {
+        console.error('Failed to export lot to Google Sheets:', exportError);
+        sheetsExportError = exportError instanceof Error ? exportError.message : 'Unknown export error';
+      }
+      
+      res.status(201).json({
+        ...lot,
+        sheetsExportSuccess,
+        sheetsExportError,
+        spreadsheetUrl
+      });
+    } catch (error: unknown) {
       console.error('Create lot error:', error);
       if (error instanceof Error) {
         console.error('Error details:', error.message);
@@ -1314,8 +1349,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to send lot creation notification email:', emailError);
       }
       
-      res.status(201).json(lot);
-    } catch (error) {
+      // Attempt to export to Google Sheets (don't fail the request if export fails)
+      let sheetsExportSuccess = false;
+      let sheetsExportError: string | null = null;
+      let spreadsheetUrl: string | null = null;
+      
+      try {
+        const userId = req.user!.id;
+        // Check if user has Google Sheets connected
+        const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
+        
+        if (!oauthAccount) {
+          sheetsExportError = 'Please connect your Google account in settings.';
+        } else if (!oauthAccount.spreadsheetId) {
+          sheetsExportError = 'Please link a spreadsheet in settings.';
+        } else {
+          // Prepare lot data with park information
+          const lotWithPark = {
+            ...lot,
+            park: park
+          };
+          
+          const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
+          sheetsExportSuccess = true;
+          spreadsheetUrl = exportResult.spreadsheetUrl;
+        }
+      } catch (exportError: unknown) {
+        console.error('Failed to export lot to Google Sheets:', exportError);
+        sheetsExportError = exportError instanceof Error ? exportError.message : 'Unknown export error';
+      }
+      
+      res.status(201).json({
+        ...lot,
+        sheetsExportSuccess,
+        sheetsExportError,
+        spreadsheetUrl
+      });
+    } catch (error: unknown) {
       console.error('Create lot error:', error);
       if (error instanceof Error) {
         console.error('Error details:', error.message);
@@ -4051,8 +4121,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get park name for notification if parkId exists
       let parkName: string | undefined;
+      let park: any = undefined;
       if (lot.parkId) {
-        const park = await storage.getPark(lot.parkId);
+        park = await storage.getPark(lot.parkId);
         parkName = park?.name;
       }
       
@@ -4074,8 +4145,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to send lot creation notification email:', emailError);
       }
       
-      res.status(201).json(lot);
-    } catch (error) {
+      // Attempt to export to Google Sheets (don't fail the request if export fails)
+      let sheetsExportSuccess = false;
+      let sheetsExportError: string | null = null;
+      let spreadsheetUrl: string | null = null;
+      
+      try {
+        const userId = req.user?.id;
+        if (userId) {
+          // Check if user has Google Sheets connected
+          const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
+          
+          if (!oauthAccount) {
+            sheetsExportError = 'Please connect your Google account in settings.';
+          } else if (!oauthAccount.spreadsheetId) {
+            sheetsExportError = 'Please link a spreadsheet in settings.';
+          } else {
+            // Prepare lot data with park information
+            const lotWithPark = {
+              ...lot,
+              park: park
+            };
+            
+            const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
+            sheetsExportSuccess = true;
+            spreadsheetUrl = exportResult.spreadsheetUrl;
+          }
+        }
+      } catch (exportError) {
+        console.error('Failed to export lot to Google Sheets:', exportError);
+        sheetsExportError = exportError instanceof Error ? exportError.message : 'Unknown export error';
+      }
+      
+      res.status(201).json({
+        ...lot,
+        sheetsExportSuccess,
+        sheetsExportError,
+        spreadsheetUrl
+      });
+    } catch (error: unknown) {
       console.error('Create lot error:', error);
       res.status(400).json({ message: 'Invalid lot data' });
     }

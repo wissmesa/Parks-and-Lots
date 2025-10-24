@@ -236,10 +236,33 @@ export function CreateLotFromFacebookDialog({
       queryClient.invalidateQueries({ queryKey: ['/api/company-manager/lots'] });
       setCreatedLotId(data.id);
       setCreatedLotName(formData.nameOrNumber);
-      toast({
-        title: 'Success',
-        description: 'Lot created successfully',
-      });
+      
+      // Handle Google Sheets export status
+      if (data.sheetsExportSuccess) {
+        toast({
+          title: 'Success',
+          description: 'Lot created and exported to Google Sheets successfully!',
+        });
+      } else if (data.sheetsExportError) {
+        // Show success for lot creation
+        toast({
+          title: 'Success',
+          description: 'Lot created successfully',
+        });
+        // Show separate warning for export failure
+        toast({
+          title: 'Google Sheets Export',
+          description: `Lot was created successfully, but it has not been exported to Google Sheets. Please verify the Google Sheets connection and the linked spreadsheet ID. ${data.sheetsExportError}`,
+          variant: 'destructive',
+        });
+      } else {
+        // No export attempted, just show success
+        toast({
+          title: 'Success',
+          description: 'Lot created successfully',
+        });
+      }
+      
       setStep('export');
     },
     onError: (error: any) => {

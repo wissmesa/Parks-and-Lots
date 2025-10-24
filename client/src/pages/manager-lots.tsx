@@ -393,11 +393,7 @@ export default function ManagerLots() {
       const response = await apiRequest("POST", endpoint, processedData);
       return response.json();
     },
-    onSuccess: () => {
-      toast({
-        title: "Lot Created",
-        description: "New lot has been created successfully.",
-      });
+    onSuccess: (data) => {
       setIsCreateModalOpen(false);
       setFormData({
         nameOrNumber: '',
@@ -429,6 +425,32 @@ export default function ManagerLots() {
         parkId: ''
       });
       queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
+      
+      // Handle Google Sheets export status
+      if (data.sheetsExportSuccess) {
+        toast({
+          title: "Lot Created",
+          description: "Lot created and exported to Google Sheets successfully!",
+        });
+      } else if (data.sheetsExportError) {
+        // Show success for lot creation
+        toast({
+          title: "Lot Created",
+          description: "New lot has been created successfully.",
+        });
+        // Show separate warning for export failure
+        toast({
+          title: "Google Sheets Export",
+          description: `Lot was created successfully, but it has not been exported to Google Sheets. Please verify the Google Sheets connection and the linked spreadsheet ID. ${data.sheetsExportError}`,
+          variant: "destructive",
+        });
+      } else {
+        // No export attempted, just show success
+        toast({
+          title: "Lot Created",
+          description: "New lot has been created successfully.",
+        });
+      }
     },
     onError: (error) => {
       toast({
