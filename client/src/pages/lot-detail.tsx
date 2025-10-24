@@ -736,7 +736,7 @@ export default function LotDetail() {
         <LotCalculator
           isOpen={showCalculator}
           onClose={() => setShowCalculator(false)}
-          lotPrice={parseFloat(lot.price || '0')}
+          lotPrice={parseFloat(lot.priceForSale || '0')}
           lotName={lot.nameOrNumber || 'Lot'}
         />
       )}

@@ -2936,7 +2936,7 @@ export default function AdminLots() {
           <LotCalculator
             isOpen={!!showCalculator}
             onClose={() => setShowCalculator(null)}
-            lotPrice={parseFloat(lotsList.find(l => l.id === showCalculator)?.price || '0')}
+            lotPrice={parseFloat(lotsList.find(l => l.id === showCalculator)?.priceForSale || '0')}
             lotName={lotsList.find(l => l.id === showCalculator)?.nameOrNumber || 'Lot'}
           />
         )}

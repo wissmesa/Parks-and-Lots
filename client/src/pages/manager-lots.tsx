@@ -2819,7 +2819,7 @@ export default function ManagerLots() {
             <LotCalculator
               isOpen={!!showCalculator}
               onClose={() => setShowCalculator(null)}
-              lotPrice={parseFloat(lots?.find(l => l.id === showCalculator)?.price || '0')}
+              lotPrice={parseFloat(lots?.find(l => l.id === showCalculator)?.priceForSale || '0')}
               lotName={lots?.find(l => l.id === showCalculator)?.nameOrNumber || 'Lot'}
             />
           )}
