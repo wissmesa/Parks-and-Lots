@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import { MapPin } from "lucide-react";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -31,11 +30,12 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <MapPin className="text-primary-foreground h-4 w-4" />
-              </div>
-              <span className="text-xl font-bold text-foreground">MHP Sales Manager</span>
+            <Link href="/" className="flex items-center">
+              <img 
+                src="/logos/MHP.svg" 
+                alt="MHP Sales Manager" 
+                className="h-60 w-auto object-contain"
+              />
             </Link>
           </div>
           
@@ -52,7 +52,7 @@ export function Navigation() {
                       size="sm" 
                       className={isOnAdminPage ? "hidden md:inline-flex" : ""}
                     >
-                      MHP Lord Panel
+                      Lord Panel
                     </Button>
                   </Link>
                 )}

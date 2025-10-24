@@ -74,7 +74,7 @@ export function ParkCard({ park, showBookingLink = true }: ParkCardProps) {
           </div>
           {showBookingLink && (
             <Link href={`/parks/${park.id}`}>
-              <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" data-testid={`link-park-details-${park.id}`}>
+              <Button variant="ghost" size="sm" className="text-primary hover:bg-accent hover:text-accent-foreground" data-testid={`link-park-details-${park.id}`}>
                 View Details <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>

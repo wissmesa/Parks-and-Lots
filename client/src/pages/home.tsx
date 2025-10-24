@@ -141,7 +141,7 @@ export default function Home() {
                         Available lots
                       </div>
                       <Link href={`/parks/${park.id}`}>
-                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
+                        <Button variant="ghost" size="sm" className="text-primary hover:bg-accent hover:text-accent-foreground">
                           View Details <ArrowRight className="w-4 h-4 ml-1" />
                         </Button>
                       </Link>

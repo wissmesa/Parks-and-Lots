@@ -51,11 +51,12 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2">
-            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-              <MapPin className="text-primary-foreground h-6 w-6" />
-            </div>
-            <span className="text-2xl font-bold text-foreground">Parks & Lots</span>
+          <Link href="/" className="inline-flex items-center justify-center">
+            <img 
+              src="/logos/MHP (1) short.png" 
+              alt="MHP Sales Manager" 
+              className="h-12 w-auto object-contain"
+            />
           </Link>
         </div>
 

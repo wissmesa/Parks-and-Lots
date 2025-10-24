@@ -50,10 +50,12 @@ export function AdminSidebar() {
   const SidebarContent = ({ isMobile = false }) => (
     <div className="p-6 h-full flex flex-col">
       <div className="flex items-center space-x-2 mb-8">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-          <Shield className="text-primary-foreground w-4 h-4" />
-        </div>
-        <span className="font-bold text-foreground">MHP Lord Panel</span>
+        <img 
+          src="/logos/icon.png" 
+          alt="Icon" 
+          className="w-12 h-12 object-contain"
+        />
+        <span className="font-bold text-foreground">Lord Panel</span>
       </div>
       
       <nav className="space-y-2 flex-1">

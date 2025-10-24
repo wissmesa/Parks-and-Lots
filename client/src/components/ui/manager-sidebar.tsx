@@ -54,9 +54,11 @@ export function ManagerSidebar() {
   const SidebarContent = ({ isMobile = false }) => (
     <div className="p-6 h-full flex flex-col">
       <div className="flex items-center space-x-2 mb-8">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-          <UserCog className="text-primary-foreground w-4 h-4" />
-        </div>
+        <img 
+          src="/logos/icon.png" 
+          alt="Icon" 
+          className="w-12 h-12 object-contain"
+        />
         <span className="font-bold text-foreground">
           {isCompanyManager ? "Admin Panel" : "Manager Panel"}
         </span>
