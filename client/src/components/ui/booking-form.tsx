@@ -334,7 +334,7 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess, parkNa
                 validateField('clientEmail', e.target.value);
               }}
               onBlur={(e) => validateField('clientEmail', e.target.value)}
-              placeholder="your@email.com"
+              placeholder="JohnDoe@email.com"
               data-testid="input-client-email"
               className={validationErrors.clientEmail ? 'border-red-500' : ''}
             />
@@ -396,6 +396,14 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess, parkNa
           <div>
             <Label>Reminder Preference</Label>
             <div className="grid grid-cols-3 gap-2 mt-2">
+            <Button
+                type="button"
+                variant={reminderPreference === "BOTH" ? "default" : "outline"}
+                onClick={() => setReminderPreference("BOTH")}
+                className="w-full"
+              >
+                Both
+              </Button>
               <Button
                 type="button"
                 variant={reminderPreference === "SMS" ? "default" : "outline"}
@@ -411,14 +419,6 @@ export function BookingForm({ lotId, selectedSlot, onSlotUsed, onSuccess, parkNa
                 className="w-full"
               >
                 Email
-              </Button>
-              <Button
-                type="button"
-                variant={reminderPreference === "BOTH" ? "default" : "outline"}
-                onClick={() => setReminderPreference("BOTH")}
-                className="w-full"
-              >
-                Both
               </Button>
             </div>
           </div>
