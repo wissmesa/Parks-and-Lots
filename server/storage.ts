@@ -359,7 +359,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCompany(id: string, updates: Partial<InsertCompany>): Promise<Company> {
-    const [company] = await db.update(companies).set(updates).where(eq(companies.id, id)).returning();
+    const [company] = await db.update(companies).set({ ...updates, updatedAt: new Date() }).where(eq(companies.id, id)).returning();
     return company;
   }
 
@@ -520,7 +520,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePark(id: string, updates: Partial<InsertPark>): Promise<Park> {
-    const [park] = await db.update(parks).set(updates).where(eq(parks.id, id)).returning();
+    const [park] = await db.update(parks).set({ ...updates, updatedAt: new Date() }).where(eq(parks.id, id)).returning();
     return park;
   }
 
@@ -846,13 +846,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateLot(id: string, updates: Partial<InsertLot>): Promise<Lot> {
-    const [lot] = await db.update(lots).set(updates).where(eq(lots.id, id)).returning();
+    const [lot] = await db.update(lots).set({ ...updates, updatedAt: new Date() }).where(eq(lots.id, id)).returning();
     return lot;
   }
 
   async updateLotRentForPark(parkId: string, lotRent: string): Promise<void> {
     await db.update(lots)
-      .set({ lotRent })
+      .set({ lotRent, updatedAt: new Date() })
       .where(eq(lots.parkId, parkId));
   }
 
@@ -1337,7 +1337,7 @@ export class DatabaseStorage implements IStorage {
   async deleteSpecialStatus(id: string): Promise<void> {
     // First, remove special status from any lots that are using it
     await db.update(lots)
-      .set({ specialStatusId: null })
+      .set({ specialStatusId: null, updatedAt: new Date() })
       .where(eq(lots.specialStatusId, id));
     
     // Then delete the special status

@@ -98,6 +98,7 @@ export const companies = pgTable("companies", {
   email: varchar("email"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Parks table
@@ -115,6 +116,7 @@ export const parks = pgTable("parks", {
   lotRent: decimal("lot_rent", { precision: 10, scale: 2 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Manager assignments (many-to-many)
@@ -183,6 +185,8 @@ export const lots = pgTable("lots", {
   specialStatusId: varchar("special_status_id").references(() => specialStatuses.id),
   facebookPostId: varchar("facebook_post_id"),
   isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Photos table
@@ -696,6 +700,7 @@ export const insertCompanySchema = createInsertSchema(companies, {
 }).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertParkSchema = createInsertSchema(parks, {
@@ -719,6 +724,7 @@ export const insertParkSchema = createInsertSchema(parks, {
 }).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertLotSchema = createInsertSchema(lots, {
@@ -733,6 +739,8 @@ export const insertLotSchema = createInsertSchema(lots, {
   ]).optional().nullable(),
 }).omit({
   id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertShowingSchema = createInsertSchema(showings).omit({
