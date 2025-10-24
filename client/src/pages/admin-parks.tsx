@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActivityTab } from "@/components/ui/activity-tab";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,7 @@ interface Park {
   companyId: string;
   lotRent?: string;
   createdAt: string;
+  updatedAt: string;
   amenities?: AmenityType[];
   company?: {
     name: string;
@@ -301,6 +304,10 @@ export default function AdminParks() {
       // Invalidate lots queries for real-time updates when lot rent changes
       await queryClient.refetchQueries({ queryKey: ["/api/lots"] });
       await queryClient.refetchQueries({ queryKey: ["/api/company-manager/lots"] });
+      // Invalidate audit logs for real-time updates
+      if (editingPark?.id) {
+        queryClient.invalidateQueries({ queryKey: ['audit-logs', 'PARK', editingPark.id] });
+      }
       setEditingPark(null);
       resetForm();
       toast({
@@ -1144,11 +1151,17 @@ export default function AdminParks() {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingPark} onOpenChange={(open) => !open && setEditingPark(null)}>
-          <DialogContent className="max-w-3xl mx-4 max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Edit Park</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <Tabs defaultValue="details" className="flex-1 overflow-hidden">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="overflow-y-auto max-h-[calc(90vh-12rem)]">
+                <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="edit-name">Park Name</Label>
                 <Input
@@ -1386,6 +1399,18 @@ export default function AdminParks() {
                 </Button>
               </div>
             </form>
+          </TabsContent>
+          <TabsContent value="activity" className="overflow-y-auto max-h-[calc(90vh-12rem)]">
+            {editingPark && (
+              <ActivityTab
+                entityType="PARK"
+                entityId={editingPark.id}
+                createdAt={editingPark.createdAt}
+                updatedAt={editingPark.updatedAt}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
           </DialogContent>
         </Dialog>
 

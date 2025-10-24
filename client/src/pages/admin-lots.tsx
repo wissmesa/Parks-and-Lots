@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActivityTab } from "@/components/ui/activity-tab";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -54,9 +56,13 @@ interface Lot {
   sqFt: number | null;
   houseManufacturer?: string | null;
   houseModel?: string | null;
+  facebookAdStatus?: 'ADS_ON' | 'ADS_OFF' | null;
+  facebookPublishedDate?: string | null;
+  facebookPublishedUntil?: string | null;
   isActive: boolean;
   parkId: string;
   createdAt: string;
+  updatedAt: string;
   specialStatusId?: string | null;
   park?: {
     name: string;
@@ -126,6 +132,9 @@ export default function AdminLots() {
     sqFt: 0,
     houseManufacturer: "",
     houseModel: "",
+    facebookAdStatus: "",
+    facebookPublishedDate: "",
+    facebookPublishedUntil: "",
     parkId: ""
   });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
@@ -489,6 +498,9 @@ export default function AdminLots() {
         houseManufacturer: data.houseManufacturer?.trim() || null,
         houseModel: data.houseModel?.trim() || null,
         description: data.description?.trim() || null,
+        facebookAdStatus: data.facebookAdStatus || null,
+        facebookPublishedDate: data.facebookPublishedDate || null,
+        facebookPublishedUntil: data.facebookPublishedUntil || null,
         isActive: true
       };
       const response = await apiRequest("POST", "/api/lots", payload);
@@ -579,11 +591,18 @@ export default function AdminLots() {
       if (data.availableDate !== undefined) payload.availableDate = data.availableDate || null;
       if (data.mobileHomeYear !== undefined) payload.mobileHomeYear = data.mobileHomeYear ? parseInt(data.mobileHomeYear) : null;
       if (data.mobileHomeSize !== undefined) payload.mobileHomeSize = data.mobileHomeSize?.trim() || null;
+      if (data.facebookAdStatus !== undefined) payload.facebookAdStatus = data.facebookAdStatus || null;
+      if (data.facebookPublishedDate !== undefined) payload.facebookPublishedDate = data.facebookPublishedDate || null;
+      if (data.facebookPublishedUntil !== undefined) payload.facebookPublishedUntil = data.facebookPublishedUntil || null;
       const response = await apiRequest("PATCH", `/api/lots/${editingLot?.id}`, payload);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedLot) => {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      // Invalidate audit logs for real-time updates
+      if (editingLot?.id) {
+        queryClient.invalidateQueries({ queryKey: ['audit-logs', 'LOT', editingLot.id] });
+      }
       setEditingLot(null);
       resetForm();
       toast({
@@ -715,6 +734,9 @@ export default function AdminLots() {
       sqFt: 0,
       houseManufacturer: "",
       houseModel: "",
+      facebookAdStatus: "",
+      facebookPublishedDate: "",
+      facebookPublishedUntil: "",
       parkId: ""
     });
   };
@@ -748,6 +770,9 @@ export default function AdminLots() {
       sqFt: lot.sqFt || 0,
       houseManufacturer: lot.houseManufacturer || "",
       houseModel: lot.houseModel || "",
+      facebookAdStatus: lot.facebookAdStatus || "",
+      facebookPublishedDate: lot.facebookPublishedDate ? lot.facebookPublishedDate.split('T')[0] : "",
+      facebookPublishedUntil: lot.facebookPublishedUntil ? lot.facebookPublishedUntil.split('T')[0] : "",
       parkId: lot.parkId
     });
   };
@@ -1500,6 +1525,48 @@ export default function AdminLots() {
                       onChange={(e) => setFormData(prev => ({ ...prev, showingLink: e.target.value }))}
                       placeholder="https://example.com/showing-link"
                     />
+                  </div>
+
+                  {/* Facebook Advertising Section */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <h3 className="text-md font-medium">Facebook Advertising (Optional)</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="facebookAdStatus">Facebook Ad Status</Label>
+                        <Select value={formData.facebookAdStatus || undefined} onValueChange={(value) => setFormData(prev => ({ ...prev, facebookAdStatus: value === "NONE" ? "" : value }))}>
+                          <SelectTrigger id="facebookAdStatus" className="mt-1">
+                            <SelectValue placeholder="Select status (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NONE">None</SelectItem>
+                            <SelectItem value="ADS_ON">Ads On</SelectItem>
+                            <SelectItem value="ADS_OFF">Ads Off</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="facebookPublishedDate">Published on Facebook Date</Label>
+                        <Input
+                          id="facebookPublishedDate"
+                          type="date"
+                          value={formData.facebookPublishedDate}
+                          onChange={(e) => setFormData(prev => ({ ...prev, facebookPublishedDate: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="facebookPublishedUntil">Published on Facebook Until</Label>
+                        <Input
+                          id="facebookPublishedUntil"
+                          type="date"
+                          value={formData.facebookPublishedUntil}
+                          onChange={(e) => setFormData(prev => ({ ...prev, facebookPublishedUntil: e.target.value }))}
+                          className="mt-1"
+                          placeholder="Optional"
+                        />
+                      </div>
+                    </div>
                   </div>
                   
                   <div className="flex space-x-3">
@@ -2278,14 +2345,20 @@ export default function AdminLots() {
             resetForm();
           }
         }}>
-          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">Edit Lot {editingLot?.nameOrNumber}</DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 Update lot information and pricing details
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <Tabs defaultValue="details" className="flex-1 overflow-hidden">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="overflow-y-auto max-h-[calc(90vh-14rem)]">
+                <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Information Section */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium border-b pb-2">Basic Information</h3>
@@ -2710,6 +2783,48 @@ export default function AdminLots() {
                 </div>
               </div>
 
+              {/* Facebook Advertising Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium border-b pb-2">Facebook Advertising (Optional)</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="edit-facebookAdStatus">Facebook Ad Status</Label>
+                    <Select value={formData.facebookAdStatus || undefined} onValueChange={(value) => setFormData(prev => ({ ...prev, facebookAdStatus: value === "NONE" ? "" : value }))}>
+                      <SelectTrigger id="edit-facebookAdStatus" className="mt-1">
+                        <SelectValue placeholder="Select status (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">None</SelectItem>
+                        <SelectItem value="ADS_ON">Ads On</SelectItem>
+                        <SelectItem value="ADS_OFF">Ads Off</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-facebookPublishedDate">Published on Facebook Date</Label>
+                    <Input
+                      id="edit-facebookPublishedDate"
+                      type="date"
+                      value={formData.facebookPublishedDate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, facebookPublishedDate: e.target.value }))}
+                      className="mt-1"
+                      placeholder="Optional"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-facebookPublishedUntil">Published on Facebook Until</Label>
+                    <Input
+                      id="edit-facebookPublishedUntil"
+                      type="date"
+                      value={formData.facebookPublishedUntil}
+                      onChange={(e) => setFormData(prev => ({ ...prev, facebookPublishedUntil: e.target.value }))}
+                      className="mt-1"
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setEditingLot(null)} className="order-2 sm:order-1">
@@ -2720,6 +2835,18 @@ export default function AdminLots() {
                 </Button>
               </div>
             </form>
+          </TabsContent>
+          <TabsContent value="activity" className="overflow-y-auto max-h-[calc(90vh-14rem)]">
+            {editingLot && (
+              <ActivityTab
+                entityType="LOT"
+                entityId={editingLot.id}
+                createdAt={editingLot.createdAt}
+                updatedAt={editingLot.updatedAt}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
           </DialogContent>
         </Dialog>
 

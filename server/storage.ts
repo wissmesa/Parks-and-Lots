@@ -21,6 +21,7 @@ import {
   crmActivities,
   crmMessages,
   crmAssociations,
+  auditLogs,
   type User, 
   type InsertUser,
   type Company,
@@ -61,7 +62,8 @@ import {
   type CrmMessage,
   type InsertCrmMessage,
   type CrmAssociation,
-  type InsertCrmAssociation
+  type InsertCrmAssociation,
+  type AuditLog
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -144,6 +146,9 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getAllManagerAssignments(): Promise<any[]>;
   removeManagerAssignments(userId: string): Promise<void>;
+  
+  // Audit Log operations
+  getAuditLogs(entityType: string, entityId: string, limit?: number): Promise<any[]>;
   
   // Missing method declarations
   getLotsWithParkInfo(filters?: { parkId?: string; status?: string; minPrice?: number; maxPrice?: number; bedrooms?: number; bathrooms?: number; state?: string; q?: string; includeInactive?: boolean }): Promise<any[]>;
@@ -470,6 +475,7 @@ export class DatabaseStorage implements IStorage {
       lotRent: row.parks.lotRent,
       isActive: row.parks.isActive,
       createdAt: row.parks.createdAt,
+      updatedAt: row.parks.updatedAt,
       company: {
         name: row.companies.name
       }
@@ -630,9 +636,14 @@ export class DatabaseStorage implements IStorage {
       houseManufacturer: lots.houseManufacturer,
       houseModel: lots.houseModel,
       facebookPostId: lots.facebookPostId,
+      facebookAdStatus: lots.facebookAdStatus,
+      facebookPublishedDate: lots.facebookPublishedDate,
+      facebookPublishedUntil: lots.facebookPublishedUntil,
       isActive: lots.isActive,
       parkId: lots.parkId,
       specialStatusId: lots.specialStatusId,
+      createdAt: lots.createdAt,
+      updatedAt: lots.updatedAt,
       park: {
         id: parks.id,
         name: parks.name,
@@ -892,6 +903,18 @@ export class DatabaseStorage implements IStorage {
     
     // Finally, delete the lot itself
     await db.delete(lots).where(eq(lots.id, id));
+  }
+
+  async getAuditLogs(entityType: string, entityId: string, limit: number = 100): Promise<AuditLog[]> {
+    return await db
+      .select()
+      .from(auditLogs)
+      .where(and(
+        eq(auditLogs.entityType, entityType),
+        eq(auditLogs.entityId, entityId)
+      ))
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
   }
 
   async getShowings(filters?: { lotId?: string; managerId?: string; status?: string }): Promise<any[]> {
@@ -1652,6 +1675,7 @@ export class DatabaseStorage implements IStorage {
       lotRent: row.parks.lotRent,
       isActive: row.parks.isActive,
       createdAt: row.parks.createdAt,
+      updatedAt: row.parks.updatedAt,
       company: {
         name: row.companies.name
       }
@@ -1693,6 +1717,8 @@ export class DatabaseStorage implements IStorage {
       specialStatusId: lots.specialStatusId,
       facebookPostId: lots.facebookPostId,
       isActive: lots.isActive,
+      createdAt: lots.createdAt,
+      updatedAt: lots.updatedAt,
       park: {
         id: parks.id,
         name: parks.name,

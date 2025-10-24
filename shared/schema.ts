@@ -26,6 +26,7 @@ export const availabilityRuleEnum = pgEnum('availability_rule', ['OPEN_SLOT', 'B
 export const tenantStatusEnum = pgEnum('tenant_status', ['ACTIVE', 'INACTIVE', 'PENDING', 'TERMINATED']);
 export const paymentStatusEnum = pgEnum('payment_status', ['PENDING', 'PAID', 'OVERDUE', 'PARTIAL']);
 export const paymentTypeEnum = pgEnum('payment_type', ['RENT', 'DEPOSIT', 'LATE_FEE', 'MAINTENANCE', 'UTILITY', 'OTHER']);
+export const facebookAdStatusEnum = pgEnum('facebook_ad_status', ['ADS_ON', 'ADS_OFF']);
 
 // CRM Enums
 export const dealStageEnum = pgEnum('deal_stage', [
@@ -184,6 +185,9 @@ export const lots = pgTable("lots", {
   houseModel: varchar("house_model"),
   specialStatusId: varchar("special_status_id").references(() => specialStatuses.id),
   facebookPostId: varchar("facebook_post_id"),
+  facebookAdStatus: facebookAdStatusEnum("facebook_ad_status"),
+  facebookPublishedDate: timestamp("facebook_published_date"),
+  facebookPublishedUntil: timestamp("facebook_published_until"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -438,6 +442,26 @@ export const crmAssociations = pgTable("crm_associations", {
   targetIdx: index("crm_associations_target_idx").on(table.targetType, table.targetId),
   companyIdx: index("crm_associations_company_idx").on(table.companyId),
   uniqueAssoc: unique().on(table.sourceType, table.sourceId, table.targetType, table.targetId),
+}));
+
+// Audit Logs table
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'COMPANY', 'PARK', 'LOT'
+  entityId: varchar("entity_id").notNull(),
+  entityName: varchar("entity_name"), // Store entity name for easy display
+  action: varchar("action", { length: 50 }).notNull(), // 'CREATED', 'UPDATED', 'DELETED', 'STATUS_CHANGED'
+  fieldName: varchar("field_name"), // Specific field changed (for UPDATED actions)
+  oldValue: text("old_value"), // Previous value (JSON or string)
+  newValue: text("new_value"), // New value (JSON or string)
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  userName: varchar("user_name").notNull(), // Store name at time of change
+  userRole: varchar("user_role").notNull(), // Store role at time of change
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  entityIdx: index("audit_logs_entity_idx").on(table.entityType, table.entityId),
+  createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+  userIdx: index("audit_logs_user_idx").on(table.userId),
 }));
 
 // Relations
@@ -737,6 +761,24 @@ export const insertLotSchema = createInsertSchema(lots, {
     z.date(),
     z.null()
   ]).optional().nullable(),
+  facebookPublishedDate: z.union([
+    z.string().transform((val) => {
+      if (!val || val === '') return null;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    z.date(),
+    z.null()
+  ]).optional().nullable(),
+  facebookPublishedUntil: z.union([
+    z.string().transform((val) => {
+      if (!val || val === '') return null;
+      const date = new Date(val);
+      return isNaN(date.getTime()) ? null : date;
+    }),
+    z.date(),
+    z.null()
+  ]).optional().nullable(),
 }).omit({
   id: true,
   createdAt: true,
@@ -903,6 +945,11 @@ export const insertCrmAssociationSchema = createInsertSchema(crmAssociations).om
   createdAt: true,
 });
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -948,3 +995,7 @@ export type CrmMessage = typeof crmMessages.$inferSelect;
 export type InsertCrmMessage = z.infer<typeof insertCrmMessageSchema>;
 export type CrmAssociation = typeof crmAssociations.$inferSelect;
 export type InsertCrmAssociation = z.infer<typeof insertCrmAssociationSchema>;
+
+// Audit Log Types
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;

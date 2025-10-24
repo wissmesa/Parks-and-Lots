@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActivityTab } from "@/components/ui/activity-tab";
 import { apiRequest } from "@/lib/queryClient";
 import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle, List, Grid3X3, UserCheck } from "lucide-react";
 import { validateEmail, validatePhone } from "@/lib/validation";
@@ -29,6 +31,7 @@ interface Company {
   email?: string;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface Park {
@@ -174,6 +177,11 @@ export default function AdminCompanies() {
       
       // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      
+      // Invalidate audit logs for real-time updates
+      if (editingCompany?.id) {
+        queryClient.invalidateQueries({ queryKey: ['audit-logs', 'COMPANY', editingCompany.id] });
+      }
       
       setEditingCompany(null);
       resetForm();
@@ -768,11 +776,17 @@ export default function AdminCompanies() {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingCompany} onOpenChange={(open) => !open && setEditingCompany(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Edit Company</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <Tabs defaultValue="details" className="flex-1 overflow-hidden">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="details">Details</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="overflow-y-auto max-h-[calc(90vh-12rem)]">
+                <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="edit-name">Company Name</Label>
                 <Input
@@ -879,6 +893,18 @@ export default function AdminCompanies() {
                 </Button>
               </div>
             </form>
+          </TabsContent>
+          <TabsContent value="activity" className="overflow-y-auto max-h-[calc(90vh-12rem)]">
+            {editingCompany && (
+              <ActivityTab
+                entityType="COMPANY"
+                entityId={editingCompany.id}
+                createdAt={editingCompany.createdAt}
+                updatedAt={editingCompany.updatedAt}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
           </DialogContent>
         </Dialog>
 

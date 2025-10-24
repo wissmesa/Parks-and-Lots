@@ -28,6 +28,7 @@ import { googleSheetsService } from "./google-sheets";
 import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
 import { sendLotCreationNotification, sendLotReactivationNotification } from "./email";
+import { logCreation, logAuditEntries, compareObjects } from "./audit";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -2894,6 +2895,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Audit Logs routes
+  app.get('/api/audit-logs/:entityType/:entityId', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const { limit } = req.query;
+      
+      const auditLogs = await storage.getAuditLogs(
+        entityType.toUpperCase(),
+        entityId,
+        limit ? parseInt(limit as string) : 100
+      );
+      
+      res.json(auditLogs);
+    } catch (error) {
+      console.error('Get audit logs error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // Company routes
   app.get('/api/companies', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
@@ -2906,10 +2926,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+  app.post('/api/companies', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
       const parsed = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(parsed);
+      
+      // Log creation
+      if (req.user) {
+        await logCreation(
+          'COMPANY',
+          company.id,
+          company.name,
+          req.user.id,
+          req.user.fullName,
+          req.user.role
+        );
+      }
+      
       res.status(201).json(company);
     } catch (error) {
       console.error('Create company error:', error);
@@ -2930,10 +2963,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/companies/:id', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+  app.patch('/api/companies/:id', authenticateToken, requireRole('MHP_LORD'), async (req: AuthRequest, res) => {
     try {
+      // Get old company data before update
+      const oldCompany = await storage.getCompany(req.params.id);
+      
       const updates = insertCompanySchema.partial().parse(req.body);
       const company = await storage.updateCompany(req.params.id, updates);
+      
+      // Log changes
+      if (req.user && oldCompany) {
+        const auditEntries = compareObjects(
+          oldCompany,
+          company,
+          req.user.id,
+          req.user.fullName,
+          req.user.role,
+          'COMPANY',
+          company.id,
+          company.name
+        );
+        await logAuditEntries(auditEntries);
+      }
+      
       res.json(company);
     } catch (error) {
       console.error('Update company error:', error);
@@ -3212,6 +3264,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Log creation
+      if (req.user) {
+        await logCreation(
+          'PARK',
+          park.id,
+          park.name,
+          req.user.id,
+          req.user.fullName,
+          req.user.role
+        );
+      }
+      
       res.status(201).json(park);
     } catch (error) {
       console.error('Create park error:', error);
@@ -3219,8 +3283,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/parks/:id', authenticateToken, requireParkAccess, async (req, res) => {
+  app.patch('/api/parks/:id', authenticateToken, requireParkAccess, async (req: AuthRequest, res) => {
     try {
+      // Get old park data before update
+      const oldPark = await storage.getPark(req.params.id);
+      
       const updates = insertParkSchema.partial().parse(req.body);
       
       // Check if lotRent is being updated
@@ -3246,6 +3313,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return amenity;
           }
         });
+      }
+      
+      // Log changes
+      if (req.user && oldPark) {
+        const auditEntries = compareObjects(
+          oldPark,
+          park,
+          req.user.id,
+          req.user.fullName,
+          req.user.role,
+          'PARK',
+          park.id,
+          park.name
+        );
+        await logAuditEntries(auditEntries);
       }
       
       res.json(park);
@@ -4177,6 +4259,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sheetsExportError = exportError instanceof Error ? exportError.message : 'Unknown export error';
       }
       
+      // Log creation
+      if (req.user) {
+        await logCreation(
+          'LOT',
+          lot.id,
+          lot.nameOrNumber,
+          req.user.id,
+          req.user.fullName,
+          req.user.role
+        );
+      }
+      
       res.status(201).json({
         ...lot,
         sheetsExportSuccess,
@@ -4189,7 +4283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/lots/:id', authenticateToken, requireLotAccess, async (req, res) => {
+  app.patch('/api/lots/:id', authenticateToken, requireLotAccess, async (req: AuthRequest, res) => {
     try {
       console.log('=== ADMIN LOT UPDATE DEBUG ===');
       console.log('Lot ID:', req.params.id);
@@ -4231,6 +4325,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const lot = await storage.updateLot(req.params.id, validation.data);
       console.log('✅ Database update successful');
+      
+      // Log changes
+      if (req.user) {
+        const auditEntries = compareObjects(
+          currentLot,
+          lot,
+          req.user.id,
+          req.user.fullName,
+          req.user.role,
+          'LOT',
+          lot.id,
+          lot.nameOrNumber
+        );
+        await logAuditEntries(auditEntries);
+      }
       
       // Check if lot was reactivated (changed from inactive to active)
       console.log('🔍 [ADMIN] Reactivation check:', { 
