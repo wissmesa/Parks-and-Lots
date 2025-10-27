@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, DollarSign } from "lucide-react";
+import { Plus, DollarSign, Search } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AuthManager } from "@/lib/auth";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 
 interface Deal {
   id: string;
@@ -34,10 +36,99 @@ const DEAL_STAGES = [
   { value: "CLOSED_LOST", label: "Closed Lost" },
 ];
 
+// Draggable Deal Card Component
+function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: deal.id,
+    data: { deal },
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.5 : 1,
+      }
+    : undefined;
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+      <Card 
+        className="cursor-move hover:shadow-md transition-shadow"
+        onClick={onClick}
+      >
+        <CardHeader className="p-4">
+          <CardTitle className="text-base">{deal.title}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
+          {deal.value && (
+            <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
+              <DollarSign className="h-4 w-4" />
+              {parseFloat(deal.value).toLocaleString()}
+            </div>
+          )}
+          {deal.probability !== null && (
+            <div className="text-sm text-muted-foreground mt-2">
+              {deal.probability}% probability
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Droppable Stage Column Component
+function DroppableStageColumn({
+  stage,
+  deals,
+  onDealClick,
+}: {
+  stage: { value: string; label: string };
+  deals: Deal[];
+  onDealClick: (dealId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage.value,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-shrink-0 w-80 transition-colors ${
+        isOver ? "ring-2 ring-primary ring-offset-2" : ""
+      }`}
+    >
+      <div className="bg-muted/50 rounded-lg p-4 min-h-[200px]">
+        <h3 className="font-semibold mb-4">
+          {stage.label} ({deals.length})
+        </h3>
+        <div className="space-y-3">
+          {deals.map((deal) => (
+            <DraggableDealCard
+              key={deal.id}
+              deal={deal}
+              onClick={() => onDealClick(deal.id)}
+            />
+          ))}
+          {deals.length === 0 && (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              No deals
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmDeals() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("title-asc");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
   const [newDeal, setNewDeal] = useState({
     title: "",
     value: "",
@@ -90,7 +181,10 @@ export default function CrmDeals() {
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
       const res = await fetch(`/api/crm/deals/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
         credentials: "include",
         body: JSON.stringify({ stage }),
       });
@@ -99,15 +193,73 @@ export default function CrmDeals() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
-      toast({ title: "Success", description: "Deal updated successfully" });
+      toast({ title: "Success", description: "Deal stage updated successfully" });
     },
   });
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const deal = event.active.data.current?.deal;
+    if (deal) {
+      setActiveDeal(deal);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDeal(null);
+
+    if (!over) return;
+
+    const dealId = active.id as string;
+    const newStage = over.id as string;
+    const deal = deals.find((d) => d.id === dealId);
+
+    if (deal && deal.stage !== newStage) {
+      updateStageMutation.mutate({ id: dealId, stage: newStage });
+    }
+  };
+
+  const handleDealClick = (dealId: string) => {
+    setLocation(`/crm/deals/${dealId}`);
+  };
+
   const deals: Deal[] = dealsData?.deals || [];
 
-  // Group deals by stage
+  // Filter deals by search query
+  const filteredDeals = deals.filter((deal) =>
+    deal.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Sort function
+  const sortDeals = (dealsArray: Deal[]) => {
+    return [...dealsArray].sort((a, b) => {
+      switch (sortBy) {
+        case "title-asc":
+          return a.title.localeCompare(b.title);
+        case "title-desc":
+          return b.title.localeCompare(a.title);
+        case "value-high":
+          const aValue = a.value ? parseFloat(a.value) : 0;
+          const bValue = b.value ? parseFloat(b.value) : 0;
+          return bValue - aValue;
+        case "value-low":
+          const aValueLow = a.value ? parseFloat(a.value) : 0;
+          const bValueLow = b.value ? parseFloat(b.value) : 0;
+          return aValueLow - bValueLow;
+        case "date-newest":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "date-oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+  };
+
+  // Group deals by stage with filtering and sorting
   const dealsByStage = DEAL_STAGES.reduce((acc, stage) => {
-    acc[stage.value] = deals.filter((deal) => deal.stage === stage.value);
+    const stageDeals = filteredDeals.filter((deal) => deal.stage === stage.value);
+    acc[stage.value] = sortDeals(stageDeals);
     return acc;
   }, {} as Record<string, Deal[]>);
 
@@ -178,68 +330,70 @@ export default function CrmDeals() {
         </Dialog>
       </div>
 
+      <div className="mb-6 flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search deals..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+            <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+            <SelectItem value="value-high">Value (High to Low)</SelectItem>
+            <SelectItem value="value-low">Value (Low to High)</SelectItem>
+            <SelectItem value="date-newest">Newest First</SelectItem>
+            <SelectItem value="date-oldest">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {DEAL_STAGES.map((stage) => (
-            <div key={stage.value} className="flex-shrink-0 w-80">
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h3 className="font-semibold mb-4">
-                  {stage.label} ({dealsByStage[stage.value]?.length || 0})
-                </h3>
-                <div className="space-y-3">
-                  {dealsByStage[stage.value]?.map((deal) => (
-                    <Card key={deal.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                      <CardHeader className="p-4">
-                        <CardTitle className="text-base">{deal.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-0">
-                        {deal.value && (
-                          <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
-                            <DollarSign className="h-4 w-4" />
-                            {parseFloat(deal.value).toLocaleString()}
-                          </div>
-                        )}
-                        {deal.probability !== null && (
-                          <div className="text-sm text-muted-foreground mt-2">
-                            {deal.probability}% probability
-                          </div>
-                        )}
-                        <div className="mt-3">
-                          <Select
-                            value={deal.stage}
-                            onValueChange={(newStage) =>
-                              updateStageMutation.mutate({ id: deal.id, stage: newStage })
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DEAL_STAGES.map((s) => (
-                                <SelectItem key={s.value} value={s.value} className="text-xs">
-                                  {s.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {(!dealsByStage[stage.value] || dealsByStage[stage.value].length === 0) && (
-                    <div className="text-center py-8 text-sm text-muted-foreground">
-                      No deals
+        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {DEAL_STAGES.map((stage) => (
+              <DroppableStageColumn
+                key={stage.value}
+                stage={stage}
+                deals={dealsByStage[stage.value] || []}
+                onDealClick={handleDealClick}
+              />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeDeal ? (
+              <Card className="w-80 opacity-90 shadow-lg cursor-move">
+                <CardHeader className="p-4">
+                  <CardTitle className="text-base">{activeDeal.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {activeDeal.value && (
+                    <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
+                      <DollarSign className="h-4 w-4" />
+                      {parseFloat(activeDeal.value).toLocaleString()}
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                  {activeDeal.probability !== null && (
+                    <div className="text-sm text-muted-foreground mt-2">
+                      {activeDeal.probability}% probability
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );

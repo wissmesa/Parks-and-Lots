@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckSquare } from "lucide-react";
+import { Plus, CheckSquare, Search } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AuthManager } from "@/lib/auth";
@@ -26,6 +26,8 @@ interface Task {
 export default function CrmTasks() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("date-newest");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [newTask, setNewTask] = useState({
@@ -94,6 +96,49 @@ export default function CrmTasks() {
   });
 
   const tasks: Task[] = tasksData?.tasks || [];
+
+  // Filter tasks by search query
+  const filteredTasks = tasks.filter((task) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      task.title.toLowerCase().includes(searchLower) ||
+      (task.description && task.description.toLowerCase().includes(searchLower))
+    );
+  });
+
+  // Sort tasks
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    switch (sortBy) {
+      case "title-asc":
+        return a.title.localeCompare(b.title);
+      case "title-desc":
+        return b.title.localeCompare(a.title);
+      case "due-nearest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case "due-farthest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      case "priority-high":
+        const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
+               (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+      case "priority-low":
+        const priorityOrderLow = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrderLow[a.priority as keyof typeof priorityOrderLow] || 0) - 
+               (priorityOrderLow[b.priority as keyof typeof priorityOrderLow] || 0);
+      case "date-newest":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "date-oldest":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      default:
+        return 0;
+    }
+  });
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -177,9 +222,18 @@ export default function CrmTasks() {
         </Dialog>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-[250px]">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-64">
+          <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -190,6 +244,21 @@ export default function CrmTasks() {
             <SelectItem value="CANCELLED">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+            <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+            <SelectItem value="due-nearest">Due Date (Nearest)</SelectItem>
+            <SelectItem value="due-farthest">Due Date (Farthest)</SelectItem>
+            <SelectItem value="priority-high">Priority (Highest)</SelectItem>
+            <SelectItem value="priority-low">Priority (Lowest)</SelectItem>
+            <SelectItem value="date-newest">Newest First</SelectItem>
+            <SelectItem value="date-oldest">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -198,7 +267,7 @@ export default function CrmTasks() {
         </div>
       ) : (
         <div className="space-y-3">
-          {tasks.map((task) => (
+          {sortedTasks.map((task) => (
             <Card key={task.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -239,7 +308,7 @@ export default function CrmTasks() {
         </div>
       )}
 
-      {!isLoading && tasks.length === 0 && (
+      {!isLoading && sortedTasks.length === 0 && (
         <div className="text-center py-12">
           <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No tasks found</h3>

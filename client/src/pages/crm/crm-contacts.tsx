@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Mail, Phone, Users, Edit2, Save, X } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ export default function CrmContacts() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("name-asc");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Contact>>({});
@@ -107,6 +109,22 @@ export default function CrmContacts() {
   });
 
   const contacts: Contact[] = contactsData?.contacts || [];
+
+  // Sort contacts
+  const sortedContacts = [...contacts].sort((a, b) => {
+    switch (sortBy) {
+      case "name-asc":
+        return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+      case "name-desc":
+        return `${b.firstName} ${b.lastName}`.localeCompare(`${a.firstName} ${a.lastName}`);
+      case "date-newest":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "date-oldest":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      default:
+        return 0;
+    }
+  });
 
   const handleRowClick = (contactId: string) => {
     if (editingId === null) {
@@ -219,8 +237,8 @@ export default function CrmContacts() {
         </Dialog>
       </div>
 
-      <div className="mb-6">
-        <div className="relative">
+      <div className="mb-6 flex gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search contacts..."
@@ -229,13 +247,24 @@ export default function CrmContacts() {
             className="pl-10"
           />
         </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+            <SelectItem value="date-newest">Newest First</SelectItem>
+            <SelectItem value="date-oldest">Oldest First</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : contacts.length > 0 ? (
+      ) : sortedContacts.length > 0 ? (
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
@@ -248,7 +277,7 @@ export default function CrmContacts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contacts.map((contact) => (
+              {sortedContacts.map((contact) => (
                 <TableRow
                   key={contact.id}
                   className={`cursor-pointer hover:bg-muted/50 ${editingId === contact.id ? 'bg-muted' : ''}`}

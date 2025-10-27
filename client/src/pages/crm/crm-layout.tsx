@@ -5,6 +5,7 @@ import { Users, Briefcase, Building2, MessageSquare, CheckSquare } from "lucide-
 import CrmContacts from "./crm-contacts";
 import CrmContactDetail from "./crm-contact-detail";
 import CrmDeals from "./crm-deals";
+import CrmDealDetail from "./crm-deal-detail";
 import CrmUnits from "./crm-units";
 import CrmMessages from "./crm-messages";
 import CrmTasks from "./crm-tasks";
@@ -28,9 +29,9 @@ export default function CrmLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background overflow-hidden">
       {/* Secondary Navigation Sidebar */}
-      <aside className="w-64 border-r bg-card">
+      <aside className="w-64 flex-shrink-0 border-r bg-card overflow-y-auto">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-foreground">CRM</h2>
           <p className="text-sm text-muted-foreground">Customer Relationship Management</p>
@@ -56,9 +57,10 @@ export default function CrmLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1">
+      <main className="flex-1 overflow-auto min-w-0">
         {location === '/crm' && <CrmContacts />}
         {location.startsWith('/crm/contacts/') && <CrmContactDetail />}
+        {location.startsWith('/crm/deals/') && location !== '/crm/deals' && <CrmDealDetail />}
         {location === '/crm/deals' && <CrmDeals />}
         {location === '/crm/units' && <CrmUnits />}
         {location === '/crm/messages' && <CrmMessages />}
