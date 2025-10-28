@@ -45,7 +45,8 @@ import {
   Moon,
   Sparkles,
   Star,
-  CircleParking
+  CircleParking,
+  Calendar
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -60,7 +61,7 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
   
   if (isLoading) {
     return (
-      <div className="w-48 h-32 bg-muted flex items-center justify-center flex-shrink-0">
+      <div className="w-48 h-32 bg-muted flex items-center justify-center flex-shrink-0 relative">
         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
       </div>
     );
@@ -68,7 +69,7 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
   
   if (hasPhotos && firstPhoto && !imageError) {
     return (
-      <div className="w-48 h-32 flex-shrink-0 overflow-hidden">
+      <div className="w-48 h-32 flex-shrink-0 overflow-hidden relative">
         <img 
           src={firstPhoto.urlOrPath || firstPhoto.url}
           alt="Lot preview"
@@ -78,16 +79,40 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
             setImageError(true);
           }}
         />
+        {/* Request Showing Button Overlay */}
+        <div className="absolute bottom-2 right-2 z-10">
+          <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
+            <Button 
+              className="py-0.5 px-2 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-[10px] h-auto"
+              size="sm"
+            >
+              <Calendar className="w-2.5 h-2.5 mr-1" />
+              Request a Showing
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
   
   // Fallback placeholder when no photos or image error
   return (
-    <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0">
+    <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 relative">
       <div className="text-center">
         <Home className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
         <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">Lot Preview</span>
+      </div>
+      {/* Request Showing Button Overlay */}
+      <div className="absolute bottom-2 right-2 z-10">
+        <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
+          <Button 
+            className="py-0.5 px-2 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-[10px] h-auto"
+            size="sm"
+          >
+            <Calendar className="w-2.5 h-2.5 mr-1" />
+            Request a Showing
+          </Button>
+        </Link>
       </div>
     </div>
   );

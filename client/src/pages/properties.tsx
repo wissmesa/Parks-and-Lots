@@ -23,7 +23,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Info
+  Info,
+  Calendar
 } from "lucide-react";
 import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
 import { ParkCard } from "@/components/ui/park-card";
@@ -36,7 +37,7 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
   
   if (isLoading) {
     return (
-      <div className="h-48 bg-muted flex items-center justify-center">
+      <div className="h-48 bg-muted flex items-center justify-center relative">
         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
       </div>
     );
@@ -44,7 +45,7 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
   
   if (hasPhotos && firstPhoto && !imageError) {
     return (
-      <div className="h-48 overflow-hidden">
+      <div className="h-48 overflow-hidden relative">
         <img 
           src={firstPhoto.urlOrPath || firstPhoto.url}
           alt="Lot preview"
@@ -54,16 +55,40 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
             setImageError(true);
           }}
         />
+        {/* Request Showing Button Overlay */}
+        <div className="absolute bottom-4 right-4 z-10">
+          <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
+            <Button 
+              className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs"
+              size="sm"
+            >
+              <Calendar className="w-3 h-3 mr-1.5" />
+              Request a Showing
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
   
   // Fallback placeholder when no photos or image error
   return (
-    <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center">
+    <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center relative">
       <div className="text-center">
         <Home className="w-10 h-10 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
         <span className="text-blue-700 dark:text-blue-300 font-medium text-sm">Lot Details</span>
+      </div>
+      {/* Request Showing Button Overlay */}
+      <div className="absolute bottom-4 right-4 z-10">
+        <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
+          <Button 
+            className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs"
+            size="sm"
+          >
+            <Calendar className="w-3 h-3 mr-1.5" />
+            Request a Showing
+          </Button>
+        </Link>
       </div>
     </div>
   );

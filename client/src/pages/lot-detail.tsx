@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -109,6 +109,16 @@ export default function LotDetail() {
   
   // State to track open tooltips for clickable info icons
   const [openTooltips, setOpenTooltips] = useState<Record<string, boolean>>({});
+
+  // Check URL parameters and automatically open booking dialog if requested
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('booking') === 'true') {
+      setShowBookingDialog(true);
+      // Clean up the URL by removing the booking parameter
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const { data: lot, isLoading: lotLoading, error: lotError } = useQuery<Lot>({
     queryKey: ["/api/lots", id],
