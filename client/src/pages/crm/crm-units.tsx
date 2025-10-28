@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +19,7 @@ interface Unit {
 }
 
 export default function CrmUnits() {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
 
@@ -98,7 +100,11 @@ export default function CrmUnits() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedUnits.map((unit) => (
-            <Card key={unit.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card 
+              key={unit.id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setLocation(`/crm/units/${unit.id}`)}
+            >
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Building2 className="h-5 w-5" />

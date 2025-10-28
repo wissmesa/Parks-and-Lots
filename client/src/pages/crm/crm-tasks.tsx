@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -8,10 +9,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckSquare, Search } from "lucide-react";
+import { Plus, CheckSquare, Search, User, Briefcase, Trash2, Check } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AuthManager } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Task {
   id: string;
@@ -21,15 +34,20 @@ interface Task {
   status: string;
   priority: string;
   createdAt: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  entityName?: string | null;
 }
 
 export default function CrmTasks() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date-newest");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
@@ -92,6 +110,46 @@ export default function CrmTasks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      toast({ title: "Success", description: "Task status updated" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/crm/tasks/${id}`, {
+        method: "DELETE",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete task");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      toast({ title: "Success", description: "Task deleted successfully" });
+      setDeleteTaskId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  const toggleCompleteMutation = useMutation({
+    mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: string }) => {
+      const newStatus = currentStatus === "COMPLETED" ? "TODO" : "COMPLETED";
+      const res = await fetch(`/api/crm/tasks/${id}`, {
+        method: "PATCH",
+        headers: { 
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders()
+        },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
     },
   });
 
@@ -140,13 +198,11 @@ export default function CrmTasks() {
     }
   });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "URGENT": return "text-red-600";
-      case "HIGH": return "text-orange-600";
-      case "MEDIUM": return "text-yellow-600";
-      case "LOW": return "text-green-600";
-      default: return "text-gray-600";
+  const handleEntityClick = (entityType: string, entityId: string) => {
+    if (entityType === 'CONTACT') {
+      setLocation(`/crm/contacts/${entityId}`);
+    } else if (entityType === 'DEAL') {
+      setLocation(`/crm/deals/${entityId}`);
     }
   };
 
@@ -268,39 +324,116 @@ export default function CrmTasks() {
       ) : (
         <div className="space-y-3">
           {sortedTasks.map((task) => (
-            <Card key={task.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{task.title}</CardTitle>
+            <Card 
+              key={task.id} 
+              className={`transition-all hover:shadow-md ${task.status === "COMPLETED" ? "bg-muted/30" : ""}`}
+            >
+              <CardContent className="p-6">
+                <div className="flex gap-4">
+                  {/* Checkbox */}
+                  <div className="flex items-start pt-0.5">
+                    <Checkbox
+                      checked={task.status === "COMPLETED"}
+                      onCheckedChange={() => toggleCompleteMutation.mutate({ 
+                        id: task.id, 
+                        currentStatus: task.status 
+                      })}
+                      className="h-5 w-5"
+                    />
+                  </div>
+
+                  {/* Main Content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Title and Priority Row */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`text-base font-semibold ${task.status === "COMPLETED" ? "line-through text-muted-foreground" : ""}`}>
+                          {task.title}
+                        </h3>
+                        {task.priority === "URGENT" && (
+                          <Badge variant="destructive" className="h-5">
+                            <span className="text-xs">Urgent</span>
+                          </Badge>
+                        )}
+                        {task.priority === "HIGH" && (
+                          <Badge className="h-5 bg-orange-500 hover:bg-orange-600">
+                            <span className="text-xs">High</span>
+                          </Badge>
+                        )}
+                        {task.priority === "MEDIUM" && (
+                          <Badge variant="secondary" className="h-5">
+                            <span className="text-xs">Medium</span>
+                          </Badge>
+                        )}
+                        {task.priority === "LOW" && (
+                          <Badge variant="outline" className="h-5">
+                            <span className="text-xs">Low</span>
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                        onClick={() => setDeleteTaskId(task.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Description */}
                     {task.description && (
-                      <p className="text-sm text-muted-foreground mt-2">{task.description}</p>
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {task.description}
+                      </p>
                     )}
+
+                    {/* Meta Information */}
+                    <div className="flex items-center gap-4 text-sm flex-wrap">
+                      {/* Associated Entity */}
+                      {task.entityType && task.entityId && task.entityName && (
+                        <Badge 
+                          variant="outline" 
+                          className="cursor-pointer hover:bg-accent transition-colors"
+                          onClick={() => handleEntityClick(task.entityType!, task.entityId!)}
+                        >
+                          {task.entityType === 'CONTACT' && <User className="h-3 w-3 mr-1.5" />}
+                          {task.entityType === 'DEAL' && <Briefcase className="h-3 w-3 mr-1.5" />}
+                          <span className="text-xs">{task.entityName}</span>
+                        </Badge>
+                      )}
+
+                      {/* Due Date */}
+                      {task.dueDate && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span className="text-xs">
+                            {new Date(task.dueDate).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: new Date(task.dueDate).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                            })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Status Selector */}
+                      <Select
+                        value={task.status}
+                        onValueChange={(status) => updateStatusMutation.mutate({ id: task.id, status })}
+                      >
+                        <SelectTrigger className="w-[130px] h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="TODO">To Do</SelectItem>
+                          <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                          <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <span className={`text-xs font-semibold ${getPriorityColor(task.priority)}`}>
-                    {task.priority}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {task.dueDate && `Due: ${new Date(task.dueDate).toLocaleDateString()}`}
-                  </div>
-                  <Select
-                    value={task.status}
-                    onValueChange={(status) => updateStatusMutation.mutate({ id: task.id, status })}
-                  >
-                    <SelectTrigger className="w-40 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="TODO">To Do</SelectItem>
-                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                      <SelectItem value="COMPLETED">Completed</SelectItem>
-                      <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -315,6 +448,27 @@ export default function CrmTasks() {
           <p className="text-muted-foreground">Create your first task to get started</p>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTaskId && deleteMutation.mutate(deleteTaskId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

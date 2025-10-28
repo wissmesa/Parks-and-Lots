@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import NotificationCenter from "@/components/crm/notification-center";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -11,10 +12,11 @@ export function Navigation() {
   console.log('Navigation - isAuthenticated:', isAuthenticated);
   console.log('Navigation - user role:', user?.role);
   
-  // Check if user is currently on admin/manager/tenant pages
+  // Check if user is currently on admin/manager/tenant/crm pages
   const isOnAdminPage = location.startsWith('/admin');
   const isOnManagerPage = location.startsWith('/manager');
   const isOnTenantPage = location.startsWith('/tenant');
+  const isOnCrmPage = location.startsWith('/crm');
 
   const handleLogout = async () => {
     try {
@@ -88,6 +90,17 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
+                {/* CRM Button - visible to all except ADMIN and MANAGER */}
+                {user?.role !== 'ADMIN' && user?.role !== 'MANAGER' && !isOnCrmPage && (
+                  <Link href="/crm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                    >
+                      CRM
+                    </Button>
+                  </Link>
+                )}
                 <Button 
                   onClick={handleLogout} 
                   variant="outline" 
@@ -97,6 +110,7 @@ export function Navigation() {
                 >
                   Sign Out
                 </Button>
+                {isOnCrmPage && <NotificationCenter />}
               </div>
             ) : (
               <Link href="/login">

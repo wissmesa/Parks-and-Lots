@@ -35,17 +35,29 @@ export default function CrmMessages() {
   // Initialize Socket.IO
   useEffect(() => {
     if (user) {
-      const token = localStorage.getItem("token"); // Assuming token is stored here
+      const token = AuthManager.getToken();
       const newSocket = io("/", {
-        auth: { token }
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
       });
 
       newSocket.on("connect", () => {
         console.log("Connected to WebSocket");
       });
 
+      newSocket.on("connect_error", (error) => {
+        console.error("WebSocket connection error:", error);
+      });
+
+      newSocket.on("disconnect", (reason) => {
+        console.log("WebSocket disconnected:", reason);
+      });
+
       newSocket.on("new_message", (message: Message) => {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/messages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
       });
 
       setSocket(newSocket);
@@ -97,12 +109,53 @@ export default function CrmMessages() {
   const sendMessage = () => {
     if (!messageInput.trim() || !selectedUserId || !socket) return;
 
-    socket.emit("send_message", {
+    const messageContent = messageInput;
+    setMessageInput("");
+
+    // Optimistic update - add message immediately to UI
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`,
+      senderId: user!.id,
       receiverId: selectedUserId,
-      content: messageInput,
+      content: messageContent,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update the query cache optimistically
+    queryClient.setQueryData(["/api/crm/messages", selectedUserId], (old: any) => {
+      return {
+        messages: [...(old?.messages || []), optimisticMessage],
+      };
     });
 
-    setMessageInput("");
+    socket.emit("send_message", {
+      receiverId: selectedUserId,
+      content: messageContent,
+    });
+
+    // Listen for confirmation
+    socket.once("message_sent", (confirmedMessage) => {
+      // Replace optimistic message with confirmed message
+      queryClient.setQueryData(["/api/crm/messages", selectedUserId], (old: any) => {
+        return {
+          messages: old?.messages.map((m: any) =>
+            m.id === optimisticMessage.id ? confirmedMessage : m
+          ) || [],
+        };
+      });
+    });
+
+    // Handle error
+    socket.once("message_error", () => {
+      // Remove optimistic message on error
+      queryClient.setQueryData(["/api/crm/messages", selectedUserId], (old: any) => {
+        return {
+          messages: old?.messages.filter((m: any) => m.id !== optimisticMessage.id) || [],
+        };
+      });
+      setMessageInput(messageContent); // Restore the message
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

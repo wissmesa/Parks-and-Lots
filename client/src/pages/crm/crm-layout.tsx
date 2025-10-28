@@ -7,6 +7,7 @@ import CrmContactDetail from "./crm-contact-detail";
 import CrmDeals from "./crm-deals";
 import CrmDealDetail from "./crm-deal-detail";
 import CrmUnits from "./crm-units";
+import CrmUnitDetail from "./crm-unit-detail";
 import CrmMessages from "./crm-messages";
 import CrmTasks from "./crm-tasks";
 
@@ -62,6 +63,7 @@ export default function CrmLayout() {
         {location.startsWith('/crm/contacts/') && <CrmContactDetail />}
         {location.startsWith('/crm/deals/') && location !== '/crm/deals' && <CrmDealDetail />}
         {location === '/crm/deals' && <CrmDeals />}
+        {location.startsWith('/crm/units/') && location !== '/crm/units' && <CrmUnitDetail />}
         {location === '/crm/units' && <CrmUnits />}
         {location === '/crm/messages' && <CrmMessages />}
         {location === '/crm/tasks' && <CrmTasks />}

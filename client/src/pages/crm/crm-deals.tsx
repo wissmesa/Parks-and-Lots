@@ -29,7 +29,7 @@ const DEAL_STAGES = [
   { value: "QUALIFIED_LEAD", label: "Qualified Lead" },
   { value: "SHOWING_SCHEDULED", label: "Showing Scheduled" },
   { value: "SHOWING_COMPLETED", label: "Showing Completed" },
-  { value: "APPLIED_TO_ALL", label: "Applied to All" },
+  { value: "APPLIED_TO_ALL", label: "Applied to All Applications" },
   { value: "FINANCING_APPROVED", label: "Financing Approved" },
   { value: "DEPOSIT_PAID_CONTRACT_SIGNED", label: "Deposit Paid & Contract Signed" },
   { value: "CLOSED_WON", label: "Closed Won" },
@@ -51,19 +51,42 @@ function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void 
     : undefined;
 
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className="w-full"
+    >
       <Card 
-        className="cursor-move hover:shadow-md transition-shadow"
-        onClick={onClick}
+        className="hover:shadow-md transition-shadow w-full group"
       >
-        <CardHeader className="p-4">
-          <CardTitle className="text-base">{deal.title}</CardTitle>
+        <CardHeader className="p-4 flex flex-row items-center justify-between">
+          <CardTitle 
+            className="text-base truncate flex-1 cursor-pointer"
+            onClick={onClick}
+          >
+            {deal.title}
+          </CardTitle>
+          <div 
+            {...listeners} 
+            {...attributes}
+            className="cursor-move ml-2 p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-all"
+            title="Drag to move"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="text-muted-foreground">
+              <circle cx="4" cy="4" r="1.5"/>
+              <circle cx="4" cy="8" r="1.5"/>
+              <circle cx="4" cy="12" r="1.5"/>
+              <circle cx="12" cy="4" r="1.5"/>
+              <circle cx="12" cy="8" r="1.5"/>
+              <circle cx="12" cy="12" r="1.5"/>
+            </svg>
+          </div>
         </CardHeader>
-        <CardContent className="p-4 pt-0">
+        <CardContent className="p-4 pt-0 cursor-pointer" onClick={onClick}>
           {deal.value && (
             <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
-              <DollarSign className="h-4 w-4" />
-              {parseFloat(deal.value).toLocaleString()}
+              <DollarSign className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">{parseFloat(deal.value).toLocaleString()}</span>
             </div>
           )}
           {deal.probability !== null && (
@@ -94,12 +117,12 @@ function DroppableStageColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 w-80 transition-colors ${
-        isOver ? "ring-2 ring-primary ring-offset-2" : ""
-      }`}
+      className="flex-shrink-0 w-80"
     >
-      <div className="bg-muted/50 rounded-lg p-4 min-h-[200px]">
-        <h3 className="font-semibold mb-4">
+      <div className={`border rounded-lg p-4 min-h-[200px] transition-all ${
+        isOver ? "border-primary bg-primary/5" : "border-border bg-background"
+      }`}>
+        <h3 className="font-semibold mb-4 text-sm uppercase tracking-wide text-muted-foreground">
           {stage.label} ({deals.length})
         </h3>
         <div className="space-y-3">

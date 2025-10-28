@@ -105,15 +105,15 @@ function Router() {
           <RequireRole role={['MANAGER', 'ADMIN', 'MHP_LORD'] as const}><MyInfo /></RequireRole>
         )} />
         
-        {/* Protected CRM routes - Beta: MHP_LORD only */}
+        {/* Protected CRM routes - accessible by all authenticated users */}
         <Route path="/crm" component={() => (
-          <RequireRole role="MHP_LORD"><CrmLayout /></RequireRole>
+          <RequireRole role={['MHP_LORD', 'MANAGER', 'ADMIN', 'TENANT'] as const}><CrmLayout /></RequireRole>
         )} />
         <Route path="/crm/:section" component={() => (
-          <RequireRole role="MHP_LORD"><CrmLayout /></RequireRole>
+          <RequireRole role={['MHP_LORD', 'MANAGER', 'ADMIN', 'TENANT'] as const}><CrmLayout /></RequireRole>
         )} />
         <Route path="/crm/:section/:id" component={() => (
-          <RequireRole role="MHP_LORD"><CrmLayout /></RequireRole>
+          <RequireRole role={['MHP_LORD', 'MANAGER', 'ADMIN', 'TENANT'] as const}><CrmLayout /></RequireRole>
         )} />
         
         {/* Protected TENANT routes */}

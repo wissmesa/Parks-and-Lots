@@ -69,6 +69,7 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").default(true).notNull(),
   resetToken: varchar("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
+  lastNotificationClearedAt: timestamp("last_notification_cleared_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

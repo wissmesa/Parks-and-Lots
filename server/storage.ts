@@ -238,11 +238,15 @@ export interface IStorage {
   getCrmMessage(id: string): Promise<CrmMessage | undefined>;
   createCrmMessage(message: InsertCrmMessage): Promise<CrmMessage>;
   markMessageAsRead(id: string): Promise<void>;
+  markAllMessagesAsRead(userId: string): Promise<void>;
   getUnreadMessageCount(userId: string): Promise<number>;
   getConversations(userId: string): Promise<any[]>;
   
+  // CRM Notification operations
+  getNotifications(userId: string, companyId: string): Promise<any>;
+  
   // CRM Association operations
-  getCrmAssociations(sourceType: string, sourceId: string): Promise<CrmAssociation[]>;
+  getCrmAssociations(sourceType: string, sourceId: string): Promise<any[]>;
   createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation>;
   deleteCrmAssociation(id: string): Promise<void>;
 }
@@ -2193,6 +2197,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(crmMessages.id, id));
   }
 
+  async markAllMessagesAsRead(userId: string): Promise<void> {
+    await db.update(crmMessages)
+      .set({ read: true, readAt: new Date() })
+      .where(
+        and(
+          eq(crmMessages.receiverId, userId),
+          eq(crmMessages.read, false)
+        )
+      );
+  }
+
   async getUnreadMessageCount(userId: string): Promise<number> {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)` })
@@ -2242,9 +2257,137 @@ export class DatabaseStorage implements IStorage {
     return Array.from(conversationsMap.values());
   }
 
+  async getNotifications(userId: string, companyId: string): Promise<any> {
+    // Get assigned tasks that are TODO or IN_PROGRESS
+    const tasks = await db.select()
+      .from(crmTasks)
+      .where(
+        and(
+          eq(crmTasks.assignedTo, userId),
+          eq(crmTasks.companyId, companyId),
+          or(
+            eq(crmTasks.status, 'TODO'),
+            eq(crmTasks.status, 'IN_PROGRESS')
+          )
+        )
+      )
+      .orderBy(asc(crmTasks.dueDate))
+      .limit(10);
+
+    // Enrich tasks with entity information
+    const enrichedTasks = await Promise.all(tasks.map(async (task) => {
+      let entityName = null;
+      
+      if (task.entityType && task.entityId) {
+        try {
+          switch (task.entityType) {
+            case 'CONTACT': {
+              const [contact] = await db.select({
+                firstName: crmContacts.firstName,
+                lastName: crmContacts.lastName
+              })
+                .from(crmContacts)
+                .where(eq(crmContacts.id, task.entityId))
+                .limit(1);
+              
+              if (contact) {
+                entityName = `${contact.firstName} ${contact.lastName}`;
+              }
+              break;
+            }
+            case 'DEAL': {
+              const [deal] = await db.select({
+                title: crmDeals.title
+              })
+                .from(crmDeals)
+                .where(eq(crmDeals.id, task.entityId))
+                .limit(1);
+              
+              if (deal) {
+                entityName = deal.title;
+              }
+              break;
+            }
+            case 'LOT': {
+              const [lot] = await db.select({
+                lotNumber: lots.lotNumber,
+                parkId: lots.parkId
+              })
+                .from(lots)
+                .where(eq(lots.id, task.entityId))
+                .limit(1);
+              
+              if (lot) {
+                // Try to get park name for better context
+                if (lot.parkId) {
+                  const [park] = await db.select({
+                    name: parks.name
+                  })
+                    .from(parks)
+                    .where(eq(parks.id, lot.parkId))
+                    .limit(1);
+                  
+                  if (park) {
+                    entityName = `Lot ${lot.lotNumber} (${park.name})`;
+                  } else {
+                    entityName = `Lot ${lot.lotNumber}`;
+                  }
+                } else {
+                  entityName = `Lot ${lot.lotNumber}`;
+                }
+              }
+              break;
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching entity for task:', error);
+        }
+      }
+
+      return {
+        ...task,
+        entityName,
+      };
+    }));
+
+    // Get unread messages with sender information
+    const unreadMessages = await db.select({
+      id: crmMessages.id,
+      senderId: crmMessages.senderId,
+      receiverId: crmMessages.receiverId,
+      content: crmMessages.content,
+      read: crmMessages.read,
+      createdAt: crmMessages.createdAt,
+      senderName: users.fullName
+    })
+      .from(crmMessages)
+      .leftJoin(users, eq(crmMessages.senderId, users.id))
+      .where(
+        and(
+          eq(crmMessages.receiverId, userId),
+          eq(crmMessages.read, false)
+        )
+      )
+      .orderBy(desc(crmMessages.createdAt))
+      .limit(5);
+
+    const unreadCount = await this.getUnreadMessageCount(userId);
+
+    return {
+      tasks: {
+        count: enrichedTasks.length,
+        items: enrichedTasks
+      },
+      messages: {
+        count: unreadCount,
+        items: unreadMessages
+      }
+    };
+  }
+
   // CRM Association operations
-  async getCrmAssociations(sourceType: string, sourceId: string): Promise<CrmAssociation[]> {
-    const results = await db.select()
+  async getCrmAssociations(sourceType: string, sourceId: string): Promise<any[]> {
+    const associations = await db.select()
       .from(crmAssociations)
       .where(
         and(
@@ -2254,16 +2397,124 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(crmAssociations.createdAt));
 
-    return results;
+    // Enrich associations with entity details
+    const enrichedAssociations = await Promise.all(
+      associations.map(async (assoc) => {
+        let entityDetails = null;
+        
+        if (assoc.targetType === 'CONTACT') {
+          const [contact] = await db.select({
+            id: crmContacts.id,
+            firstName: crmContacts.firstName,
+            lastName: crmContacts.lastName,
+            email: crmContacts.email,
+            phone: crmContacts.phone,
+          }).from(crmContacts).where(eq(crmContacts.id, assoc.targetId));
+          entityDetails = contact;
+        } else if (assoc.targetType === 'DEAL') {
+          const [deal] = await db.select({
+            id: crmDeals.id,
+            title: crmDeals.title,
+            value: crmDeals.value,
+            stage: crmDeals.stage,
+          }).from(crmDeals).where(eq(crmDeals.id, assoc.targetId));
+          entityDetails = deal;
+        } else if (assoc.targetType === 'LOT') {
+          const [lot] = await db.select({
+            id: lots.id,
+            nameOrNumber: lots.nameOrNumber,
+            status: lots.status,
+            priceForRent: lots.priceForRent,
+            priceForSale: lots.priceForSale,
+            priceRentToOwn: lots.priceRentToOwn,
+            priceContractForDeed: lots.priceContractForDeed,
+          }).from(lots).where(eq(lots.id, assoc.targetId));
+          entityDetails = lot;
+        }
+        
+        return {
+          ...assoc,
+          entityDetails,
+        };
+      })
+    );
+
+    return enrichedAssociations;
   }
 
   async createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation> {
+    // Check if association already exists
+    const existingAssociation = await db.select()
+      .from(crmAssociations)
+      .where(
+        and(
+          eq(crmAssociations.sourceType, association.sourceType),
+          eq(crmAssociations.sourceId, association.sourceId),
+          eq(crmAssociations.targetType, association.targetType),
+          eq(crmAssociations.targetId, association.targetId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssociation.length > 0) {
+      return existingAssociation[0];
+    }
+
+    // Create the main association
     const [result] = await db.insert(crmAssociations).values(association).returning();
+    
+    // Create the reverse association for bidirectional linking
+    const reverseAssociation = {
+      sourceType: association.targetType,
+      sourceId: association.targetId,
+      targetType: association.sourceType,
+      targetId: association.sourceId,
+      relationshipType: association.relationshipType,
+      companyId: association.companyId,
+      createdBy: association.createdBy,
+    };
+
+    // Check if reverse association already exists
+    const existingReverse = await db.select()
+      .from(crmAssociations)
+      .where(
+        and(
+          eq(crmAssociations.sourceType, reverseAssociation.sourceType),
+          eq(crmAssociations.sourceId, reverseAssociation.sourceId),
+          eq(crmAssociations.targetType, reverseAssociation.targetType),
+          eq(crmAssociations.targetId, reverseAssociation.targetId)
+        )
+      )
+      .limit(1);
+
+    if (existingReverse.length === 0) {
+      await db.insert(crmAssociations).values(reverseAssociation);
+    }
+
     return result;
   }
 
   async deleteCrmAssociation(id: string): Promise<void> {
-    await db.delete(crmAssociations).where(eq(crmAssociations.id, id));
+    // Get the association to delete
+    const [association] = await db.select()
+      .from(crmAssociations)
+      .where(eq(crmAssociations.id, id));
+
+    if (association) {
+      // Delete the main association
+      await db.delete(crmAssociations).where(eq(crmAssociations.id, id));
+
+      // Delete the reverse association
+      await db.delete(crmAssociations)
+        .where(
+          and(
+            eq(crmAssociations.sourceType, association.targetType),
+            eq(crmAssociations.sourceId, association.targetId),
+            eq(crmAssociations.targetType, association.sourceType),
+            eq(crmAssociations.targetId, association.sourceId)
+          )
+        );
+    }
   }
 }
 

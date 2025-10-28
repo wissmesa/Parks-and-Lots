@@ -7,12 +7,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Plus, CheckCircle2, Circle, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft, Save, Plus, CheckCircle2, Circle, Clock, DollarSign, Trash2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { AuthManager } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AssociationsSection } from "@/components/crm/associations-section";
 
 interface Deal {
   id: string;
@@ -41,6 +54,9 @@ interface Task {
   priority: string;
   dueDate?: string | null;
   createdAt: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  entityName?: string | null;
 }
 
 interface Activity {
@@ -54,7 +70,7 @@ const DEAL_STAGES = [
   { value: "QUALIFIED_LEAD", label: "Qualified Lead" },
   { value: "SHOWING_SCHEDULED", label: "Showing Scheduled" },
   { value: "SHOWING_COMPLETED", label: "Showing Completed" },
-  { value: "APPLIED_TO_ALL", label: "Applied to All" },
+  { value: "APPLIED_TO_ALL", label: "Applied to All Applications" },
   { value: "FINANCING_APPROVED", label: "Financing Approved" },
   { value: "DEPOSIT_PAID_CONTRACT_SIGNED", label: "Deposit Paid & Contract Signed" },
   { value: "CLOSED_WON", label: "Closed Won" },
@@ -64,11 +80,13 @@ const DEAL_STAGES = [
 export default function CrmDealDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Deal>>({});
   const [newNote, setNewNote] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "" });
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
   // Fetch deal
   const { data: deal, isLoading } = useQuery<Deal>({
@@ -109,6 +127,7 @@ export default function CrmDealDetail() {
       return res.json();
     },
     enabled: !!id,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for real-time updates
   });
 
   // Fetch activities
@@ -193,6 +212,7 @@ export default function CrmDealDetail() {
           entityId: id,
           status: "TODO",
           priority: "MEDIUM",
+          assignedTo: user?.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to create task");
@@ -203,6 +223,49 @@ export default function CrmDealDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
       toast({ title: "Success", description: "Task created successfully" });
       setNewTask({ title: "", description: "" });
+    },
+  });
+
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const res = await fetch(`/api/crm/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete task");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      toast({ title: "Success", description: "Task deleted successfully" });
+      setDeleteTaskId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  // Toggle complete mutation
+  const toggleCompleteTaskMutation = useMutation({
+    mutationFn: async ({ taskId, currentStatus }: { taskId: string; currentStatus: string }) => {
+      const newStatus = currentStatus === "COMPLETED" ? "TODO" : "COMPLETED";
+      const res = await fetch(`/api/crm/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders(),
+        },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
     },
   });
 
@@ -445,6 +508,9 @@ export default function CrmDealDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Related Items Section */}
+          {deal && <AssociationsSection entityType="DEAL" entityId={deal.id} />}
         </TabsContent>
 
         <TabsContent value="notes">
@@ -515,11 +581,23 @@ export default function CrmDealDetail() {
               </div>
               <div className="space-y-2">
                 {tasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-3 flex items-start gap-3">
-                    {getStatusIcon(task.status)}
+                  <div 
+                    key={task.id} 
+                    className={`border rounded-lg p-3 flex items-start gap-3 ${task.status === "COMPLETED" ? "opacity-60" : ""}`}
+                  >
+                    <Checkbox
+                      checked={task.status === "COMPLETED"}
+                      onCheckedChange={() => toggleCompleteTaskMutation.mutate({ 
+                        taskId: task.id, 
+                        currentStatus: task.status 
+                      })}
+                      className="mt-0.5"
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{task.title}</h4>
+                        <h4 className={`font-medium ${task.status === "COMPLETED" ? "line-through" : ""}`}>
+                          {task.title}
+                        </h4>
                         <Badge className={getPriorityColor(task.priority)}>
                           {task.priority}
                         </Badge>
@@ -533,6 +611,14 @@ export default function CrmDealDetail() {
                         </p>
                       )}
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteTaskId(task.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
                 {tasks.length === 0 && (
@@ -572,6 +658,27 @@ export default function CrmDealDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Task Confirmation Dialog */}
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTaskId && deleteTaskMutation.mutate(deleteTaskId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
