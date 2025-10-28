@@ -9,7 +9,10 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "generate-key": "node generate-encryption-key.cjs",
+    "migrate:encrypt-messages": "node migrate-encrypt-messages.cjs",
+    "migrate:encrypt-messages:dry-run": "node migrate-encrypt-messages.cjs --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.913.0",

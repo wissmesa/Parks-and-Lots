@@ -70,6 +70,7 @@ export const users = pgTable("users", {
   resetToken: varchar("reset_token"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
   lastNotificationClearedAt: timestamp("last_notification_cleared_at"),
+  lastMentionClearedAt: timestamp("last_mention_cleared_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -385,6 +386,7 @@ export const crmNotes = pgTable("crm_notes", {
   entityId: varchar("entity_id").notNull(),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   companyId: varchar("company_id").references(() => companies.id).notNull(),
+  mentionedUsers: text("mentioned_users").array(), // Array of user IDs mentioned in note
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

@@ -417,6 +417,19 @@ export default function CrmTasks() {
                         </div>
                       )}
 
+                      {/* Created Date */}
+                      {task.createdAt && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="text-xs">
+                            Created: {new Date(task.createdAt).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: new Date(task.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                            })}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Status Selector */}
                       <Select
                         value={task.status}

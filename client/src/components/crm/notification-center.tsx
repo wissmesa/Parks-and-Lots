@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Bell, CheckSquare, MessageSquare, Clock, X } from "lucide-react";
+import { Bell, CheckSquare, MessageSquare, Clock, X, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,6 +31,16 @@ interface Message {
   senderName: string;
 }
 
+interface Mention {
+  id: string;
+  content: string;
+  entityType: string;
+  entityId: string;
+  authorName: string;
+  createdAt: string;
+  entityName?: string | null;
+}
+
 interface NotificationData {
   tasks: {
     count: number;
@@ -39,6 +49,10 @@ interface NotificationData {
   messages: {
     count: number;
     items: Message[];
+  };
+  mentions: {
+    count: number;
+    items: Mention[];
   };
 }
 
@@ -87,15 +101,34 @@ export default function NotificationCenter() {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
       });
 
+      newSocket.on("note_mention", (data: any) => {
+        // Immediately refetch notifications when mentioned in a note
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+        toast({
+          title: "You were mentioned",
+          description: `${data.mentionedBy} mentioned you in a note`,
+        });
+      });
+
+      newSocket.on("task_notifications_cleared", () => {
+        // Immediately refetch notifications when task notifications are cleared
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      });
+
+      newSocket.on("mention_notifications_cleared", () => {
+        // Immediately refetch notifications when mention notifications are cleared
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      });
+
       setSocket(newSocket);
 
       return () => {
         newSocket.close();
       };
     }
-  }, [user]);
+  }, [user, toast]);
 
-  const totalCount = (notificationData?.tasks.count || 0) + (notificationData?.messages.count || 0);
+  const totalCount = (notificationData?.tasks.count || 0) + (notificationData?.messages.count || 0) + (notificationData?.mentions.count || 0);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -157,6 +190,68 @@ export default function NotificationCenter() {
     clearMessagesMutation.mutate();
   };
 
+  const clearTasksMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/crm/notifications/clear-tasks", {
+        method: "POST",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear task notifications");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      toast({
+        title: "Tasks cleared",
+        description: "Task notifications have been cleared",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to clear task notifications",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClearTasks = () => {
+    clearTasksMutation.mutate();
+  };
+
+  const clearMentionsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/crm/notifications/clear-mentions", {
+        method: "POST",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear mention notifications");
+      return res.json();
+    },
+    onSuccess: async () => {
+      // Force refetch immediately
+      await queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      await refetch();
+      toast({
+        title: "Mentions cleared",
+        description: "Mention notifications have been cleared",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClearMentions = () => {
+    clearMentionsMutation.mutate();
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -192,9 +287,20 @@ export default function NotificationCenter() {
           {/* Tasks Section */}
           {notificationData && notificationData.tasks.count > 0 && (
             <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckSquare className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-semibold text-sm">Tasks ({notificationData.tasks.count})</h4>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="font-semibold text-sm">Tasks ({notificationData.tasks.count})</h4>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearTasks}
+                  disabled={clearTasksMutation.isPending}
+                  className="h-7 text-xs"
+                >
+                  Clear All
+                </Button>
               </div>
               <div className="space-y-2">
                 {notificationData.tasks.items.map((task) => (
@@ -226,7 +332,63 @@ export default function NotificationCenter() {
             </div>
           )}
 
-          {notificationData && notificationData.tasks.count > 0 && notificationData.messages.count > 0 && (
+          {notificationData && notificationData.tasks.count > 0 && (notificationData.mentions.count > 0 || notificationData.messages.count > 0) && (
+            <Separator />
+          )}
+
+          {/* Mentions Section */}
+          {notificationData && notificationData.mentions.count > 0 && (
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <AtSign className="h-4 w-4 text-muted-foreground" />
+                  <h4 className="font-semibold text-sm">Mentions ({notificationData.mentions.count})</h4>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearMentions}
+                  disabled={clearMentionsMutation.isPending}
+                  className="h-7 text-xs"
+                >
+                  Clear All
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {notificationData.mentions.items.map((mention) => {
+                  const entityUrl = mention.entityType === 'CONTACT' 
+                    ? `/crm/contacts/${mention.entityId}`
+                    : mention.entityType === 'DEAL'
+                    ? `/crm/deals/${mention.entityId}`
+                    : `/crm/units/${mention.entityId}`;
+                  
+                  return (
+                    <Link key={mention.id} href={entityUrl} onClick={() => setOpen(false)}>
+                      <div className="p-3 rounded-lg border hover:bg-muted cursor-pointer transition-colors">
+                        <p className="text-xs font-semibold text-primary mb-1">
+                          {mention.authorName} mentioned you
+                        </p>
+                        {mention.entityName && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            in {mention.entityType}: {mention.entityName}
+                          </p>
+                        )}
+                        <p className="text-sm line-clamp-2">{mention.content.replace(/@\[[^\]]+\]/g, (match) => {
+                          const userName = match.match(/:[^\]]+/)?.[0].slice(1);
+                          return `@${userName}`;
+                        })}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatTimeAgo(mention.createdAt)}
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {notificationData && notificationData.mentions.count > 0 && notificationData.messages.count > 0 && (
             <Separator />
           )}
 
@@ -255,7 +417,7 @@ export default function NotificationCenter() {
                       <p className="text-xs font-semibold text-primary mb-1">
                         {message.senderName}
                       </p>
-                      <p className="text-sm line-clamp-2">{message.content}</p>
+                      <p className="text-sm line-clamp-2 break-words overflow-hidden">{message.content}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatTimeAgo(message.createdAt)}
                       </p>

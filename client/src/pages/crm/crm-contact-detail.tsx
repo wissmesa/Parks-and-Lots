@@ -15,6 +15,13 @@ import { AuthManager } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -25,6 +32,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AssociationsSection } from "@/components/crm/associations-section";
+import { MentionTextarea } from "@/components/crm/mention-textarea";
+import { NoteItem } from "@/components/crm/note-item";
 
 interface Contact {
   id: string;
@@ -41,7 +50,15 @@ interface Note {
   id: string;
   content: string;
   createdBy: string;
+  authorName: string;
+  authorEmail: string;
   createdAt: string;
+}
+
+interface User {
+  id: string;
+  fullName: string;
+  email: string;
 }
 
 interface Task {
@@ -74,6 +91,7 @@ export default function CrmContactDetail() {
   const [newNote, setNewNote] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "" });
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [taskSortBy, setTaskSortBy] = useState("date-newest");
 
   // Fetch contact
   const { data: contact, isLoading } = useQuery<Contact>({
@@ -86,6 +104,20 @@ export default function CrmContactDetail() {
       if (!res.ok) throw new Error("Failed to fetch contact");
       return res.json();
     },
+  });
+
+  // Fetch company users
+  const { data: usersData } = useQuery({
+    queryKey: ["/api/crm/company-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/company-users", {
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    enabled: !!user,
   });
 
   // Fetch notes
@@ -259,6 +291,37 @@ export default function CrmContactDetail() {
   const notes: Note[] = notesData?.notes || [];
   const tasks: Task[] = tasksData?.tasks || [];
   const activities: Activity[] = activitiesData?.activities || [];
+  const companyUsers: User[] = usersData?.users || [];
+
+  // Sort tasks
+  const sortedTasks = [...tasks].sort((a, b) => {
+    switch (taskSortBy) {
+      case "priority-high":
+        const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
+               (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+      case "priority-low":
+        const priorityOrderLow = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrderLow[a.priority as keyof typeof priorityOrderLow] || 0) - 
+               (priorityOrderLow[b.priority as keyof typeof priorityOrderLow] || 0);
+      case "due-nearest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case "due-farthest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      case "date-newest":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "date-oldest":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      default:
+        return 0;
+    }
+  });
 
   const handleSaveInfo = () => {
     if (editForm.firstName && editForm.lastName) {
@@ -344,96 +407,103 @@ export default function CrmContactDetail() {
         </TabsList>
 
         <TabsContent value="info">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Contact Information</CardTitle>
-              {!isEditingInfo ? (
-                <Button onClick={startEditingInfo}>Edit</Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button onClick={handleSaveInfo} disabled={updateMutation.isPending}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isEditingInfo ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>First Name</Label>
-                      <Input
-                        value={editForm.firstName || ""}
-                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Last Name</Label>
-                      <Input
-                        value={editForm.lastName || ""}
-                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      value={editForm.email || ""}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Phone</Label>
-                    <Input
-                      value={editForm.phone || ""}
-                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Source</Label>
-                    <Input
-                      value={editForm.source || ""}
-                      onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  {contact.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-5 w-5 text-muted-foreground" />
-                      <span>{contact.email}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Information - Left Side (2/3 width) */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Contact Information</CardTitle>
+                  {!isEditingInfo ? (
+                    <Button onClick={startEditingInfo}>Edit</Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveInfo} disabled={updateMutation.isPending}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
+                        Cancel
+                      </Button>
                     </div>
                   )}
-                  {contact.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-5 w-5 text-muted-foreground" />
-                      <span>{contact.phone}</span>
-                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isEditingInfo ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>First Name</Label>
+                          <Input
+                            value={editForm.firstName || ""}
+                            onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Last Name</Label>
+                          <Input
+                            value={editForm.lastName || ""}
+                            onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <Input
+                          type="email"
+                          value={editForm.email || ""}
+                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Phone</Label>
+                        <Input
+                          value={editForm.phone || ""}
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Source</Label>
+                        <Input
+                          value={editForm.source || ""}
+                          onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {contact.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 text-muted-foreground" />
+                          <span>{contact.email}</span>
+                        </div>
+                      )}
+                      {contact.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-5 w-5 text-muted-foreground" />
+                          <span>{contact.phone}</span>
+                        </div>
+                      )}
+                      {contact.source && (
+                        <div>
+                          <span className="text-sm text-muted-foreground">Source:</span>{" "}
+                          <span>{contact.source}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-sm text-muted-foreground">Created:</span>{" "}
+                        <span>{new Date(contact.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </>
                   )}
-                  {contact.source && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">Source:</span>{" "}
-                      <span>{contact.source}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-sm text-muted-foreground">Created:</span>{" "}
-                    <span>{new Date(contact.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Related Items Section */}
-          {contact && <AssociationsSection entityType="CONTACT" entityId={contact.id} />}
+            {/* Related Items Section - Right Side (1/3 width) */}
+            <div className="lg:col-span-1">
+              {contact && <AssociationsSection entityType="CONTACT" entityId={contact.id} />}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="notes">
@@ -443,12 +513,15 @@ export default function CrmContactDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a note..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  rows={3}
-                />
+                <div className="flex-1">
+                  <MentionTextarea
+                    value={newNote}
+                    onChange={setNewNote}
+                    users={companyUsers}
+                    placeholder="Add a note... (type @ to mention someone)"
+                    rows={3}
+                  />
+                </div>
                 <Button
                   onClick={() => createNoteMutation.mutate(newNote)}
                   disabled={!newNote.trim() || createNoteMutation.isPending}
@@ -458,12 +531,12 @@ export default function CrmContactDetail() {
               </div>
               <div className="space-y-2">
                 {notes.map((note) => (
-                  <div key={note.id} className="border rounded-lg p-3">
-                    <p className="text-sm">{note.content}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(note.createdAt).toLocaleString()}
-                    </p>
-                  </div>
+                  <NoteItem
+                    key={note.id}
+                    content={note.content}
+                    authorName={note.authorName}
+                    createdAt={note.createdAt}
+                  />
                 ))}
                 {notes.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
@@ -502,8 +575,28 @@ export default function CrmContactDetail() {
                   Add Task
                 </Button>
               </div>
+              
+              {/* Task Sort Dropdown */}
+              {tasks.length > 0 && (
+                <div className="flex justify-end">
+                  <Select value={taskSortBy} onValueChange={setTaskSortBy}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date-newest">Newest First</SelectItem>
+                      <SelectItem value="date-oldest">Oldest First</SelectItem>
+                      <SelectItem value="priority-high">Priority (Highest)</SelectItem>
+                      <SelectItem value="priority-low">Priority (Lowest)</SelectItem>
+                      <SelectItem value="due-nearest">Due Date (Nearest)</SelectItem>
+                      <SelectItem value="due-farthest">Due Date (Farthest)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               <div className="space-y-2">
-                {tasks.map((task) => (
+                {sortedTasks.map((task) => (
                   <div 
                     key={task.id} 
                     className={`border rounded-lg p-3 flex items-start gap-3 ${task.status === "COMPLETED" ? "opacity-60" : ""}`}
@@ -528,11 +621,18 @@ export default function CrmContactDetail() {
                       {task.description && (
                         <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                       )}
-                      {task.dueDate && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </p>
-                      )}
+                      <div className="flex gap-3 flex-wrap mt-1">
+                        {task.dueDate && (
+                          <p className="text-xs text-muted-foreground">
+                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                          </p>
+                        )}
+                        {task.createdAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Created: {new Date(task.createdAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="ghost"

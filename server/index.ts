@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { testEncryption } from "./encryption";
 import path from "path";
 // Force reload - S3 fallback enabled
 
@@ -64,6 +65,20 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Test encryption on startup
+  log('Testing message encryption...');
+  try {
+    const encryptionOk = testEncryption();
+    if (!encryptionOk) {
+      log('⚠️  WARNING: Message encryption test failed! DMs may not work correctly.');
+    }
+  } catch (error) {
+    log('❌ ERROR: Message encryption is not configured!');
+    log('   Generate an encryption key with: node generate-encryption-key.js');
+    log('   Then add ENCRYPTION_KEY to your .env file');
+    throw error;
+  }
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

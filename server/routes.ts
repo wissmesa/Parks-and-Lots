@@ -6834,6 +6834,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Emit WebSocket event to assigned user for real-time notification
+      const io = app.get('socketIo');
+      if (io && task.assignedTo) {
+        io.to(`user:${task.assignedTo}`).emit('task_updated', {
+          taskId: task.id,
+          action: 'created'
+        });
+      }
+
       res.json(task);
     } catch (error) {
       console.error('Create CRM task error:', error);
@@ -6858,6 +6867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const oldStatus = task.status;
+      const oldAssignedTo = task.assignedTo;
       const updated = await storage.updateCrmTask(req.params.id, req.body);
       
       // Log activity if status changed and task is associated with an entity
@@ -6870,6 +6880,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: req.user!.id,
           companyId: task.companyId
         });
+      }
+
+      // Emit WebSocket event to assigned users for real-time notification
+      const io = app.get('socketIo');
+      if (io) {
+        // Notify old assignee if changed
+        if (req.body.assignedTo && req.body.assignedTo !== oldAssignedTo && oldAssignedTo) {
+          io.to(`user:${oldAssignedTo}`).emit('task_updated', {
+            taskId: task.id,
+            action: 'unassigned'
+          });
+        }
+        // Notify new assignee
+        if (updated.assignedTo) {
+          io.to(`user:${updated.assignedTo}`).emit('task_updated', {
+            taskId: updated.id,
+            action: 'updated'
+          });
+        }
       }
 
       res.json(updated);
@@ -6938,6 +6967,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user!.id,
         companyId
       });
+
+      // Emit WebSocket event to mentioned users
+      if (note.mentionedUsers && note.mentionedUsers.length > 0) {
+        const io = app.get('socketIo');
+        if (io) {
+          note.mentionedUsers.forEach((userId: string) => {
+            io.to(`user:${userId}`).emit('note_mention', {
+              noteId: note.id,
+              entityType: note.entityType,
+              entityId: note.entityId,
+              mentionedBy: req.user!.fullName,
+            });
+          });
+        }
+      }
 
       res.json(note);
     } catch (error) {
@@ -7038,6 +7082,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/crm/notifications/clear-tasks', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      await storage.clearTaskNotifications(req.user!.id);
+      
+      // Emit WebSocket event for real-time update
+      const io = app.get('socketIo');
+      if (io) {
+        io.to(`user:${req.user!.id}`).emit('task_notifications_cleared');
+      }
+      
+      res.json({ message: 'Task notifications cleared' });
+    } catch (error) {
+      console.error('Clear task notifications error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/crm/notifications/clear-mentions', authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      await storage.clearMentionNotifications(req.user!.id);
+      
+      // Emit WebSocket event for real-time update
+      const io = app.get('socketIo');
+      if (io) {
+        io.to(`user:${req.user!.id}`).emit('mention_notifications_cleared');
+      }
+      
+      res.json({ message: 'Mention notifications cleared' });
+    } catch (error) {
+      console.error('Clear mention notifications error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+
   // CRM Associations
   app.get('/api/crm/associations', authenticateToken, async (req: AuthRequest, res) => {
     try {
@@ -7059,6 +7137,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyId = req.user!.companyId;
       if (!companyId) {
         return res.status(403).json({ message: 'User must be assigned to a company' });
+      }
+
+      const { sourceType, sourceId, targetType, targetId } = req.body;
+      
+      // Validate required fields
+      if (!sourceType || !sourceId || !targetType || !targetId) {
+        return res.status(400).json({ 
+          message: 'Missing required fields: sourceType, sourceId, targetType, and targetId are required' 
+        });
       }
 
       const associationData = {
@@ -7092,7 +7179,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(association);
     } catch (error) {
       console.error('Create CRM association error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+      res.status(500).json({ message: errorMessage });
     }
   });
 
@@ -7144,10 +7232,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { parks } = await storage.getParksByCompany(companyId);
       const parkIds = parks.map(p => p.id);
       
+      // Create a map of parkId to park name
+      const parkMap = new Map(parks.map(p => [p.id, p.name]));
+      
       let lots = [];
       for (const parkId of parkIds) {
         const parkLots = await storage.getLots({ parkId });
-        lots.push(...parkLots);
+        // Enrich each lot with park name
+        const enrichedLots = parkLots.map(lot => ({
+          ...lot,
+          parkName: parkMap.get(lot.parkId || '') || null
+        }));
+        lots.push(...enrichedLots);
       }
 
       res.json({ units: lots });
@@ -7339,6 +7435,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`User disconnected: ${user.fullName} (${user.id})`);
     });
   });
+
+  // Store io instance for use in routes
+  app.set('socketIo', io);
 
   return httpServer;
 }

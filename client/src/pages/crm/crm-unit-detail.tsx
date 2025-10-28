@@ -7,13 +7,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Plus, CheckCircle2, Circle, Clock, Building2, DollarSign } from "lucide-react";
+import { ArrowLeft, Save, Plus, CheckCircle2, Circle, Clock, Building2, DollarSign, Trash2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { AuthManager } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AssociationsSection } from "@/components/crm/associations-section";
+import { MentionTextarea } from "@/components/crm/mention-textarea";
+import { NoteItem } from "@/components/crm/note-item";
 
 interface Lot {
   id: string;
@@ -53,7 +73,15 @@ interface Note {
   id: string;
   content: string;
   createdBy: string;
+  authorName: string;
+  authorEmail: string;
   createdAt: string;
+}
+
+interface User {
+  id: string;
+  fullName: string;
+  email: string;
 }
 
 interface Task {
@@ -86,11 +114,14 @@ const LOT_STATUSES = [
 export default function CrmUnitDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Lot>>({});
   const [newNote, setNewNote] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "" });
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [taskSortBy, setTaskSortBy] = useState("date-newest");
 
   // Fetch lot
   const { data: lot, isLoading } = useQuery<Lot>({
@@ -119,6 +150,20 @@ export default function CrmUnitDetail() {
       return res.json();
     },
     enabled: !!lot?.parkId,
+  });
+
+  // Fetch company users
+  const { data: usersData } = useQuery({
+    queryKey: ["/api/crm/company-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/company-users", {
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    enabled: !!user,
   });
 
   // Fetch notes
@@ -235,6 +280,7 @@ export default function CrmUnitDetail() {
           entityId: id,
           status: "TODO",
           priority: "MEDIUM",
+          assignedTo: user?.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to create task");
@@ -248,9 +294,83 @@ export default function CrmUnitDetail() {
     },
   });
 
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const res = await fetch(`/api/crm/tasks/${taskId}`, {
+        method: "DELETE",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete task");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+      toast({ title: "Success", description: "Task deleted successfully" });
+      setDeleteTaskId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete task", variant: "destructive" });
+    },
+  });
+
+  // Toggle complete mutation
+  const toggleCompleteTaskMutation = useMutation({
+    mutationFn: async ({ taskId, currentStatus }: { taskId: string; currentStatus: string }) => {
+      const newStatus = currentStatus === "COMPLETED" ? "TODO" : "COMPLETED";
+      const res = await fetch(`/api/crm/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...AuthManager.getAuthHeaders(),
+        },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
+    },
+  });
+
   const notes: Note[] = notesData?.notes || [];
   const tasks: Task[] = tasksData?.tasks || [];
   const activities: Activity[] = activitiesData?.activities || [];
+  const companyUsers: User[] = usersData?.users || [];
+
+  // Sort tasks
+  const sortedTasks = [...tasks].sort((a, b) => {
+    switch (taskSortBy) {
+      case "priority-high":
+        const priorityOrder = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
+               (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+      case "priority-low":
+        const priorityOrderLow = { URGENT: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (priorityOrderLow[a.priority as keyof typeof priorityOrderLow] || 0) - 
+               (priorityOrderLow[b.priority as keyof typeof priorityOrderLow] || 0);
+      case "due-nearest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case "due-farthest":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      case "date-newest":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "date-oldest":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      default:
+        return 0;
+    }
+  });
 
   const handleSaveInfo = () => {
     if (editForm.nameOrNumber) {
@@ -321,24 +441,8 @@ export default function CrmUnitDetail() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "FOR_RENT":
-        return "bg-blue-100 text-blue-800";
-      case "FOR_SALE":
-        return "bg-green-100 text-green-800";
-      case "RENT_TO_OWN":
-        return "bg-purple-100 text-purple-800";
-      case "CONTRACT_FOR_DEED":
-        return "bg-indigo-100 text-indigo-800";
-      case "OCCUPIED":
-        return "bg-gray-100 text-gray-800";
-      case "MAINTENANCE":
-        return "bg-orange-100 text-orange-800";
-      case "RESERVED":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    // Use a neutral color scheme for all statuses
+    return "bg-gray-100 text-gray-800 border border-gray-200";
   };
 
   if (isLoading) {
@@ -391,24 +495,27 @@ export default function CrmUnitDetail() {
         </TabsList>
 
         <TabsContent value="info">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Unit Information</CardTitle>
-              {!isEditingInfo ? (
-                <Button onClick={startEditingInfo}>Edit</Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button onClick={handleSaveInfo} disabled={updateMutation.isPending}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Information - Left Side (2/3 width) */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Unit Information</CardTitle>
+                  {!isEditingInfo ? (
+                    <Button onClick={startEditingInfo}>Edit</Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button onClick={handleSaveInfo} disabled={updateMutation.isPending}>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-6">
               {isEditingInfo ? (
                 <>
                   <div>
@@ -659,8 +766,8 @@ export default function CrmUnitDetail() {
                       {lot.priceForRent && (
                         <div>
                           <span className="text-sm text-muted-foreground">Price for Rent:</span>
-                          <div className="flex items-center gap-1 text-lg font-semibold text-green-600 mt-1">
-                            <DollarSign className="h-5 w-5" />
+                          <div className="flex items-center gap-1 text-lg font-semibold mt-1">
+                            <DollarSign className="h-5 w-5 text-muted-foreground" />
                             {parseFloat(lot.priceForRent).toLocaleString()}/mo
                           </div>
                         </div>
@@ -668,8 +775,8 @@ export default function CrmUnitDetail() {
                       {lot.priceForSale && (
                         <div>
                           <span className="text-sm text-muted-foreground">Price for Sale:</span>
-                          <div className="flex items-center gap-1 text-lg font-semibold text-blue-600 mt-1">
-                            <DollarSign className="h-5 w-5" />
+                          <div className="flex items-center gap-1 text-lg font-semibold mt-1">
+                            <DollarSign className="h-5 w-5 text-muted-foreground" />
                             {parseFloat(lot.priceForSale).toLocaleString()}
                           </div>
                         </div>
@@ -677,8 +784,8 @@ export default function CrmUnitDetail() {
                       {lot.priceRentToOwn && (
                         <div>
                           <span className="text-sm text-muted-foreground">Rent to Own:</span>
-                          <div className="flex items-center gap-1 text-lg font-semibold text-purple-600 mt-1">
-                            <DollarSign className="h-5 w-5" />
+                          <div className="flex items-center gap-1 text-lg font-semibold mt-1">
+                            <DollarSign className="h-5 w-5 text-muted-foreground" />
                             {parseFloat(lot.priceRentToOwn).toLocaleString()}
                           </div>
                         </div>
@@ -686,8 +793,8 @@ export default function CrmUnitDetail() {
                       {lot.priceContractForDeed && (
                         <div>
                           <span className="text-sm text-muted-foreground">Contract for Deed:</span>
-                          <div className="flex items-center gap-1 text-lg font-semibold text-indigo-600 mt-1">
-                            <DollarSign className="h-5 w-5" />
+                          <div className="flex items-center gap-1 text-lg font-semibold mt-1">
+                            <DollarSign className="h-5 w-5 text-muted-foreground" />
                             {parseFloat(lot.priceContractForDeed).toLocaleString()}
                           </div>
                         </div>
@@ -695,8 +802,8 @@ export default function CrmUnitDetail() {
                       {lot.lotRent && (
                         <div>
                           <span className="text-sm text-muted-foreground">Lot Rent:</span>
-                          <div className="flex items-center gap-1 text-lg font-semibold text-gray-600 mt-1">
-                            <DollarSign className="h-5 w-5" />
+                          <div className="flex items-center gap-1 text-lg font-semibold mt-1">
+                            <DollarSign className="h-5 w-5 text-muted-foreground" />
                             {parseFloat(lot.lotRent).toLocaleString()}/mo
                           </div>
                         </div>
@@ -705,12 +812,12 @@ export default function CrmUnitDetail() {
                         <div>
                           <span className="text-sm text-muted-foreground">Promotional Price:</span>
                           <div className="flex items-center gap-2 mt-1">
-                            <div className="flex items-center gap-1 text-lg font-semibold text-red-600">
-                              <DollarSign className="h-5 w-5" />
+                            <div className="flex items-center gap-1 text-lg font-semibold">
+                              <DollarSign className="h-5 w-5 text-muted-foreground" />
                               {parseFloat(lot.promotionalPrice).toLocaleString()}
                             </div>
                             {lot.promotionalPriceActive && (
-                              <Badge className="bg-red-100 text-red-800">Active</Badge>
+                              <Badge className="bg-gray-100 text-gray-800 border border-gray-200">Active</Badge>
                             )}
                           </div>
                         </div>
@@ -822,11 +929,15 @@ export default function CrmUnitDetail() {
                   </div>
                 </>
               )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Related Items Section */}
-          {lot && <AssociationsSection entityType="LOT" entityId={lot.id} />}
+            {/* Related Items Section - Right Side (1/3 width) */}
+            <div className="lg:col-span-1">
+              {lot && <AssociationsSection entityType="LOT" entityId={lot.id} />}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="notes">
@@ -836,12 +947,15 @@ export default function CrmUnitDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a note..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  rows={3}
-                />
+                <div className="flex-1">
+                  <MentionTextarea
+                    value={newNote}
+                    onChange={setNewNote}
+                    users={companyUsers}
+                    placeholder="Add a note... (type @ to mention someone)"
+                    rows={3}
+                  />
+                </div>
                 <Button
                   onClick={() => createNoteMutation.mutate(newNote)}
                   disabled={!newNote.trim() || createNoteMutation.isPending}
@@ -851,12 +965,12 @@ export default function CrmUnitDetail() {
               </div>
               <div className="space-y-2">
                 {notes.map((note) => (
-                  <div key={note.id} className="border rounded-lg p-3">
-                    <p className="text-sm">{note.content}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(note.createdAt).toLocaleString()}
-                    </p>
-                  </div>
+                  <NoteItem
+                    key={note.id}
+                    content={note.content}
+                    authorName={note.authorName}
+                    createdAt={note.createdAt}
+                  />
                 ))}
                 {notes.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
@@ -895,13 +1009,45 @@ export default function CrmUnitDetail() {
                   Add Task
                 </Button>
               </div>
+              
+              {/* Task Sort Dropdown */}
+              {tasks.length > 0 && (
+                <div className="flex justify-end">
+                  <Select value={taskSortBy} onValueChange={setTaskSortBy}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date-newest">Newest First</SelectItem>
+                      <SelectItem value="date-oldest">Oldest First</SelectItem>
+                      <SelectItem value="priority-high">Priority (Highest)</SelectItem>
+                      <SelectItem value="priority-low">Priority (Lowest)</SelectItem>
+                      <SelectItem value="due-nearest">Due Date (Nearest)</SelectItem>
+                      <SelectItem value="due-farthest">Due Date (Farthest)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
               <div className="space-y-2">
-                {tasks.map((task) => (
-                  <div key={task.id} className="border rounded-lg p-3 flex items-start gap-3">
-                    {getStatusIcon(task.status)}
+                {sortedTasks.map((task) => (
+                  <div 
+                    key={task.id} 
+                    className={`border rounded-lg p-3 flex items-start gap-3 ${task.status === "COMPLETED" ? "opacity-60" : ""}`}
+                  >
+                    <Checkbox
+                      checked={task.status === "COMPLETED"}
+                      onCheckedChange={() => toggleCompleteTaskMutation.mutate({ 
+                        taskId: task.id, 
+                        currentStatus: task.status 
+                      })}
+                      className="mt-0.5"
+                    />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{task.title}</h4>
+                        <h4 className={`font-medium ${task.status === "COMPLETED" ? "line-through" : ""}`}>
+                          {task.title}
+                        </h4>
                         <Badge className={getPriorityColor(task.priority)}>
                           {task.priority}
                         </Badge>
@@ -909,15 +1055,30 @@ export default function CrmUnitDetail() {
                       {task.description && (
                         <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                       )}
-                      {task.dueDate && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Due: {new Date(task.dueDate).toLocaleDateString()}
-                        </p>
-                      )}
+                      <div className="flex gap-3 flex-wrap mt-1">
+                        {task.dueDate && (
+                          <p className="text-xs text-muted-foreground">
+                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                          </p>
+                        )}
+                        {task.createdAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Created: {new Date(task.createdAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setDeleteTaskId(task.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
-                {tasks.length === 0 && (
+                {sortedTasks.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     No tasks yet. Create one above!
                   </p>
@@ -954,6 +1115,27 @@ export default function CrmUnitDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Task Confirmation Dialog */}
+      <AlertDialog open={!!deleteTaskId} onOpenChange={(open) => !open && setDeleteTaskId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTaskId && deleteTaskMutation.mutate(deleteTaskId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

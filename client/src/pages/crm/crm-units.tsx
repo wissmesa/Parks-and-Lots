@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Building2, DollarSign, Bed, Bath, Search } from "lucide-react";
 import { AuthManager } from "@/lib/auth";
 
@@ -13,9 +14,13 @@ interface Unit {
   status: string[] | null;
   priceForRent?: string | null;
   priceForSale?: string | null;
+  priceRentToOwn?: string | null;
+  priceContractForDeed?: string | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  sqFt?: number | null;
   parkId?: string | null;
+  parkName?: string | null;
 }
 
 export default function CrmUnits() {
@@ -63,6 +68,15 @@ export default function CrmUnits() {
     }
   });
 
+  const getStatusColor = (status: string) => {
+    // Use a neutral color scheme for all statuses
+    return "bg-gray-100 text-gray-800 border border-gray-200";
+  };
+
+  const handleRowClick = (unitId: string) => {
+    setLocation(`/crm/units/${unitId}`);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -97,76 +111,112 @@ export default function CrmUnits() {
         <div className="flex justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedUnits.map((unit) => (
-            <Card 
-              key={unit.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => setLocation(`/crm/units/${unit.id}`)}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Unit {unit.nameOrNumber}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {unit.status && unit.status.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {unit.status.map((s, i) => (
-                      <span
-                        key={i}
-                        className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary"
-                      >
-                        {s.replace(/_/g, " ")}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {unit.priceForRent && (
-                    <div className="flex items-center gap-1 text-green-600 font-semibold">
-                      <DollarSign className="h-4 w-4" />
-                      {parseFloat(unit.priceForRent).toLocaleString()}/mo
+      ) : sortedUnits.length > 0 ? (
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Unit Number</TableHead>
+                <TableHead>Park</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Details</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedUnits.map((unit) => (
+                <TableRow
+                  key={unit.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleRowClick(unit.id)}
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span>Unit {unit.nameOrNumber}</span>
                     </div>
-                  )}
-                  {unit.priceForSale && (
-                    <div className="flex items-center gap-1 text-blue-600 font-semibold">
-                      <DollarSign className="h-4 w-4" />
-                      {parseFloat(unit.priceForSale).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {unit.parkName || "-"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {unit.status && unit.status.length > 0 ? (
+                        unit.status.map((s, i) => (
+                          <Badge key={i} className={getStatusColor(s)}>
+                            {s.replace(/_/g, " ")}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                {(unit.bedrooms || unit.bathrooms) && (
-                  <div className="flex gap-4 text-sm text-muted-foreground">
-                    {unit.bedrooms && (
-                      <div className="flex items-center gap-1">
-                        <Bed className="h-4 w-4" />
-                        {unit.bedrooms} bed
-                      </div>
-                    )}
-                    {unit.bathrooms && (
-                      <div className="flex items-center gap-1">
-                        <Bath className="h-4 w-4" />
-                        {unit.bathrooms} bath
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      {unit.priceForRent && (
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          {parseFloat(unit.priceForRent).toLocaleString()}/mo
+                        </div>
+                      )}
+                      {unit.priceForSale && (
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          {parseFloat(unit.priceForSale).toLocaleString()}
+                        </div>
+                      )}
+                      {unit.priceRentToOwn && (
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          {parseFloat(unit.priceRentToOwn).toLocaleString()} RTO
+                        </div>
+                      )}
+                      {unit.priceContractForDeed && (
+                        <div className="flex items-center gap-1 text-sm font-medium">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          {parseFloat(unit.priceContractForDeed).toLocaleString()} CFD
+                        </div>
+                      )}
+                      {!unit.priceForRent && !unit.priceForSale && !unit.priceRentToOwn && !unit.priceContractForDeed && (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-3 text-sm text-muted-foreground">
+                      {unit.bedrooms && (
+                        <div className="flex items-center gap-1">
+                          <Bed className="h-4 w-4" />
+                          {unit.bedrooms}
+                        </div>
+                      )}
+                      {unit.bathrooms && (
+                        <div className="flex items-center gap-1">
+                          <Bath className="h-4 w-4" />
+                          {unit.bathrooms}
+                        </div>
+                      )}
+                      {unit.sqFt && (
+                        <span>{unit.sqFt.toLocaleString()} sqft</span>
+                      )}
+                      {!unit.bedrooms && !unit.bathrooms && !unit.sqFt && (
+                        <span>-</span>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      )}
-
-      {!isLoading && sortedUnits.length === 0 && (
-        <div className="text-center py-12">
+      ) : (
+        <div className="text-center py-12 border rounded-lg">
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No units found</h3>
-          <p className="text-muted-foreground">Units will appear here once they are added to your parks</p>
+          <p className="text-muted-foreground">
+            {searchQuery ? "Try adjusting your search query" : "Units will appear here once they are added to your parks"}
+          </p>
         </div>
       )}
     </div>

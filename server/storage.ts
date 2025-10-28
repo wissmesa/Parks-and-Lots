@@ -66,7 +66,8 @@ import {
   type AuditLog
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, gt, gte, lte, or, like, ilike, desc, asc, sql, inArray, isNotNull, isNull } from "drizzle-orm";
+import { encryptMessage, decryptMessage } from "./encryption";
 
 export interface IStorage {
   // User operations
@@ -244,6 +245,8 @@ export interface IStorage {
   
   // CRM Notification operations
   getNotifications(userId: string, companyId: string): Promise<any>;
+  clearTaskNotifications(userId: string): Promise<void>;
+  clearMentionNotifications(userId: string): Promise<void>;
   
   // CRM Association operations
   getCrmAssociations(sourceType: string, sourceId: string): Promise<any[]>;
@@ -2092,10 +2095,37 @@ export class DatabaseStorage implements IStorage {
     await db.delete(crmTasks).where(eq(crmTasks.id, id));
   }
 
+  // Helper function to parse user mentions from note content
+  private parseUserMentions(content: string): string[] {
+    // Match pattern @[userId:DisplayName]
+    const mentionRegex = /@\[([^:]+):[^\]]+\]/g;
+    const userIds: string[] = [];
+    let match;
+    
+    while ((match = mentionRegex.exec(content)) !== null) {
+      userIds.push(match[1]);
+    }
+    
+    return [...new Set(userIds)]; // Remove duplicates
+  }
+
   // CRM Note operations
-  async getCrmNotes(entityType: string, entityId: string): Promise<CrmNote[]> {
-    const results = await db.select()
+  async getCrmNotes(entityType: string, entityId: string): Promise<any[]> {
+    const results = await db.select({
+      id: crmNotes.id,
+      content: crmNotes.content,
+      entityType: crmNotes.entityType,
+      entityId: crmNotes.entityId,
+      createdBy: crmNotes.createdBy,
+      companyId: crmNotes.companyId,
+      mentionedUsers: crmNotes.mentionedUsers,
+      createdAt: crmNotes.createdAt,
+      updatedAt: crmNotes.updatedAt,
+      authorName: users.fullName,
+      authorEmail: users.email,
+    })
       .from(crmNotes)
+      .leftJoin(users, eq(crmNotes.createdBy, users.id))
       .where(
         and(
           eq(crmNotes.entityType, entityType as any),
@@ -2113,7 +2143,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCrmNote(note: InsertCrmNote): Promise<CrmNote> {
-    const [result] = await db.insert(crmNotes).values(note).returning();
+    // Parse user mentions from content
+    const mentionedUserIds = this.parseUserMentions(note.content);
+    
+    // Insert note with mentioned users
+    const [result] = await db.insert(crmNotes).values({
+      ...note,
+      mentionedUsers: mentionedUserIds.length > 0 ? mentionedUserIds : null,
+    }).returning();
+    
     return result;
   }
 
@@ -2178,17 +2216,38 @@ export class DatabaseStorage implements IStorage {
       .where(conditions)
       .orderBy(asc(crmMessages.createdAt));
 
-    return results;
+    // Decrypt message content before returning
+    return results.map(msg => ({
+      ...msg,
+      content: decryptMessage(msg.content)
+    }));
   }
 
   async getCrmMessage(id: string): Promise<CrmMessage | undefined> {
     const [message] = await db.select().from(crmMessages).where(eq(crmMessages.id, id));
-    return message;
+    if (!message) return undefined;
+    
+    // Decrypt message content before returning
+    return {
+      ...message,
+      content: decryptMessage(message.content)
+    };
   }
 
   async createCrmMessage(message: InsertCrmMessage): Promise<CrmMessage> {
-    const [result] = await db.insert(crmMessages).values(message).returning();
-    return result;
+    // Encrypt the message content before storing
+    const encryptedMessage = {
+      ...message,
+      content: encryptMessage(message.content)
+    };
+    
+    const [result] = await db.insert(crmMessages).values(encryptedMessage).returning();
+    
+    // Decrypt content before returning to caller
+    return {
+      ...result,
+      content: message.content // Return original plaintext to caller
+    };
   }
 
   async markMessageAsRead(id: string): Promise<void> {
@@ -2248,9 +2307,15 @@ export class DatabaseStorage implements IStorage {
     const conversationsMap = new Map();
     
     [...sentMessages, ...receivedMessages].forEach(msg => {
-      if (!conversationsMap.has(msg.userId) || 
-          conversationsMap.get(msg.userId).lastMessageAt < msg.lastMessageAt) {
-        conversationsMap.set(msg.userId, msg);
+      // Decrypt the last message content
+      const decryptedMsg = {
+        ...msg,
+        lastMessage: decryptMessage(msg.lastMessage)
+      };
+      
+      if (!conversationsMap.has(decryptedMsg.userId) || 
+          conversationsMap.get(decryptedMsg.userId).lastMessageAt < decryptedMsg.lastMessageAt) {
+        conversationsMap.set(decryptedMsg.userId, decryptedMsg);
       }
     });
 
@@ -2258,19 +2323,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNotifications(userId: string, companyId: string): Promise<any> {
+    // Get user to check lastNotificationClearedAt
+    const [user] = await db.select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
     // Get assigned tasks that are TODO or IN_PROGRESS
+    // Filter out tasks created before last notification cleared timestamp
+    const taskConditions = [
+      eq(crmTasks.assignedTo, userId),
+      eq(crmTasks.companyId, companyId),
+      or(
+        eq(crmTasks.status, 'TODO'),
+        eq(crmTasks.status, 'IN_PROGRESS')
+      )
+    ];
+
+    // Only show tasks created after the last notification clear
+    if (user?.lastNotificationClearedAt) {
+      taskConditions.push(gt(crmTasks.createdAt, user.lastNotificationClearedAt));
+    }
+
     const tasks = await db.select()
       .from(crmTasks)
-      .where(
-        and(
-          eq(crmTasks.assignedTo, userId),
-          eq(crmTasks.companyId, companyId),
-          or(
-            eq(crmTasks.status, 'TODO'),
-            eq(crmTasks.status, 'IN_PROGRESS')
-          )
-        )
-      )
+      .where(and(...taskConditions))
       .orderBy(asc(crmTasks.dueDate))
       .limit(10);
 
@@ -2373,6 +2450,112 @@ export class DatabaseStorage implements IStorage {
 
     const unreadCount = await this.getUnreadMessageCount(userId);
 
+    // Decrypt message content before returning
+    const decryptedMessages = unreadMessages.map(msg => ({
+      ...msg,
+      content: decryptMessage(msg.content)
+    }));
+
+    // Get notes where user is mentioned
+    // Filter out mentions created before last mention cleared timestamp
+    const mentionConditions = [
+      eq(crmNotes.companyId, companyId),
+      sql`${userId} = ANY(${crmNotes.mentionedUsers})`
+    ];
+
+    // Only show mentions created after the last mention clear
+    if (user?.lastMentionClearedAt) {
+      mentionConditions.push(gt(crmNotes.createdAt, user.lastMentionClearedAt));
+    }
+
+    const mentions = await db.select({
+      id: crmNotes.id,
+      content: crmNotes.content,
+      entityType: crmNotes.entityType,
+      entityId: crmNotes.entityId,
+      createdBy: crmNotes.createdBy,
+      createdAt: crmNotes.createdAt,
+      authorName: users.fullName,
+    })
+      .from(crmNotes)
+      .leftJoin(users, eq(crmNotes.createdBy, users.id))
+      .where(and(...mentionConditions))
+      .orderBy(desc(crmNotes.createdAt))
+      .limit(5);
+
+    // Enrich mentions with entity information
+    const enrichedMentions = await Promise.all(mentions.map(async (mention) => {
+      let entityName = null;
+      
+      try {
+        switch (mention.entityType) {
+          case 'CONTACT': {
+            const [contact] = await db.select({
+              firstName: crmContacts.firstName,
+              lastName: crmContacts.lastName
+            })
+              .from(crmContacts)
+              .where(eq(crmContacts.id, mention.entityId))
+              .limit(1);
+            
+            if (contact) {
+              entityName = `${contact.firstName} ${contact.lastName}`;
+            }
+            break;
+          }
+          case 'DEAL': {
+            const [deal] = await db.select({
+              title: crmDeals.title
+            })
+              .from(crmDeals)
+              .where(eq(crmDeals.id, mention.entityId))
+              .limit(1);
+            
+            if (deal) {
+              entityName = deal.title;
+            }
+            break;
+          }
+          case 'LOT': {
+            const [lot] = await db.select({
+              nameOrNumber: lots.nameOrNumber,
+              parkId: lots.parkId
+            })
+              .from(lots)
+              .where(eq(lots.id, mention.entityId))
+              .limit(1);
+            
+            if (lot) {
+              if (lot.parkId) {
+                const [park] = await db.select({
+                  name: parks.name
+                })
+                  .from(parks)
+                  .where(eq(parks.id, lot.parkId))
+                  .limit(1);
+                
+                if (park) {
+                  entityName = `Lot ${lot.nameOrNumber} (${park.name})`;
+                } else {
+                  entityName = `Lot ${lot.nameOrNumber}`;
+                }
+              } else {
+                entityName = `Lot ${lot.nameOrNumber}`;
+              }
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching entity for mention:', error);
+      }
+
+      return {
+        ...mention,
+        entityName,
+      };
+    }));
+
     return {
       tasks: {
         count: enrichedTasks.length,
@@ -2380,9 +2563,25 @@ export class DatabaseStorage implements IStorage {
       },
       messages: {
         count: unreadCount,
-        items: unreadMessages
+        items: decryptedMessages
+      },
+      mentions: {
+        count: enrichedMentions.length,
+        items: enrichedMentions
       }
     };
+  }
+
+  async clearTaskNotifications(userId: string): Promise<void> {
+    await db.update(users)
+      .set({ lastNotificationClearedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async clearMentionNotifications(userId: string): Promise<void> {
+    await db.update(users)
+      .set({ lastMentionClearedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 
   // CRM Association operations
@@ -2443,55 +2642,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation> {
-    // Check if association already exists
-    const existingAssociation = await db.select()
-      .from(crmAssociations)
-      .where(
-        and(
-          eq(crmAssociations.sourceType, association.sourceType),
-          eq(crmAssociations.sourceId, association.sourceId),
-          eq(crmAssociations.targetType, association.targetType),
-          eq(crmAssociations.targetId, association.targetId)
+    try {
+      console.log("Creating CRM association:", association);
+      
+      // Check if association already exists
+      const existingAssociation = await db.select()
+        .from(crmAssociations)
+        .where(
+          and(
+            eq(crmAssociations.sourceType, association.sourceType),
+            eq(crmAssociations.sourceId, association.sourceId),
+            eq(crmAssociations.targetType, association.targetType),
+            eq(crmAssociations.targetId, association.targetId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existingAssociation.length > 0) {
-      return existingAssociation[0];
-    }
+      if (existingAssociation.length > 0) {
+        console.log("Association already exists, returning existing:", existingAssociation[0]);
+        return existingAssociation[0];
+      }
 
-    // Create the main association
-    const [result] = await db.insert(crmAssociations).values(association).returning();
-    
-    // Create the reverse association for bidirectional linking
-    const reverseAssociation = {
-      sourceType: association.targetType,
-      sourceId: association.targetId,
-      targetType: association.sourceType,
-      targetId: association.sourceId,
-      relationshipType: association.relationshipType,
-      companyId: association.companyId,
-      createdBy: association.createdBy,
-    };
+      // Create the main association
+      const [result] = await db.insert(crmAssociations).values(association).returning();
+      console.log("Created main association:", result);
+      
+      // Create the reverse association for bidirectional linking
+      const reverseAssociation = {
+        sourceType: association.targetType,
+        sourceId: association.targetId,
+        targetType: association.sourceType,
+        targetId: association.sourceId,
+        relationshipType: association.relationshipType,
+        companyId: association.companyId,
+        createdBy: association.createdBy,
+      };
 
-    // Check if reverse association already exists
-    const existingReverse = await db.select()
-      .from(crmAssociations)
-      .where(
-        and(
-          eq(crmAssociations.sourceType, reverseAssociation.sourceType),
-          eq(crmAssociations.sourceId, reverseAssociation.sourceId),
-          eq(crmAssociations.targetType, reverseAssociation.targetType),
-          eq(crmAssociations.targetId, reverseAssociation.targetId)
+      // Check if reverse association already exists
+      const existingReverse = await db.select()
+        .from(crmAssociations)
+        .where(
+          and(
+            eq(crmAssociations.sourceType, reverseAssociation.sourceType),
+            eq(crmAssociations.sourceId, reverseAssociation.sourceId),
+            eq(crmAssociations.targetType, reverseAssociation.targetType),
+            eq(crmAssociations.targetId, reverseAssociation.targetId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existingReverse.length === 0) {
-      await db.insert(crmAssociations).values(reverseAssociation);
+      if (existingReverse.length === 0) {
+        await db.insert(crmAssociations).values(reverseAssociation);
+        console.log("Created reverse association");
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error in createCrmAssociation:", error);
+      throw error;
     }
-
-    return result;
   }
 
   async deleteCrmAssociation(id: string): Promise<void> {

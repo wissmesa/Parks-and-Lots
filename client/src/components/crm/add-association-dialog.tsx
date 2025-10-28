@@ -100,7 +100,10 @@ export function AddAssociationDialog({
         credentials: "include",
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create association");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: "Failed to create association" }));
+        throw new Error(errorData.message || "Failed to create association");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -109,8 +112,13 @@ export function AddAssociationDialog({
       toast({ title: "Success", description: "Association created successfully" });
       onOpenChange(false);
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create association", variant: "destructive" });
+    onError: (error: Error) => {
+      console.error("Create association error:", error);
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create association", 
+        variant: "destructive" 
+      });
     },
   });
 
@@ -120,6 +128,13 @@ export function AddAssociationDialog({
       toast({ title: "Error", description: "Please select an entity to associate", variant: "destructive" });
       return;
     }
+
+    console.log("Creating association:", {
+      sourceType,
+      sourceId,
+      targetType,
+      targetId,
+    });
 
     createAssociationMutation.mutate({
       sourceType,
@@ -143,7 +158,7 @@ export function AddAssociationDialog({
     } else if (targetType === "DEAL") {
       return dealsData?.deals || [];
     } else if (targetType === "LOT") {
-      return lotsData || [];
+      return lotsData?.lots || [];
     }
     return [];
   };
