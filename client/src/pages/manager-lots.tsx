@@ -81,6 +81,8 @@ interface Lot {
   houseModel?: string;
   parkId: string;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
   specialStatusId?: string | null;
   park: {
     id: string;
@@ -158,6 +160,8 @@ export default function ManagerLots() {
     bathroomsMax: "",
     sqFtMin: "",
     sqFtMax: "",
+    createdDateFrom: "",
+    createdDateTo: "",
     searchText: ""
   });
 
@@ -190,6 +194,8 @@ export default function ManagerLots() {
       bathroomsMax: "",
       sqFtMin: "",
       sqFtMax: "",
+      createdDateFrom: "",
+      createdDateTo: "",
       searchText: ""
     });
   };
@@ -239,6 +245,8 @@ export default function ManagerLots() {
            filters.bathroomsMax ||
            filters.sqFtMin ||
            filters.sqFtMax ||
+           filters.createdDateFrom ||
+           filters.createdDateTo ||
            filters.searchText;
   };
   
@@ -1065,6 +1073,23 @@ export default function ManagerLots() {
         if (filters.sqFtMax && sqFt > parseInt(filters.sqFtMax)) return false;
       }
 
+      // Created date range filter
+      if (filters.createdDateFrom || filters.createdDateTo) {
+        const lotCreatedDate = new Date(lot.createdAt);
+        
+        if (filters.createdDateFrom) {
+          const fromDate = new Date(filters.createdDateFrom);
+          fromDate.setHours(0, 0, 0, 0); // Start of day
+          if (lotCreatedDate < fromDate) return false;
+        }
+        
+        if (filters.createdDateTo) {
+          const toDate = new Date(filters.createdDateTo);
+          toDate.setHours(23, 59, 59, 999); // End of day
+          if (lotCreatedDate > toDate) return false;
+        }
+      }
+
       // Search text filter
       if (filters.searchText) {
         const searchLower = filters.searchText.toLowerCase();
@@ -1123,6 +1148,10 @@ export default function ManagerLots() {
         case "specialStatus":
           valueA = a.specialStatus?.name?.toLowerCase() || "";
           valueB = b.specialStatus?.name?.toLowerCase() || "";
+          break;
+        case "createdAt":
+          valueA = new Date(a.createdAt).getTime();
+          valueB = new Date(b.createdAt).getTime();
           break;
         default:
           valueA = a.nameOrNumber.toLowerCase();
@@ -1642,6 +1671,7 @@ export default function ManagerLots() {
                         <SelectItem value="bathrooms">Bathrooms</SelectItem>
                         <SelectItem value="sqFt">Square Feet</SelectItem>
                         <SelectItem value="specialStatus">Special Status</SelectItem>
+                        <SelectItem value="createdAt">Created Date</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1901,6 +1931,56 @@ export default function ManagerLots() {
                       </div>
                     </PopoverContent>
                   </Popover>
+
+                  {/* Created Date Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-created-date-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        Created Date {(filters.createdDateFrom || filters.createdDateTo) && "✓"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80" align="start">
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Created Date Range</Label>
+                        <div>
+                          <Label htmlFor="manager-createdDateFrom" className="text-xs text-muted-foreground">From</Label>
+                          <Input
+                            id="manager-createdDateFrom"
+                            type="date"
+                            value={filters.createdDateFrom}
+                            onChange={(e) => updateRangeFilter("createdDateFrom", e.target.value)}
+                            className="mt-1"
+                            data-testid="manager-created-date-from"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="manager-createdDateTo" className="text-xs text-muted-foreground">To</Label>
+                          <Input
+                            id="manager-createdDateTo"
+                            type="date"
+                            value={filters.createdDateTo}
+                            onChange={(e) => updateRangeFilter("createdDateTo", e.target.value)}
+                            className="mt-1"
+                            data-testid="manager-created-date-to"
+                          />
+                        </div>
+                        {(filters.createdDateFrom || filters.createdDateTo) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              updateRangeFilter("createdDateFrom", "");
+                              updateRangeFilter("createdDateTo", "");
+                            }}
+                            className="w-full"
+                          >
+                            Clear Dates
+                          </Button>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 {/* Clear Filters */}
@@ -2009,6 +2089,14 @@ export default function ManagerLots() {
                           No tenant assigned
                         </div>
                       )}
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground pt-3 border-t mt-3">
+                      Created: {new Date(lot.createdAt).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
                     </div>
                   </CardHeader>
                   
@@ -2164,6 +2252,7 @@ export default function ManagerLots() {
                     <TableHead>Status</TableHead>
                     <TableHead>Tenant</TableHead>
                     <TableHead>Visibility</TableHead>
+                    <TableHead>Created Date</TableHead>
                     <TableHead>Details</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -2171,14 +2260,16 @@ export default function ManagerLots() {
                 <TableBody>
                   {sortedLots.map((lot) => (
                     <TableRow key={lot.id}>
-                      <TableCell>
+                      <TableCell className="max-w-xs">
                         <button
                           onClick={() => setShowLotHistory({ lotId: lot.id, lotName: lot.nameOrNumber })}
                           className="font-medium text-left hover:text-primary hover:underline transition-colors"
                         >
                           {lot.nameOrNumber}
                         </button>
-                        <div className="text-sm text-muted-foreground">{lot.description}</div>
+                        {lot.description && (
+                          <div className="text-sm text-muted-foreground line-clamp-2 mt-1">{lot.description}</div>
+                        )}
                         {lot.specialStatus && (
                           <div className="flex items-center gap-1 mt-1">
                             <div
@@ -2232,6 +2323,15 @@ export default function ManagerLots() {
                         <Badge variant={lot.isActive ? 'default' : 'destructive'}>
                           {lot.isActive ? 'On Market' : 'Out of Market'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(lot.createdAt).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          })}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
