@@ -6712,8 +6712,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Contact not found' });
       }
 
-      // Verify access
-      if (contact.companyId !== req.user!.companyId) {
+      // Verify access - Lords can access any contact
+      const isLord = req.user!.role === 'MHP_LORD';
+      if (!isLord && contact.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -6846,7 +6847,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Deal not found' });
       }
 
-      if (deal.companyId !== req.user!.companyId) {
+      // Verify access - Lords can access any deal
+      const isLord = req.user!.role === 'MHP_LORD';
+      if (!isLord && deal.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
