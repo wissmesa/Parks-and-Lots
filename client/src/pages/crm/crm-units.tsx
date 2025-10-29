@@ -21,12 +21,15 @@ interface Unit {
   sqFt?: number | null;
   parkId?: string | null;
   parkName?: string | null;
+  companyName?: string | null;
 }
 
 export default function CrmUnits() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
+  const user = AuthManager.getUser();
+  const isLord = user?.role === 'MHP_LORD';
 
   const { data: unitsData, isLoading } = useQuery({
     queryKey: ["/api/crm/units"],
@@ -117,6 +120,7 @@ export default function CrmUnits() {
             <TableHeader>
               <TableRow>
                 <TableHead>Unit Number</TableHead>
+                {isLord && <TableHead>Company</TableHead>}
                 <TableHead>Park</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Price</TableHead>
@@ -136,6 +140,11 @@ export default function CrmUnits() {
                       <span>Unit {unit.nameOrNumber}</span>
                     </div>
                   </TableCell>
+                  {isLord && (
+                    <TableCell>
+                      {unit.companyName || "-"}
+                    </TableCell>
+                  )}
                   <TableCell>
                     {unit.parkName || "-"}
                   </TableCell>

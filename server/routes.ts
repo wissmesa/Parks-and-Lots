@@ -7398,27 +7398,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM Units (Lots in CRM context)
   app.get('/api/crm/units', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
-      }
-
-      // Get company parks then get their lots
-      const { parks } = await storage.getParksByCompany(companyId);
-      const parkIds = parks.map(p => p.id);
-      
-      // Create a map of parkId to park name
-      const parkMap = new Map(parks.map(p => [p.id, p.name]));
-      
+      const isLord = req.user!.role === 'MHP_LORD';
       let lots = [];
-      for (const parkId of parkIds) {
-        const parkLots = await storage.getLots({ parkId });
-        // Enrich each lot with park name
-        const enrichedLots = parkLots.map(lot => ({
-          ...lot,
-          parkName: parkMap.get(lot.parkId || '') || null
-        }));
-        lots.push(...enrichedLots);
+
+      if (isLord) {
+        // Lords can see all units from all companies
+        const { parks } = await storage.getParks();
+        
+        // Create maps for parkId to park name and park to company name
+        const parkMap = new Map(parks.map((p: any) => [p.id, p.name]));
+        const companyMap = new Map(parks.map((p: any) => [p.id, p.company?.name || null]));
+        
+        for (const park of parks) {
+          const parkLots = await storage.getLots({ parkId: park.id });
+          // Enrich each lot with park name and company name
+          const enrichedLots = parkLots.map(lot => ({
+            ...lot,
+            parkName: parkMap.get(lot.parkId || '') || null,
+            companyName: companyMap.get(lot.parkId || '') || null
+          }));
+          lots.push(...enrichedLots);
+        }
+      } else {
+        // Non-Lords see only units from their company
+        const companyId = req.user!.companyId;
+        if (!companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company' });
+        }
+
+        // Get company parks then get their lots
+        const { parks } = await storage.getParksByCompany(companyId);
+        const parkIds = parks.map(p => p.id);
+        
+        // Create a map of parkId to park name
+        const parkMap = new Map(parks.map(p => [p.id, p.name]));
+        
+        for (const parkId of parkIds) {
+          const parkLots = await storage.getLots({ parkId });
+          // Enrich each lot with park name
+          const enrichedLots = parkLots.map(lot => ({
+            ...lot,
+            parkName: parkMap.get(lot.parkId || '') || null
+          }));
+          lots.push(...enrichedLots);
+        }
       }
 
       res.json({ units: lots });
