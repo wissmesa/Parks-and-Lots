@@ -6682,13 +6682,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM Contacts
   app.get('/api/crm/contacts', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
+      const isLord = req.user!.role === 'MHP_LORD';
+      const { q } = req.query;
+      let contacts = [];
+
+      if (isLord) {
+        // Lords can see all contacts from all companies
+        contacts = await storage.getAllCrmContacts({ q: q as string });
+      } else {
+        // Regular users see only their company's contacts
+        const companyId = req.user!.companyId;
+        if (!companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company' });
+        }
+        contacts = await storage.getCrmContacts(companyId, { q: q as string });
       }
 
-      const { q } = req.query;
-      const contacts = await storage.getCrmContacts(companyId, { q: q as string });
       res.json({ contacts });
     } catch (error) {
       console.error('Get CRM contacts error:', error);
@@ -6799,17 +6808,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CRM Deals
   app.get('/api/crm/deals', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
-      }
-
+      const isLord = req.user!.role === 'MHP_LORD';
       const { stage, assignedTo, contactId } = req.query;
-      const deals = await storage.getCrmDeals(companyId, {
-        stage: stage as string,
-        assignedTo: assignedTo as string,
-        contactId: contactId as string
-      });
+      let deals = [];
+
+      if (isLord) {
+        // Lords can see all deals from all companies
+        deals = await storage.getAllCrmDeals({
+          stage: stage as string,
+          assignedTo: assignedTo as string,
+          contactId: contactId as string
+        });
+      } else {
+        // Regular users see only their company's deals
+        const companyId = req.user!.companyId;
+        if (!companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company' });
+        }
+        deals = await storage.getCrmDeals(companyId, {
+          stage: stage as string,
+          assignedTo: assignedTo as string,
+          contactId: contactId as string
+        });
+      }
       
       res.json({ deals });
     } catch (error) {

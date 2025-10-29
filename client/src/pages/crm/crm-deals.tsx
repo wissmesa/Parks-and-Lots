@@ -23,6 +23,8 @@ interface Deal {
   contactId?: string | null;
   lotId?: string | null;
   createdAt: string;
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 const DEAL_STAGES = [
@@ -37,7 +39,7 @@ const DEAL_STAGES = [
 ];
 
 // Draggable Deal Card Component
-function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void }) {
+function DraggableDealCard({ deal, onClick, showCompany }: { deal: Deal; onClick: () => void; showCompany?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: deal.id,
     data: { deal },
@@ -94,6 +96,11 @@ function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void 
               {deal.probability}% probability
             </div>
           )}
+          {showCompany && deal.companyName && (
+            <div className="text-xs text-muted-foreground mt-2 truncate">
+              {deal.companyName}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -105,10 +112,12 @@ function DroppableStageColumn({
   stage,
   deals,
   onDealClick,
+  showCompany,
 }: {
   stage: { value: string; label: string };
   deals: Deal[];
   onDealClick: (dealId: string) => void;
+  showCompany?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.value,
@@ -131,6 +140,7 @@ function DroppableStageColumn({
               key={deal.id}
               deal={deal}
               onClick={() => onDealClick(deal.id)}
+              showCompany={showCompany}
             />
           ))}
           {deals.length === 0 && (
@@ -158,6 +168,8 @@ export default function CrmDeals() {
     stage: "QUALIFIED_LEAD",
     probability: "50",
   });
+
+  const isLord = user?.role === 'MHP_LORD';
 
   const { data: dealsData, isLoading } = useQuery({
     queryKey: ["/api/crm/deals"],
@@ -391,6 +403,7 @@ export default function CrmDeals() {
                 stage={stage}
                 deals={dealsByStage[stage.value] || []}
                 onDealClick={handleDealClick}
+                showCompany={isLord}
               />
             ))}
           </div>
@@ -410,6 +423,11 @@ export default function CrmDeals() {
                   {activeDeal.probability !== null && (
                     <div className="text-sm text-muted-foreground mt-2">
                       {activeDeal.probability}% probability
+                    </div>
+                  )}
+                  {isLord && activeDeal.companyName && (
+                    <div className="text-xs text-muted-foreground mt-2 truncate">
+                      {activeDeal.companyName}
                     </div>
                   )}
                 </CardContent>

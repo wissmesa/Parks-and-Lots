@@ -22,6 +22,8 @@ interface Contact {
   source?: string | null;
   tags?: string[] | null;
   createdAt: string;
+  companyId?: string | null;
+  companyName?: string | null;
 }
 
 export default function CrmContacts() {
@@ -40,6 +42,8 @@ export default function CrmContacts() {
     phone: "",
     source: "",
   });
+
+  const isLord = user?.role === 'MHP_LORD';
 
   // Fetch contacts
   const { data: contactsData, isLoading } = useQuery({
@@ -273,6 +277,7 @@ export default function CrmContacts() {
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Source</TableHead>
+                {isLord && <TableHead>Company</TableHead>}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -359,6 +364,13 @@ export default function CrmContacts() {
                       contact.source
                     )}
                   </TableCell>
+                  {isLord && (
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {contact.companyName || 'N/A'}
+                      </span>
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     {editingId === contact.id ? (
                       <div className="flex justify-end gap-2">

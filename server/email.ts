@@ -46,7 +46,7 @@ export async function sendPasswordResetEmail(
   userEmail: string,
   resetUrl: string,
   userName: string,
-  fromEmail: string = 'hi@mhpsalesmanager.com'
+  fromEmail: string = 'MHP Sales Manager Team <hi@mhpsalesmanager.com>'
 ): Promise<boolean> {
   const subject = 'Password Reset - MHP Sales Manager App';
   
@@ -114,7 +114,7 @@ export async function sendInviteEmail(
   inviteEmail: string,
   inviteUrl: string,
   invitedByName: string,
-  fromEmail: string = 'hi@mhpsalesmanager.com'
+  fromEmail: string = 'MHP Sales Manager Team <hi@mhpsalesmanager.com>'
 ): Promise<boolean> {
   const subject = 'You\'re invited to the MHP Sales Manager App';
   
@@ -178,7 +178,7 @@ export async function sendTenantInviteEmail(
   tenantName: string,
   lotInfo: string,
   createdByName: string,
-  fromEmail: string = 'hi@mhpsalesmanager.com'
+  fromEmail: string = 'MHP Sales Manager Team <hi@mhpsalesmanager.com>'
 ): Promise<boolean> {
   const subject = 'Welcome the MHP Sales Manager App - Set Up Your Tenant Account';
   
@@ -271,7 +271,7 @@ export async function sendLotCreationNotification(
     bathrooms?: number | null;
   },
   createdByName: string,
-  fromEmail: string = 'hi@mhpsalesmanager.com'
+  fromEmail: string = 'MHP Sales Manager Team <hi@mhpsalesmanager.com>'
 ): Promise<boolean> {
   const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com', 'chris@mhpsalesmanager.com'];
   
@@ -382,7 +382,7 @@ export async function sendLotReactivationNotification(
     bathrooms?: number | null;
   },
   reactivatedByName: string,
-  fromEmail: string = 'hi@mhpsalesmanager.com'
+  fromEmail: string = 'MHP Sales Manager Team <hi@mhpsalesmanager.com>'
 ): Promise<boolean> {
   const recipients = ['luis@bluepaperclip.com', 'alem@bluepaperclip.com', 'nicole@bluepaperclip.com','chris@mhpsalesmanager.com'];
   

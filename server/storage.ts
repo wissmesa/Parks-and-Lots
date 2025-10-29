@@ -204,6 +204,7 @@ export interface IStorage {
   
   // CRM Contact operations
   getCrmContacts(companyId: string, filters?: { q?: string }): Promise<CrmContact[]>;
+  getAllCrmContacts(filters?: { q?: string }): Promise<any[]>;
   getCrmContact(id: string): Promise<CrmContact | undefined>;
   createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
   updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
@@ -211,6 +212,7 @@ export interface IStorage {
   
   // CRM Deal operations
   getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<CrmDeal[]>;
+  getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<any[]>;
   getCrmDeal(id: string): Promise<CrmDeal | undefined>;
   createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
   updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal>;
@@ -1980,6 +1982,49 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
+  async getAllCrmContacts(filters?: { q?: string }): Promise<any[]> {
+    const conditions = [];
+    
+    if (filters?.q) {
+      const search = `%${filters.q}%`;
+      conditions.push(
+        or(
+          ilike(crmContacts.firstName, search),
+          ilike(crmContacts.lastName, search),
+          ilike(crmContacts.email, search),
+          ilike(crmContacts.phone, search)
+        ) as any
+      );
+    }
+
+    let query = db.select({
+      id: crmContacts.id,
+      firstName: crmContacts.firstName,
+      lastName: crmContacts.lastName,
+      email: crmContacts.email,
+      phone: crmContacts.phone,
+      source: crmContacts.source,
+      companyId: crmContacts.companyId,
+      companyName: companies.name,
+      createdBy: crmContacts.createdBy,
+      tags: crmContacts.tags,
+      notes: crmContacts.notes,
+      tenantId: crmContacts.tenantId,
+      createdAt: crmContacts.createdAt,
+      updatedAt: crmContacts.updatedAt,
+    })
+      .from(crmContacts)
+      .leftJoin(companies, eq(crmContacts.companyId, companies.id))
+      .orderBy(desc(crmContacts.createdAt));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    const results = await query;
+    return results;
+  }
+
   async getCrmContact(id: string): Promise<CrmContact | undefined> {
     const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, id));
     return contact;
@@ -2023,6 +2068,49 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(crmDeals.createdAt));
 
+    return results;
+  }
+
+  async getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<any[]> {
+    const conditions = [];
+
+    if (filters?.stage) {
+      conditions.push(eq(crmDeals.stage, filters.stage as any));
+    }
+
+    if (filters?.assignedTo) {
+      conditions.push(eq(crmDeals.assignedTo, filters.assignedTo));
+    }
+
+    if (filters?.contactId) {
+      conditions.push(eq(crmDeals.contactId, filters.contactId));
+    }
+
+    let query = db.select({
+      id: crmDeals.id,
+      title: crmDeals.title,
+      value: crmDeals.value,
+      stage: crmDeals.stage,
+      probability: crmDeals.probability,
+      expectedCloseDate: crmDeals.expectedCloseDate,
+      contactId: crmDeals.contactId,
+      lotId: crmDeals.lotId,
+      assignedTo: crmDeals.assignedTo,
+      companyId: crmDeals.companyId,
+      companyName: companies.name,
+      createdBy: crmDeals.createdBy,
+      createdAt: crmDeals.createdAt,
+      updatedAt: crmDeals.updatedAt,
+    })
+      .from(crmDeals)
+      .leftJoin(companies, eq(crmDeals.companyId, companies.id))
+      .orderBy(desc(crmDeals.createdAt));
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    const results = await query;
     return results;
   }
 
