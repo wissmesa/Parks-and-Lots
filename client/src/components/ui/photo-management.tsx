@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,18 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const endpointBase = entityType === 'COMPANY' ? 'companies' : entityType === 'PARK' ? 'parks' : 'lots';
+
+  // Reset upload state when dialog opens
+  useEffect(() => {
+    if (isUploadOpen) {
+      setSelectedFiles([]);
+      setCaptions({});
+      setFileInputKey(prev => prev + 1); // Force file input to remount
+    }
+  }, [isUploadOpen]);
 
   // Fetch photos
   const { data: photos = [], isLoading } = useQuery<Photo[]>({
@@ -189,6 +199,9 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
 
   // Shared validation function for file selection
   const validateAndSetFiles = (files: File[]) => {
+    console.log('validateAndSetFiles called with:', files.length, 'files');
+    console.log('Files received:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+    
     // Check if user is trying to upload more than 20 photos
     if (files.length > 20) {
       toast({
@@ -200,9 +213,14 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
     }
     
     const validFiles: File[] = [];
+    const invalidFiles: Array<{name: string, reason: string}> = [];
     
     for (const file of files) {
+      console.log('Validating file:', file.name, { size: file.size, type: file.type });
+      
       if (file.size > 10 * 1024 * 1024) {
+        console.log('File rejected - too large:', file.name);
+        invalidFiles.push({ name: file.name, reason: 'too large (>10MB)' });
         toast({
           title: "Error",
           description: `${file.name} is larger than 10MB`,
@@ -211,6 +229,8 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         continue;
       }
       if (!file.type.startsWith('image/')) {
+        console.log('File rejected - not an image:', file.name, file.type);
+        invalidFiles.push({ name: file.name, reason: `not an image (${file.type})` });
         toast({
           title: "Error",
           description: `${file.name} is not an image file`,
@@ -218,8 +238,12 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
         });
         continue;
       }
+      console.log('File accepted:', file.name);
       validFiles.push(file);
     }
+    
+    console.log('Valid files:', validFiles.length);
+    console.log('Invalid files:', invalidFiles);
     
     if (validFiles.length > 0) {
       setSelectedFiles(validFiles);
@@ -442,24 +466,87 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
   };
 
   // Drag and drop handlers for file upload
+  const handleFileDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Drag enter - items:', e.dataTransfer.items?.length, 'types:', Array.from(e.dataTransfer.types));
+    
+    // Log each item's details during drag enter
+    if (e.dataTransfer.items) {
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        console.log(`DragEnter - Item ${i}:`, {
+          kind: item.kind,
+          type: item.type
+        });
+      }
+    }
+  };
+
   const handleFileDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Set the dropEffect to indicate this is a copy operation
+    e.dataTransfer.dropEffect = 'copy';
     setIsDragging(true);
   };
 
   const handleFileDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragging(false);
+    // Only set isDragging to false if we're actually leaving the drop zone
+    // and not just entering a child element
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
+      setIsDragging(false);
+    }
   };
 
-  const handleFileDrop = (e: React.DragEvent) => {
+  const handleFileDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     
-    const files = Array.from(e.dataTransfer.files);
+    // Debug: Check what we're getting from the drop event
+    console.log('Drop event dataTransfer:', e.dataTransfer);
+    console.log('dataTransfer.files:', e.dataTransfer.files);
+    console.log('dataTransfer.items:', e.dataTransfer.items);
+    console.log('Number of files:', e.dataTransfer.files.length);
+    console.log('Number of items:', e.dataTransfer.items?.length);
+    
+    // Use dataTransfer.items API for better compatibility with Windows File Explorer
+    // This handles multiple file drops more reliably
+    const files: File[] = [];
+    
+    if (e.dataTransfer.items) {
+      // Use DataTransferItemList interface
+      const items = Array.from(e.dataTransfer.items);
+      console.log('Processing items:', items.length);
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        console.log('Item', i, ':', { kind: item.kind, type: item.type });
+        
+        // Only process file items
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            console.log('Got file from item:', file.name);
+            files.push(file);
+          }
+        }
+      }
+    } else {
+      // Fallback to dataTransfer.files
+      console.log('Falling back to dataTransfer.files');
+      files.push(...Array.from(e.dataTransfer.files));
+    }
+    
+    console.log('Files array after processing:', files.length, files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+    
     validateAndSetFiles(files);
   };
 
@@ -597,6 +684,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
               <div className="space-y-4">
                 {/* Drag and Drop Zone */}
                 <div
+                  onDragEnter={handleFileDragEnter}
                   onDragOver={handleFileDragOver}
                   onDragLeave={handleFileDragLeave}
                   onDrop={handleFileDrop}
@@ -618,6 +706,7 @@ export function PhotoManagement({ entityType, entityId, entityName }: PhotoManag
                 <div>
                   <Label htmlFor="photo-files">Select Images</Label>
                   <Input
+                    key={fileInputKey}
                     id="photo-files"
                     type="file"
                     accept="image/*"

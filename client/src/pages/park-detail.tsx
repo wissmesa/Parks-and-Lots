@@ -61,15 +61,15 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
   
   if (isLoading) {
     return (
-      <div className="w-48 h-32 bg-muted flex items-center justify-center flex-shrink-0 relative">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+      <div className="w-full h-full bg-muted flex items-center justify-center flex-shrink-0 relative">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
   
   if (hasPhotos && firstPhoto && !imageError) {
     return (
-      <div className="w-48 h-32 flex-shrink-0 overflow-hidden relative">
+      <div className="w-full h-full flex-shrink-0 overflow-hidden relative">
         <img 
           src={firstPhoto.urlOrPath || firstPhoto.url}
           alt="Lot preview"
@@ -80,13 +80,13 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
           }}
         />
         {/* Request Showing Button Overlay */}
-        <div className="absolute bottom-2 right-2 z-10">
+        <div className="absolute bottom-3 right-3 z-10">
           <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
             <Button 
-              className="py-0.5 px-2 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-[10px] h-auto"
+              className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs h-auto"
               size="sm"
             >
-              <Calendar className="w-2.5 h-2.5 mr-1" />
+              <Calendar className="w-3.5 h-3.5 mr-1.5" />
               Request a Showing
             </Button>
           </Link>
@@ -97,19 +97,19 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
   
   // Fallback placeholder when no photos or image error
   return (
-    <div className="w-48 h-32 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 relative">
+    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 relative">
       <div className="text-center">
-        <Home className="w-8 h-8 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
-        <span className="text-blue-700 dark:text-blue-300 text-xs font-medium">Lot Preview</span>
+        <Home className="w-12 h-12 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
+        <span className="text-blue-700 dark:text-blue-300 text-sm font-medium">Lot Preview</span>
       </div>
       {/* Request Showing Button Overlay */}
-      <div className="absolute bottom-2 right-2 z-10">
+      <div className="absolute bottom-3 right-3 z-10">
         <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
           <Button 
-            className="py-0.5 px-2 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-[10px] h-auto"
+            className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs h-auto"
             size="sm"
           >
-            <Calendar className="w-2.5 h-2.5 mr-1" />
+            <Calendar className="w-3.5 h-3.5 mr-1.5" />
             Request a Showing
           </Button>
         </Link>
@@ -476,7 +476,7 @@ export default function ParkDetail() {
                         <div className="border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer bg-card" data-testid={`card-lot-${lot.id}`}>
                           <div className="flex flex-col sm:flex-row">
                             {/* Preview Image */}
-                            <div className="w-full sm:w-48 h-48 sm:h-auto flex-shrink-0">
+                            <div className="w-full sm:w-96 h-80 sm:h-72 flex-shrink-0">
                               <LotPreviewImage lotId={lot.id} />
                             </div>
                             
@@ -560,7 +560,7 @@ export default function ParkDetail() {
                                 
                                 {/* Description */}
                                 <div className="flex-1">
-                                  <p className="text-sm text-muted-foreground leading-relaxed">
+                                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
                                     {lot.description || "Spacious unit with modern amenities"}
                                   </p>
                                 </div>

@@ -67,7 +67,7 @@ export function LotCard({ lot, showBookButton = true }: LotCardProps) {
                 })()}
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground line-clamp-2">
               {lot.description || "Contact us for more details about this property."}
             </p>
           </div>

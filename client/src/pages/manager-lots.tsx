@@ -7,6 +7,7 @@ import { LotHistoryDialog } from "@/components/ui/lot-history-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
 import { SheetsConnection } from "@/components/ui/sheets-connection";
+import { DriveConnection } from "@/components/ui/drive-connection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1642,6 +1643,11 @@ export default function ManagerLots() {
               </DialogContent>
             </Dialog>
             </div>
+          </div>
+
+          {/* Google Drive Backup */}
+          <div className="mb-6">
+            <DriveConnection />
           </div>
 
           {/* Google Sheets Export */}

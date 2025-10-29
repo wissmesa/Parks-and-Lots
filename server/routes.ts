@@ -29,6 +29,7 @@ import { getLocationFromIP, extractIPFromRequest } from "./geolocation";
 import { uploadToS3, deleteFromS3, extractS3KeyFromUrl } from "./s3";
 import { sendLotCreationNotification, sendLotReactivationNotification } from "./email";
 import { logCreation, logAuditEntries, compareObjects } from "./audit";
+import { uploadLotPhotoToDrive, isDriveConfigured, generateDriveAuthUrl, exchangeDriveCodeForTokens } from "./google-drive";
 
 // Helper function to check if Google Calendar service is available
 const isGoogleCalendarAvailable = () => googleCalendarService !== null;
@@ -1811,6 +1812,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
         </body>
         </html>
       `);
+    }
+  });
+
+  // Google Drive OAuth routes (MHP_LORD only)
+  app.get('/api/auth/google-drive/url', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      const state = `${user.id}:${randomBytes(16).toString('hex')}`;
+      const authUrl = generateDriveAuthUrl(state);
+      
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Google Drive auth URL generation error:', error);
+      res.status(500).json({ message: 'Failed to generate authorization URL' });
+    }
+  });
+
+  app.get('/api/auth/google-drive/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        return res.status(400).send('Missing authorization code or state');
+      }
+
+      // Extract and validate user ID from state
+      const stateStr = state as string;
+      const [stateUserId, stateNonce] = stateStr.split(':');
+      
+      if (!stateUserId || !stateNonce) {
+        return res.status(400).send('Invalid state parameter format');
+      }
+      
+      // Validate that the user exists and is MHP_LORD
+      const user = await storage.getUser(stateUserId);
+      if (!user || user.role !== 'MHP_LORD') {
+        return res.status(403).send('Invalid user or insufficient permissions');
+      }
+
+      // Exchange code for tokens
+      const tokens = await exchangeDriveCodeForTokens(code as string);
+      
+      // Store tokens for the user
+      await storage.createOrUpdateOAuthAccount(stateUserId, {
+        provider: 'google-drive',
+        accessToken: tokens.access_token!,
+        refreshToken: tokens.refresh_token || undefined,
+        tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+      });
+      
+      // Return success page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Drive Connected</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .success { color: #059669; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="success">✅ Google Drive Connected Successfully!</div>
+          <div class="message">Photos will now automatically sync to your Drive. You can close this window.</div>
+          <script>
+            // Notify parent window that connection was successful
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: true }, '*');
+            }
+            // Auto-close after 2 seconds
+            setTimeout(() => window.close(), 2000);
+          </script>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('Google Drive OAuth callback error:', error);
+      
+      // Return error page that closes the popup
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Connection Error</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
+            .error { color: #dc2626; font-size: 18px; margin-bottom: 20px; }
+            .message { color: #6b7280; }
+          </style>
+        </head>
+        <body>
+          <div class="error">❌ Connection Failed</div>
+          <div class="message">Please try again or close this window.</div>
+          <script>
+            // Notify parent window that connection failed
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: false }, '*');
+            }
+            // Auto-close after 3 seconds
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    }
+  });
+
+  app.get('/api/auth/google-drive/status', authenticateToken, async (req, res) => {
+    try {
+      // Find the MHP_LORD user and check their connection status
+      const lordUsers = await storage.getUsers({ role: 'MHP_LORD' });
+      const mhpLord = lordUsers[0];
+      
+      if (!mhpLord) {
+        return res.json({ connected: false, hasToken: false });
+      }
+      
+      const account = await storage.getOAuthAccount(mhpLord.id, 'google-drive');
+      
+      res.json({ 
+        connected: !!account,
+        hasToken: !!account?.accessToken
+      });
+    } catch (error) {
+      console.error('Google Drive status check error:', error);
+      res.status(500).json({ message: 'Failed to check connection status' });
+    }
+  });
+
+  app.delete('/api/auth/google-drive/disconnect', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+    try {
+      const user = (req as AuthRequest).user!;
+      await storage.deleteOAuthAccount(user.id, 'google-drive');
+      
+      res.json({ message: 'Google Drive disconnected successfully' });
+    } catch (error) {
+      console.error('Google Drive disconnect error:', error);
+      res.status(500).json({ message: 'Failed to disconnect Google Drive' });
     }
   });
 
@@ -4529,6 +4669,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Captions string:', req.body.captions);
       console.log('Single caption:', req.body.caption);
 
+      // Get lot and park information for Google Drive folder naming
+      const lot = await storage.getLot(req.params.id);
+      if (!lot) {
+        return res.status(404).json({ message: 'Lot not found' });
+      }
+      
+      let parkName: string | null = null;
+      if (lot.parkId) {
+        const park = await storage.getPark(lot.parkId);
+        parkName = park?.name || null;
+      }
+
       // Parse captions from JSON string
       let captionsArray = [];
       try {
@@ -4558,6 +4710,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Lot photo ${i} caption:`, caption);
         
+        // Preserve buffer for Google Drive upload (S3 upload may consume it)
+        const bufferCopy = Buffer.from(file.buffer);
+        
         // Upload to S3
         const s3Result = await uploadToS3(file, 'lots');
         console.log('Uploaded to S3:', s3Result.url);
@@ -4574,6 +4729,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         photos.push(photo);
+        
+        // Upload to Google Drive in background (fire and forget)
+        // Always use MHP_LORD's credentials regardless of who uploads
+        if (isDriveConfigured) {
+          const fileName = file.originalname || `photo-${Date.now()}-${i}.jpg`;
+          // Find MHP_LORD user and use their credentials
+          const lordUsers = await storage.getUsers({ role: 'MHP_LORD' });
+          const mhpLord = lordUsers[0];
+          
+          if (mhpLord) {
+            uploadLotPhotoToDrive(
+              mhpLord.id,
+              bufferCopy,
+              fileName,
+              file.mimetype || 'image/jpeg',
+              parkName,
+              lot.nameOrNumber
+            );
+          }
+        }
       }
 
       res.status(201).json(allFiles.length === 1 ? photos[0] : photos);
