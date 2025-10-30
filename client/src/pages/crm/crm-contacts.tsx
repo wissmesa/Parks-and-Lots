@@ -26,6 +26,11 @@ interface Contact {
   companyName?: string | null;
 }
 
+interface Company {
+  id: string;
+  name: string;
+}
+
 export default function CrmContacts() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -41,9 +46,16 @@ export default function CrmContacts() {
     email: "",
     phone: "",
     source: "",
+    companyId: "",
   });
 
   const isLord = user?.role === 'MHP_LORD';
+
+  // Fetch companies for MHP_LORD users
+  const { data: companies } = useQuery<Company[]>({
+    queryKey: ["/api/companies"],
+    enabled: isLord,
+  });
 
   // Fetch contacts
   const { data: contactsData, isLoading } = useQuery({
@@ -79,7 +91,7 @@ export default function CrmContacts() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
       toast({ title: "Success", description: "Contact created successfully" });
       setIsCreateOpen(false);
-      setNewContact({ firstName: "", lastName: "", email: "", phone: "", source: "" });
+      setNewContact({ firstName: "", lastName: "", email: "", phone: "", source: "", companyId: "" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create contact", variant: "destructive" });
@@ -183,6 +195,26 @@ export default function CrmContacts() {
               <DialogTitle>Create New Contact</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {isLord && (
+                <div>
+                  <Label htmlFor="companyId">Company *</Label>
+                  <Select
+                    value={newContact.companyId}
+                    onValueChange={(value) => setNewContact({ ...newContact, companyId: value })}
+                  >
+                    <SelectTrigger id="companyId">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies?.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="firstName">First Name *</Label>
                 <Input
@@ -231,7 +263,7 @@ export default function CrmContacts() {
               </div>
               <Button
                 onClick={() => createMutation.mutate(newContact)}
-                disabled={!newContact.firstName || !newContact.lastName || createMutation.isPending}
+                disabled={!newContact.firstName || !newContact.lastName || (isLord && !newContact.companyId) || createMutation.isPending}
                 className="w-full"
               >
                 {createMutation.isPending ? "Creating..." : "Create Contact"}

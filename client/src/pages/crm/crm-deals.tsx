@@ -27,6 +27,11 @@ interface Deal {
   companyName?: string | null;
 }
 
+interface Company {
+  id: string;
+  name: string;
+}
+
 const DEAL_STAGES = [
   { value: "QUALIFIED_LEAD", label: "Qualified Lead" },
   { value: "SHOWING_SCHEDULED", label: "Showing Scheduled" },
@@ -167,9 +172,16 @@ export default function CrmDeals() {
     value: "",
     stage: "QUALIFIED_LEAD",
     probability: "50",
+    companyId: "",
   });
 
   const isLord = user?.role === 'MHP_LORD';
+
+  // Fetch companies for MHP_LORD users
+  const { data: companies } = useQuery<Company[]>({
+    queryKey: ["/api/companies"],
+    enabled: isLord,
+  });
 
   const { data: dealsData, isLoading } = useQuery({
     queryKey: ["/api/crm/deals"],
@@ -205,7 +217,7 @@ export default function CrmDeals() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
       toast({ title: "Success", description: "Deal created successfully" });
       setIsCreateOpen(false);
-      setNewDeal({ title: "", value: "", stage: "QUALIFIED_LEAD", probability: "50" });
+      setNewDeal({ title: "", value: "", stage: "QUALIFIED_LEAD", probability: "50", companyId: "" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create deal", variant: "destructive" });
@@ -317,6 +329,26 @@ export default function CrmDeals() {
               <DialogTitle>Create New Deal</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {isLord && (
+                <div>
+                  <Label htmlFor="companyId">Company *</Label>
+                  <Select
+                    value={newDeal.companyId}
+                    onValueChange={(value) => setNewDeal({ ...newDeal, companyId: value })}
+                  >
+                    <SelectTrigger id="companyId">
+                      <SelectValue placeholder="Select a company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies?.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label htmlFor="title">Deal Title *</Label>
                 <Input
@@ -355,7 +387,7 @@ export default function CrmDeals() {
                   probability: newDeal.probability ? parseInt(newDeal.probability) : 50,
                   assignedTo: user?.id,
                 })}
-                disabled={!newDeal.title || createMutation.isPending || !user?.id}
+                disabled={!newDeal.title || (isLord && !newDeal.companyId) || createMutation.isPending || !user?.id}
                 className="w-full"
               >
                 {createMutation.isPending ? "Creating..." : "Create Deal"}

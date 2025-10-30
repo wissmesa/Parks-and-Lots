@@ -6989,9 +6989,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/crm/contacts', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
+      // For MHP_LORD, accept companyId from request body; for others, use user's companyId
+      let companyId: string | undefined;
+      if (req.user!.role === 'MHP_LORD') {
+        companyId = req.body.companyId;
+        if (!companyId) {
+          return res.status(400).json({ message: 'Company selection is required' });
+        }
+        // Validate company exists
+        const company = await storage.getCompany(companyId);
+        if (!company) {
+          return res.status(404).json({ message: 'Selected company not found' });
+        }
+      } else {
+        companyId = req.user!.companyId;
+        if (!companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company' });
+        }
       }
 
       const contactData = {
@@ -7124,9 +7138,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/crm/deals', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
+      // For MHP_LORD, accept companyId from request body; for others, use user's companyId
+      let companyId: string | undefined;
+      if (req.user!.role === 'MHP_LORD') {
+        companyId = req.body.companyId;
+        if (!companyId) {
+          return res.status(400).json({ message: 'Company selection is required' });
+        }
+        // Validate company exists
+        const company = await storage.getCompany(companyId);
+        if (!company) {
+          return res.status(404).json({ message: 'Selected company not found' });
+        }
+      } else {
+        companyId = req.user!.companyId;
+        if (!companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company' });
+        }
       }
 
       const dealData = {
