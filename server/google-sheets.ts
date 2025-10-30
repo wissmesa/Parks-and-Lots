@@ -4,9 +4,20 @@ import type { Lot } from '@shared/schema';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.REPLIT_DOMAINS 
-  ? `https://${process.env.REPLIT_DOMAINS}/api/auth/google-sheets/callback`
-  : 'http://localhost:5000/api/auth/google-sheets/callback';
+const getRedirectUri = () => {
+  // Check for explicit production URL
+  if (process.env.FRONTEND_BASE_URL && process.env.FRONTEND_BASE_URL.includes('https://')) {
+    return `${process.env.FRONTEND_BASE_URL}/api/auth/google-sheets/callback`;
+  }
+  // Check for Replit
+  if (process.env.REPLIT_DOMAINS) {
+    return `https://${process.env.REPLIT_DOMAINS}/api/auth/google-sheets/callback`;
+  }
+  // Default to localhost for development
+  return 'http://localhost:5000/api/auth/google-sheets/callback';
+};
+
+const REDIRECT_URI = getRedirectUri();
 
 const SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets', // Full access to spreadsheets (read/write any sheet)

@@ -5,9 +5,20 @@ import { storage } from './storage';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const GOOGLE_DRIVE_PARENT_FOLDER_ID = process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID;
-const REDIRECT_URI = process.env.REPLIT_DOMAINS 
-  ? `https://${process.env.REPLIT_DOMAINS}/api/auth/google-drive/callback`
-  : 'http://localhost:5000/api/auth/google-drive/callback';
+const getRedirectUri = () => {
+  // Check for explicit production URL
+  if (process.env.FRONTEND_BASE_URL && process.env.FRONTEND_BASE_URL.includes('https://')) {
+    return `${process.env.FRONTEND_BASE_URL}/api/auth/google-drive/callback`;
+  }
+  // Check for Replit
+  if (process.env.REPLIT_DOMAINS) {
+    return `https://${process.env.REPLIT_DOMAINS}/api/auth/google-drive/callback`;
+  }
+  // Default to localhost for development
+  return 'http://localhost:5000/api/auth/google-drive/callback';
+};
+
+const REDIRECT_URI = getRedirectUri();
 
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
