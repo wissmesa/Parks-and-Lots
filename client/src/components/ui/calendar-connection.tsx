@@ -34,45 +34,71 @@ export function CalendarConnection() {
     onSuccess: (data) => {
       if (data.authUrl) {
         setIsConnecting(true);
+        
+        // Clear any previous auth result
+        localStorage.removeItem('google_calendar_auth_result');
+        
         const popup = window.open(data.authUrl, '_blank', 'width=500,height=600');
         
-        // Listen for postMessage from popup
-        const handleMessage = (event: MessageEvent) => {
-          if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
-            setIsConnecting(false);
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/google/status"] });
-            
-            if (event.data.success) {
-              toast({
-                title: "Calendar Connected",
-                description: "Your Google Calendar has been connected successfully.",
-              });
-            } else {
-              toast({
-                title: "Connection Failed",
-                description: "Failed to connect to Google Calendar. Please try again.",
-                variant: "destructive",
-              });
-            }
-            
-            // Cleanup
-            window.removeEventListener('message', handleMessage);
-            if (popup && !popup.closed) {
-              popup.close();
-            }
+        const handleAuthResult = (result: any) => {
+          setIsConnecting(false);
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/google/status"] });
+          
+          if (result.success) {
+            toast({
+              title: "Calendar Connected",
+              description: "Your Google Calendar has been connected successfully.",
+            });
+          } else {
+            toast({
+              title: "Connection Failed",
+              description: "Failed to connect to Google Calendar. Please try again.",
+              variant: "destructive",
+            });
+          }
+          
+          if (popup && !popup.closed) {
+            popup.close();
           }
         };
         
+        // Listen for postMessage (fallback)
+        const handleMessage = (event: MessageEvent) => {
+          if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
+            handleAuthResult(event.data);
+            window.removeEventListener('message', handleMessage);
+            clearInterval(checkClosed);
+          }
+        };
         window.addEventListener('message', handleMessage);
         
-        // Check if popup was closed manually (fallback)
+        // Poll for localStorage changes (works around COOP restrictions)
         const checkClosed = setInterval(() => {
+          // Check localStorage for auth result
+          try {
+            const resultStr = localStorage.getItem('google_calendar_auth_result');
+            if (resultStr) {
+              const result = JSON.parse(resultStr);
+              // Only process recent results (within last 10 seconds)
+              if (Date.now() - result.timestamp < 10000) {
+                localStorage.removeItem('google_calendar_auth_result');
+                handleAuthResult(result);
+                window.removeEventListener('message', handleMessage);
+                clearInterval(checkClosed);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Error checking localStorage:', e);
+          }
+          
+          // Check if popup was closed manually
           if (popup && popup.closed) {
             setIsConnecting(false);
             window.removeEventListener('message', handleMessage);
             clearInterval(checkClosed);
           }
-        }, 1000);
+        }, 500);
       }
     },
     onError: (error) => {

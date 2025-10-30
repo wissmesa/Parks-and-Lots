@@ -1773,10 +1773,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="success">✅ Google Calendar Connected Successfully!</div>
           <div class="message">You can close this window now.</div>
           <script>
-            // Notify parent window that connection was successful
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: true }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_calendar_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_CALENDAR_CONNECTED', 
+                success: true,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: true }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 2 seconds
             setTimeout(() => window.close(), 2000);
           </script>
@@ -1802,10 +1818,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="error">❌ Connection Failed</div>
           <div class="message">Please try again or close this window.</div>
           <script>
-            // Notify parent window that connection failed
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: false }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_calendar_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_CALENDAR_CONNECTED', 
+                success: false,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: false }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 3 seconds
             setTimeout(() => window.close(), 3000);
           </script>
@@ -1878,10 +1910,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="success">✅ Google Drive Connected Successfully!</div>
           <div class="message">Photos will now automatically sync to your Drive. You can close this window.</div>
           <script>
-            // Notify parent window that connection was successful
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: true }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_drive_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_DRIVE_CONNECTED', 
+                success: true,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: true }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 2 seconds
             setTimeout(() => window.close(), 2000);
           </script>
@@ -1907,10 +1955,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="error">❌ Connection Failed</div>
           <div class="message">Please try again or close this window.</div>
           <script>
-            // Notify parent window that connection failed
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: false }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_drive_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_DRIVE_CONNECTED', 
+                success: false,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_DRIVE_CONNECTED', success: false }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 3 seconds
             setTimeout(() => window.close(), 3000);
           </script>
@@ -2057,10 +2121,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="success">✅ Google Sheets Connected</div>
           <div class="message">You can now export lot data to Google Sheets. This window will close automatically.</div>
           <script>
-            // Notify parent window that connection was successful
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: true }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_sheets_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_SHEETS_CONNECTED', 
+                success: true,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: true }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 2 seconds
             setTimeout(() => window.close(), 2000);
           </script>
@@ -2091,10 +2171,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <div class="message">An error occurred while connecting to Google Sheets.</div>
           <div class="details">${errorMessage}</div>
           <script>
-            // Notify parent window that connection failed
-            if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: false, error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
+            // Use localStorage to communicate with parent window (works around COOP restrictions)
+            try {
+              localStorage.setItem('google_sheets_auth_result', JSON.stringify({ 
+                type: 'GOOGLE_SHEETS_CONNECTED', 
+                success: false,
+                error: '${errorMessage.replace(/'/g, "\\'")}',
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.error('Failed to set localStorage:', e);
             }
+            
+            // Also try postMessage as fallback
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: false, error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
+              }
+            } catch (e) {
+              console.error('postMessage failed:', e);
+            }
+            
             // Auto-close after 5 seconds
             setTimeout(() => window.close(), 5000);
           </script>

@@ -619,41 +619,71 @@ export default function AdminCompanies() {
                           
                           if (data.authUrl) {
                             setIsConnectingSheets(true);
+                            
+                            // Clear any previous auth result
+                            localStorage.removeItem('google_sheets_auth_result');
+                            
                             const popup = window.open(data.authUrl, 'google-sheets-auth', 'width=500,height=600');
                             
-                            const handleMessage = (event: MessageEvent) => {
-                              if (event.data?.type === 'GOOGLE_SHEETS_CONNECTED') {
-                                setIsConnectingSheets(false);
-                                
-                                if (event.data.success) {
-                                  queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/system-status"] });
-                                  toast({
-                                    title: "Google Sheets Connected",
-                                    description: "You can now add Google Sheet IDs to companies below.",
-                                  });
-                                } else {
-                                  const errorMsg = event.data.error || "Failed to connect to Google Sheets. Please try again.";
-                                  console.error('Google Sheets connection error:', errorMsg);
-                                  toast({
-                                    title: "Connection Failed",
-                                    description: errorMsg,
-                                    variant: "destructive",
-                                  });
-                                }
-                                
-                                window.removeEventListener('message', handleMessage);
-                                if (popup && !popup.closed) {
-                                  popup.close();
-                                }
+                            const handleAuthResult = (result: any) => {
+                              setIsConnectingSheets(false);
+                              
+                              if (result.success) {
+                                queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/system-status"] });
+                                toast({
+                                  title: "Google Sheets Connected",
+                                  description: "You can now add Google Sheet IDs to companies below.",
+                                });
+                              } else {
+                                const errorMsg = result.error || "Failed to connect to Google Sheets. Please try again.";
+                                console.error('Google Sheets connection error:', errorMsg);
+                                toast({
+                                  title: "Connection Failed",
+                                  description: errorMsg,
+                                  variant: "destructive",
+                                });
+                              }
+                              
+                              if (popup && !popup.closed) {
+                                popup.close();
                               }
                             };
                             
+                            // Listen for postMessage (fallback)
+                            const handleMessage = (event: MessageEvent) => {
+                              if (event.data?.type === 'GOOGLE_SHEETS_CONNECTED') {
+                                handleAuthResult(event.data);
+                                window.removeEventListener('message', handleMessage);
+                                clearInterval(checkClosed);
+                              }
+                            };
                             window.addEventListener('message', handleMessage);
                             
+                            // Poll for localStorage changes (works around COOP restrictions)
                             const checkClosed = setInterval(() => {
+                              // Check localStorage for auth result
+                              try {
+                                const resultStr = localStorage.getItem('google_sheets_auth_result');
+                                if (resultStr) {
+                                  const result = JSON.parse(resultStr);
+                                  // Only process recent results (within last 10 seconds)
+                                  if (Date.now() - result.timestamp < 10000) {
+                                    localStorage.removeItem('google_sheets_auth_result');
+                                    handleAuthResult(result);
+                                    window.removeEventListener('message', handleMessage);
+                                    clearInterval(checkClosed);
+                                    return;
+                                  }
+                                }
+                              } catch (e) {
+                                console.error('Error checking localStorage:', e);
+                              }
+                              
+                              // Check if popup was closed
                               if (popup?.closed) {
                                 clearInterval(checkClosed);
                                 setIsConnectingSheets(false);
+                                window.removeEventListener('message', handleMessage);
                               }
                             }, 500);
                           }
