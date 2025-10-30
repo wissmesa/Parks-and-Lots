@@ -2046,6 +2046,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
     } catch (error) {
       console.error('Google Sheets OAuth callback error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : '';
+      console.error('Error details:', { message: errorMessage, stack: errorStack });
       
       // Return error page that closes the popup
       res.send(`
@@ -2056,19 +2059,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center; background: #f8f9fa; }
             .error { color: #dc2626; font-size: 18px; margin-bottom: 20px; }
-            .message { color: #6b7280; }
+            .message { color: #6b7280; margin-bottom: 20px; }
+            .details { color: #9ca3af; font-size: 12px; font-family: monospace; background: #1f2937; color: #f3f4f6; padding: 12px; border-radius: 4px; text-align: left; max-width: 600px; margin: 20px auto; overflow-x: auto; }
           </style>
         </head>
         <body>
           <div class="error">❌ Connection Failed</div>
-          <div class="message">Please try again or close this window.</div>
+          <div class="message">An error occurred while connecting to Google Sheets.</div>
+          <div class="details">${errorMessage}</div>
           <script>
             // Notify parent window that connection failed
             if (window.opener) {
-              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: false }, '*');
+              window.opener.postMessage({ type: 'GOOGLE_SHEETS_CONNECTED', success: false, error: '${errorMessage.replace(/'/g, "\\'")}' }, '*');
             }
-            // Auto-close after 3 seconds
-            setTimeout(() => window.close(), 3000);
+            // Auto-close after 5 seconds
+            setTimeout(() => window.close(), 5000);
           </script>
         </body>
         </html>

@@ -632,9 +632,11 @@ export default function AdminCompanies() {
                                     description: "You can now add Google Sheet IDs to companies below.",
                                   });
                                 } else {
+                                  const errorMsg = event.data.error || "Failed to connect to Google Sheets. Please try again.";
+                                  console.error('Google Sheets connection error:', errorMsg);
                                   toast({
                                     title: "Connection Failed",
-                                    description: "Failed to connect to Google Sheets. Please try again.",
+                                    description: errorMsg,
                                     variant: "destructive",
                                   });
                                 }
