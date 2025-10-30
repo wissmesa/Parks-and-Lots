@@ -130,7 +130,7 @@ export default function AdminCompanies() {
 
   const { data: sheetsStatus } = useQuery<{ connected: boolean; lordUserId?: string; lordUserName?: string }>({
     queryKey: ["/api/auth/google-sheets/system-status"],
-    enabled: user?.role === 'MHP_LORD',
+    enabled: user?.email === 'alem@bluepaperclip.com',
   });
 
   const [isConnectingSheets, setIsConnectingSheets] = useState(false);
@@ -561,7 +561,8 @@ export default function AdminCompanies() {
           </div>
         </div>
 
-        {/* Google Sheets Connection for LORD */}
+        {/* Google Sheets Connection - Only for alem@bluepaperclip.com */}
+        {user?.email === 'alem@bluepaperclip.com' && (
         <div className="mb-6">
           <Card>
             <CardContent className="p-6">
@@ -706,6 +707,7 @@ export default function AdminCompanies() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         <Card>
           <CardHeader>

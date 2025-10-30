@@ -2067,43 +2067,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/auth/google-sheets/connect', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
+      console.log('[Google Sheets Connect] User attempting to connect:', user.email);
+      
       const state = `${user.id}:${randomBytes(16).toString('hex')}`;
       const authUrl = googleSheetsService.generateAuthUrl(state);
       
+      console.log('[Google Sheets Connect] Generated auth URL');
+      console.log('[Google Sheets Connect] OAuth client configured:', !!googleSheetsService);
+      
       res.json({ authUrl });
     } catch (error) {
-      console.error('Google Sheets auth URL generation error:', error);
+      console.error('[Google Sheets Connect] Error generating auth URL:', error);
+      if (error instanceof Error) {
+        console.error('[Google Sheets Connect] Error stack:', error.stack);
+      }
       res.status(500).json({ message: 'Failed to generate authorization URL' });
     }
   });
 
   app.get('/api/auth/google-sheets/callback', async (req, res) => {
     try {
+      console.log('[Google Sheets Callback] Received callback from Google');
       const { code, state } = req.query;
+      console.log('[Google Sheets Callback] Has code:', !!code, 'Has state:', !!state);
       
       if (!code || !state) {
+        console.error('[Google Sheets Callback] Missing code or state');
         return res.status(400).send('Missing authorization code or state');
       }
 
       // Extract and validate user ID from state
       const stateStr = state as string;
       const [stateUserId, stateNonce] = stateStr.split(':');
+      console.log('[Google Sheets Callback] State user ID:', stateUserId);
       
       if (!stateUserId || !stateNonce) {
+        console.error('[Google Sheets Callback] Invalid state format');
         return res.status(400).send('Invalid state parameter format');
       }
       
       // Validate that the user exists and has appropriate role
       const user = await storage.getUser(stateUserId);
+      console.log('[Google Sheets Callback] User found:', user?.email);
       if (!user || !['MHP_LORD', 'MANAGER', 'ADMIN'].includes(user.role)) {
+        console.error('[Google Sheets Callback] Invalid user or insufficient permissions');
         return res.status(403).send('Invalid user or insufficient permissions');
       }
 
       // Exchange code for tokens
+      console.log('[Google Sheets Callback] Exchanging code for tokens...');
       const tokens = await googleSheetsService.exchangeCodeForTokens(code as string);
+      console.log('[Google Sheets Callback] Tokens received, has access_token:', !!tokens.access_token);
+      console.log('[Google Sheets Callback] Tokens received, has refresh_token:', !!tokens.refresh_token);
       
       // Store tokens for the user from state
+      console.log('[Google Sheets Callback] Storing tokens for user:', user.email);
       await googleSheetsService.storeTokens(stateUserId, tokens);
+      console.log('[Google Sheets Callback] Tokens stored successfully');
       
       // Return success page that closes the popup
       res.send(`
@@ -2227,11 +2247,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check system-wide Google Sheets status (checks the lord user that will be used for exports)
   app.get('/api/auth/google-sheets/system-status', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
     try {
-      // Get the MHP_LORD user that will be used for exports
-      const lordUser = await storage.getMhpLordUser();
+      // Get the system integration user (alem@bluepaperclip.com) that will be used for exports
+      const lordUser = await storage.getSystemIntegrationUser();
       
       if (!lordUser) {
-        return res.json({ connected: false, message: 'No MHP_LORD user found' });
+        return res.json({ connected: false, message: 'System administrator not found' });
       }
 
       const account = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
@@ -2347,18 +2367,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Company does not have a Google Sheets ID configured.' });
       }
 
-      // Get MHP_LORD user for authentication
-      const lordUser = await storage.getMhpLordUser();
+      // Get system integration user (alem@bluepaperclip.com) for authentication
+      const lordUser = await storage.getSystemIntegrationUser();
       
       if (!lordUser) {
-        return res.status(500).json({ message: 'No MHP_LORD user found for Google Sheets authentication.' });
+        return res.status(500).json({ message: 'System administrator has not been configured for Google Sheets integration.' });
       }
 
-      // Check if lord has Google Sheets connected
+      // Check if system admin has Google Sheets connected
       const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
       
       if (!lordOauthAccount) {
-        return res.status(400).json({ message: 'MHP_LORD has not connected Google Sheets. Please connect in settings.' });
+        return res.status(400).json({ message: 'System administrator has not connected Google Sheets. Please contact support.' });
       }
 
       // Export to Google Sheets using lord's auth and company's spreadsheet
@@ -2434,18 +2454,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Company does not have a Google Sheets ID configured.' });
       }
 
-      // Get MHP_LORD user for authentication
-      const lordUser = await storage.getMhpLordUser();
+      // Get system integration user (alem@bluepaperclip.com) for authentication
+      const lordUser = await storage.getSystemIntegrationUser();
       
       if (!lordUser) {
-        return res.status(500).json({ message: 'No MHP_LORD user found for Google Sheets authentication.' });
+        return res.status(500).json({ message: 'System administrator has not been configured for Google Sheets integration.' });
       }
 
-      // Check if lord has Google Sheets connected
+      // Check if system admin has Google Sheets connected
       const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
       
       if (!lordOauthAccount) {
-        return res.status(400).json({ message: 'MHP_LORD has not connected Google Sheets. Please connect in settings.' });
+        return res.status(400).json({ message: 'System administrator has not connected Google Sheets. Please contact support.' });
       }
 
       // Export to Google Sheets using lord's auth and company's spreadsheet
@@ -4629,17 +4649,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!company || !company.googleSheetId) {
             sheetsExportError = 'Company does not have a Google Sheets ID configured.';
           } else {
-            // Get MHP_LORD user for authentication
-            const lordUser = await storage.getMhpLordUser();
+            // Get system integration user (alem@bluepaperclip.com) for authentication
+            const lordUser = await storage.getSystemIntegrationUser();
             
             if (!lordUser) {
-              sheetsExportError = 'No MHP_LORD user found for Google Sheets authentication.';
+              sheetsExportError = 'System administrator has not been configured for Google Sheets integration.';
             } else {
-              // Check if lord has Google Sheets connected
+              // Check if system admin has Google Sheets connected
               const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
               
               if (!lordOauthAccount) {
-                sheetsExportError = 'MHP_LORD has not connected Google Sheets. Please connect in settings.';
+                sheetsExportError = 'System administrator has not connected Google Sheets. Please contact support.';
               } else {
                 // Prepare lot data with park information
                 const lotWithPark = {

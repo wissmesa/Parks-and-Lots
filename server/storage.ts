@@ -275,8 +275,9 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getMhpLordUser(): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.role, 'MHP_LORD'));
+  async getSystemIntegrationUser(): Promise<User | undefined> {
+    // Only alem@bluepaperclip.com should manage Google integrations
+    const [user] = await db.select().from(users).where(eq(users.email, 'alem@bluepaperclip.com'));
     return user;
   }
 

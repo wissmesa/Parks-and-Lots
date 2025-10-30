@@ -18,8 +18,8 @@ export function DriveConnection() {
   const queryClient = useQueryClient();
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Only show Drive connection for MHP_LORD
-  if (user?.role !== 'MHP_LORD') {
+  // Only show Drive connection for alem@bluepaperclip.com
+  if (user?.email !== 'alem@bluepaperclip.com') {
     return null;
   }
 
