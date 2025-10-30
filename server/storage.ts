@@ -275,6 +275,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getMhpLordUser(): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.role, 'MHP_LORD'));
+    return user;
+  }
+
   async createUser(user: InsertUser): Promise<User> {
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;

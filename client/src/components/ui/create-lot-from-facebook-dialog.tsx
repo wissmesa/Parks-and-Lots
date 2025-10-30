@@ -243,6 +243,10 @@ export function CreateLotFromFacebookDialog({
           title: 'Success',
           description: 'Lot created and exported to Google Sheets successfully!',
         });
+        // Open the spreadsheet if available
+        if (data.spreadsheetUrl) {
+          window.open(data.spreadsheetUrl, '_blank');
+        }
       } else if (data.sheetsExportError) {
         // Show success for lot creation
         toast({
@@ -251,8 +255,8 @@ export function CreateLotFromFacebookDialog({
         });
         // Show separate warning for export failure
         toast({
-          title: 'Google Sheets Export',
-          description: `Lot was created successfully, but it has not been exported to Google Sheets. Please verify the Google Sheets connection and the linked spreadsheet ID. ${data.sheetsExportError}`,
+          title: 'Google Sheets Export Warning',
+          description: data.sheetsExportError,
           variant: 'destructive',
         });
       } else {
@@ -263,7 +267,8 @@ export function CreateLotFromFacebookDialog({
         });
       }
       
-      setStep('export');
+      // Close dialog after successful creation
+      onClose();
     },
     onError: (error: any) => {
       console.error('Create lot mutation error:', error);

@@ -9,7 +9,7 @@ import multer from "multer";
 import jwt from 'jsonwebtoken';
 import { storage } from "./storage";
 import { db } from "./db";
-import { invites, users } from "@shared/schema";
+import { invites, users, lots } from "@shared/schema";
 import { and, isNull, inArray, eq, ne } from "drizzle-orm";
 import { 
   authenticateToken, 
@@ -2139,10 +2139,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const lotId = req.params.id;
       const user = req.user!;
       
-      // Get the lot data
-      const lot = await storage.getLot(lotId);
+      // Get lot data directly without active status filters (we want to export any lot)
+      const [lot] = await db.select().from(lots).where(eq(lots.id, lotId));
       if (!lot) {
         return res.status(404).json({ message: 'Lot not found' });
+      }
+
+      // Check if lot has a park
+      if (!lot.parkId) {
+        return res.status(400).json({ message: 'Lot does not have an associated park. Please assign a park to this lot first.' });
       }
 
       // Check if user has access to this lot
@@ -2160,6 +2165,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Get park info
+      const park = await storage.getPark(lot.parkId);
+      if (!park) {
+        return res.status(404).json({ message: 'Park not found for this lot' });
+      }
+
+      // Check if park has a company
+      if (!park.companyId) {
+        return res.status(400).json({ message: 'Park does not have an associated company. Please assign the park to a company first.' });
+      }
+
       // Get lot with park info for export
       const lotsWithParkInfo = await storage.getLotsWithParkInfo({ includeInactive: true });
       const lotWithPark = lotsWithParkInfo.find(l => l.id === lotId);
@@ -2168,8 +2184,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Lot details not found' });
       }
 
-      // Export to Google Sheets
-      const result = await googleSheetsService.exportLotToSheet(user.id, lotWithPark);
+      // Get company
+      const company = await storage.getCompany(park.companyId);
+      
+      if (!company || !company.googleSheetId) {
+        return res.status(400).json({ message: 'Company does not have a Google Sheets ID configured.' });
+      }
+
+      // Get MHP_LORD user for authentication
+      const lordUser = await storage.getMhpLordUser();
+      
+      if (!lordUser) {
+        return res.status(500).json({ message: 'No MHP_LORD user found for Google Sheets authentication.' });
+      }
+
+      // Check if lord has Google Sheets connected
+      const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+      
+      if (!lordOauthAccount) {
+        return res.status(400).json({ message: 'MHP_LORD has not connected Google Sheets. Please connect in settings.' });
+      }
+
+      // Export to Google Sheets using lord's auth and company's spreadsheet
+      const result = await googleSheetsService.exportLotToSheet(lordUser.id, company.googleSheetId, lotWithPark);
       
       res.json({
         message: 'Lot exported to Google Sheets successfully',
@@ -2178,6 +2215,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Export lot to Google Sheets error:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.stack);
+      }
       const errorMessage = error instanceof Error ? error.message : 'Failed to export lot to Google Sheets';
       res.status(500).json({ message: errorMessage });
     }
@@ -2226,8 +2266,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'No accessible lots found' });
       }
 
-      // Export to Google Sheets
-      const result = await googleSheetsService.exportMultipleLotsToSheet(user.id, lots);
+      // Get company from the first lot's park (all lots should be from same company for batch export)
+      const firstLot = lots[0];
+      if (!firstLot.park?.companyId) {
+        return res.status(400).json({ message: 'Lot does not have an associated company for Google Sheets export.' });
+      }
+
+      const company = await storage.getCompany(firstLot.park.companyId);
+      
+      if (!company || !company.googleSheetId) {
+        return res.status(400).json({ message: 'Company does not have a Google Sheets ID configured.' });
+      }
+
+      // Get MHP_LORD user for authentication
+      const lordUser = await storage.getMhpLordUser();
+      
+      if (!lordUser) {
+        return res.status(500).json({ message: 'No MHP_LORD user found for Google Sheets authentication.' });
+      }
+
+      // Check if lord has Google Sheets connected
+      const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+      
+      if (!lordOauthAccount) {
+        return res.status(400).json({ message: 'MHP_LORD has not connected Google Sheets. Please connect in settings.' });
+      }
+
+      // Export to Google Sheets using lord's auth and company's spreadsheet
+      const result = await googleSheetsService.exportMultipleLotsToSheet(lordUser.id, company.googleSheetId, lots);
       
       res.json({
         message: `${lots.length} lots exported to Google Sheets successfully`,
@@ -3428,6 +3494,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get old park data before update
       const oldPark = await storage.getPark(req.params.id);
       
+      if (!oldPark) {
+        return res.status(404).json({ message: 'Park not found' });
+      }
+      
+      // For ADMIN users, ensure they cannot change the companyId
+      // This prevents admins from moving parks between companies
+      if (req.user?.role === 'ADMIN') {
+        if (req.body.companyId && req.body.companyId !== oldPark.companyId) {
+          console.error('ADMIN attempted to change park companyId:', {
+            userId: req.user.id,
+            oldCompanyId: oldPark.companyId,
+            newCompanyId: req.body.companyId
+          });
+          return res.status(403).json({ message: 'Cannot change park company assignment' });
+        }
+        // Ensure companyId stays the same even if included in request
+        req.body.companyId = oldPark.companyId;
+      }
+      
       const updates = insertParkSchema.partial().parse(req.body);
       
       // Check if lotRent is being updated
@@ -3473,6 +3558,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(park);
     } catch (error) {
       console.error('Update park error:', error);
+      // Provide more detailed error information
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
       res.status(400).json({ message: 'Invalid park data' });
     }
   });
@@ -4373,26 +4466,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let spreadsheetUrl: string | null = null;
       
       try {
-        const userId = req.user?.id;
-        if (userId) {
-          // Check if user has Google Sheets connected
-          const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
+        // Get company from park to determine which spreadsheet to use
+        if (park && park.companyId) {
+          const company = await storage.getCompany(park.companyId);
           
-          if (!oauthAccount) {
-            sheetsExportError = 'Please connect your Google account in settings.';
-          } else if (!oauthAccount.spreadsheetId) {
-            sheetsExportError = 'Please link a spreadsheet in settings.';
+          if (!company || !company.googleSheetId) {
+            sheetsExportError = 'Company does not have a Google Sheets ID configured.';
           } else {
-            // Prepare lot data with park information
-            const lotWithPark = {
-              ...lot,
-              park: park
-            };
+            // Get MHP_LORD user for authentication
+            const lordUser = await storage.getMhpLordUser();
             
-            const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
-            sheetsExportSuccess = true;
-            spreadsheetUrl = exportResult.spreadsheetUrl;
+            if (!lordUser) {
+              sheetsExportError = 'No MHP_LORD user found for Google Sheets authentication.';
+            } else {
+              // Check if lord has Google Sheets connected
+              const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+              
+              if (!lordOauthAccount) {
+                sheetsExportError = 'MHP_LORD has not connected Google Sheets. Please connect in settings.';
+              } else {
+                // Prepare lot data with park information
+                const lotWithPark = {
+                  ...lot,
+                  park: park
+                };
+                
+                const exportResult = await googleSheetsService.exportLotToSheet(lordUser.id, company.googleSheetId, lotWithPark);
+                sheetsExportSuccess = true;
+                spreadsheetUrl = exportResult.spreadsheetUrl;
+              }
+            }
           }
+        } else {
+          sheetsExportError = 'Lot does not have an associated company for Google Sheets export.';
         }
       } catch (exportError) {
         console.error('Failed to export lot to Google Sheets:', exportError);

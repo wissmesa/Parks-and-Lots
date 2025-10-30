@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActivityTab } from "@/components/ui/activity-tab";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle, List, Grid3X3, UserCheck } from "lucide-react";
+import { Building, Plus, Edit, Trash2, Camera, TreePine, MoreHorizontal, AlertCircle, List, Grid3X3, UserCheck, Sheet, Check, ExternalLink, Unlink } from "lucide-react";
 import { validateEmail, validatePhone } from "@/lib/validation";
 
 interface Company {
@@ -29,6 +29,7 @@ interface Company {
   zipCode?: string;
   phone?: string;
   email?: string;
+  googleSheetId?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -62,7 +63,8 @@ export default function AdminCompanies() {
     state: "",
     zipCode: "",
     phone: "",
-    email: ""
+    email: "",
+    googleSheetId: ""
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
@@ -126,6 +128,12 @@ export default function AdminCompanies() {
     enabled: user?.role === 'MHP_LORD',
   });
 
+  const { data: sheetsStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/auth/google-sheets/status"],
+    enabled: user?.role === 'MHP_LORD',
+  });
+
+  const [isConnectingSheets, setIsConnectingSheets] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: async (data: any): Promise<Company> => {
@@ -281,7 +289,8 @@ export default function AdminCompanies() {
       state: "",
       zipCode: "",
       phone: "",
-      email: ""
+      email: "",
+      googleSheetId: ""
     });
   };
 
@@ -295,7 +304,8 @@ export default function AdminCompanies() {
       state: company.state || "",
       zipCode: company.zipCode || "",
       phone: company.phone || "",
-      email: company.email || ""
+      email: company.email || "",
+      googleSheetId: company.googleSheetId || ""
     });
   };
 
@@ -524,6 +534,19 @@ export default function AdminCompanies() {
                       </p>
                     )}
                   </div>
+                  <div>
+                    <Label htmlFor="googleSheetId">Google Sheets ID</Label>
+                    <Input
+                      id="googleSheetId"
+                      type="text"
+                      value={formData.googleSheetId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, googleSheetId: e.target.value }))}
+                      placeholder="Enter spreadsheet ID from URL"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Get the ID from your Google Sheets URL: docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit
+                    </p>
+                  </div>
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                       Cancel
@@ -536,6 +559,120 @@ export default function AdminCompanies() {
               </DialogContent>
             </Dialog>
           </div>
+        </div>
+
+        {/* Google Sheets Connection for LORD */}
+        <div className="mb-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg ${sheetsStatus?.connected ? 'bg-green-100' : 'bg-muted'}`}>
+                    {sheetsStatus?.connected ? (
+                      <Check className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <Sheet className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Google Sheets Integration</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {sheetsStatus?.connected 
+                        ? 'Connected - Add Google Sheets IDs to companies below'
+                        : 'Connect to enable automatic lot exports to Google Sheets'
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  {sheetsStatus?.connected ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await apiRequest('POST', '/api/auth/google-sheets/disconnect');
+                          queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/status"] });
+                          toast({
+                            title: "Disconnected",
+                            description: "Google Sheets has been disconnected.",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "Failed to disconnect Google Sheets.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Unlink className="w-4 h-4 mr-2" />
+                      Disconnect
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const response = await apiRequest('GET', '/api/auth/google-sheets/connect');
+                          const data = await response.json();
+                          
+                          if (data.authUrl) {
+                            setIsConnectingSheets(true);
+                            const popup = window.open(data.authUrl, 'google-sheets-auth', 'width=500,height=600');
+                            
+                            const handleMessage = (event: MessageEvent) => {
+                              if (event.data?.type === 'GOOGLE_SHEETS_CONNECTED') {
+                                setIsConnectingSheets(false);
+                                
+                                if (event.data.success) {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/status"] });
+                                  toast({
+                                    title: "Google Sheets Connected",
+                                    description: "You can now add Google Sheet IDs to companies below.",
+                                  });
+                                } else {
+                                  toast({
+                                    title: "Connection Failed",
+                                    description: "Failed to connect to Google Sheets. Please try again.",
+                                    variant: "destructive",
+                                  });
+                                }
+                                
+                                window.removeEventListener('message', handleMessage);
+                                if (popup && !popup.closed) {
+                                  popup.close();
+                                }
+                              }
+                            };
+                            
+                            window.addEventListener('message', handleMessage);
+                            
+                            const checkClosed = setInterval(() => {
+                              if (popup?.closed) {
+                                clearInterval(checkClosed);
+                                setIsConnectingSheets(false);
+                              }
+                            }, 500);
+                          }
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "Failed to initiate Google Sheets connection.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      disabled={isConnectingSheets}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      {isConnectingSheets ? 'Connecting...' : 'Connect Google Sheets'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -883,6 +1020,19 @@ export default function AdminCompanies() {
                     {validationErrors.email}
                   </p>
                 )}
+              </div>
+              <div>
+                <Label htmlFor="edit-googleSheetId">Google Sheets ID</Label>
+                <Input
+                  id="edit-googleSheetId"
+                  type="text"
+                  value={formData.googleSheetId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, googleSheetId: e.target.value }))}
+                  placeholder="Enter spreadsheet ID from URL"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Get the ID from your Google Sheets URL: docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit
+                </p>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={() => setEditingCompany(null)}>

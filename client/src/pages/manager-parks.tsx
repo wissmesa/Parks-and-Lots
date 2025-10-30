@@ -274,7 +274,21 @@ export default function ManagerParks() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("PATCH", `/api/parks/${editingPark?.id}`, data);
+      // Helper to convert empty strings to null for optional fields
+      const toStringOrNull = (value: any) => {
+        if (value === '' || value === null || value === undefined) return null;
+        return String(value);
+      };
+      
+      // Clean up the data before sending
+      const cleanedData = {
+        ...data,
+        description: toStringOrNull(data.description),
+        meetingPlace: toStringOrNull(data.meetingPlace),
+        lotRent: toStringOrNull(data.lotRent),
+      };
+      
+      return apiRequest("PATCH", `/api/parks/${editingPark?.id}`, cleanedData);
     },
     onSuccess: async () => {
       // Force immediate refetch of queries before closing dialog
@@ -291,10 +305,11 @@ export default function ManagerParks() {
         description: "Park updated successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Park update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update park",
+        description: error?.message || "Failed to update park",
         variant: "destructive",
       });
     },

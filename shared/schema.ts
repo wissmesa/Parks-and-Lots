@@ -99,6 +99,7 @@ export const companies = pgTable("companies", {
   zipCode: varchar("zip_code"),
   phone: varchar("phone"),
   email: varchar("email"),
+  googleSheetId: varchar("google_sheet_id"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

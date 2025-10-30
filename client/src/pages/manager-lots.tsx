@@ -6,7 +6,6 @@ import { LotCalculator } from "@/components/ui/lot-calculator";
 import { LotHistoryDialog } from "@/components/ui/lot-history-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ManagerSidebar } from "@/components/ui/manager-sidebar";
-import { SheetsConnection } from "@/components/ui/sheets-connection";
 import { DriveConnection } from "@/components/ui/drive-connection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -905,52 +904,7 @@ export default function ManagerLots() {
   // Handle Google Sheets export
   const handleExportToGoogleSheets = async (lot: Lot) => {
     try {
-      // Check if Google Sheets is connected
-      const statusResponse = await apiRequest('GET', '/api/auth/google-sheets/status');
-      const statusData = await statusResponse.json();
-      
-      if (!statusData.connected) {
-        // Open Google Sheets connection in a popup
-        const connectResponse = await apiRequest('GET', '/api/auth/google-sheets/connect');
-        const connectData = await connectResponse.json();
-        const popup = window.open(connectData.authUrl, 'google-sheets-auth', 'width=500,height=600');
-        
-        // Listen for the popup to close or send a message
-        const checkClosed = setInterval(() => {
-          if (popup?.closed) {
-            clearInterval(checkClosed);
-            // Don't retry automatically - user needs to set sheet ID first
-          }
-        }, 1000);
-
-        // Listen for success message from popup
-        const messageListener = (event: MessageEvent) => {
-          if (event.data.type === 'GOOGLE_SHEETS_CONNECTED' && event.data.success) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', messageListener);
-            popup?.close();
-            
-            toast({
-              title: "Connected!",
-              description: "Please link your Google Sheet, then try exporting again.",
-            });
-          }
-        };
-        window.addEventListener('message', messageListener);
-        return;
-      }
-
-      // Check if spreadsheet ID is set
-      if (!statusData.spreadsheetId) {
-        toast({
-          title: "Sheet Not Linked",
-          description: "Please link a Google Sheet first.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Export the lot to Google Sheets
+      // Export the lot to Google Sheets (backend handles lord auth and company sheet ID)
       const response = await apiRequest('POST', `/api/lots/${lot.id}/export-to-sheets`);
       const responseData = await response.json();
 
@@ -961,11 +915,12 @@ export default function ManagerLots() {
 
       // Open the Google Sheets document
       window.open(responseData.spreadsheetUrl, '_blank');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error exporting to Google Sheets:', error);
+      const errorMessage = error?.message || 'Failed to export lot to Google Sheets. Please try again.';
       toast({
         title: "Export Failed",
-        description: "Failed to export lot to Google Sheets. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -1648,11 +1603,6 @@ export default function ManagerLots() {
           {/* Google Drive Backup */}
           <div className="mb-6">
             <DriveConnection />
-          </div>
-
-          {/* Google Sheets Export */}
-          <div className="mb-6">
-            <SheetsConnection />
           </div>
 
           {/* Filter and Sort Controls */}

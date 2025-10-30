@@ -231,10 +231,9 @@ export class GoogleSheetsService {
     return google.sheets({ version: 'v4', auth: this.oauth2Client });
   }
 
-  async exportLotToSheet(userId: string, lot: any): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
+  async exportLotToSheet(lordUserId: string, spreadsheetId: string, lot: any): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
     try {
-      const sheets = await this.createSheetsClient(userId);
-      const spreadsheetId = await this.getSpreadsheetId(userId);
+      const sheets = await this.createSheetsClient(lordUserId);
       
       if (!spreadsheetId) {
         throw new Error('No spreadsheet linked. Please provide a Google Sheet ID first.');
@@ -390,10 +389,9 @@ export class GoogleSheetsService {
     }
   }
 
-  async exportMultipleLotsToSheet(userId: string, lots: any[]): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
+  async exportMultipleLotsToSheet(lordUserId: string, spreadsheetId: string, lots: any[]): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> {
     try {
-      const sheets = await this.createSheetsClient(userId);
-      const spreadsheetId = await this.getSpreadsheetId(userId);
+      const sheets = await this.createSheetsClient(lordUserId);
       
       if (!spreadsheetId) {
         throw new Error('No spreadsheet linked. Please provide a Google Sheet ID first.');
