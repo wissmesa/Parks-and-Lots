@@ -530,24 +530,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let spreadsheetUrl: string | null = null;
       
       try {
-        const userId = req.user!.id;
-        // Check if user has Google Sheets connected
-        const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
-        
-        if (!oauthAccount) {
-          sheetsExportError = 'Please connect your Google account in settings.';
-        } else if (!oauthAccount.spreadsheetId) {
-          sheetsExportError = 'Please link a spreadsheet in settings.';
-        } else {
-          // Prepare lot data with park information
-          const lotWithPark = {
-            ...lot,
-            park: park
-          };
+        // Get company from park to determine which spreadsheet to use
+        if (park && park.companyId) {
+          const company = await storage.getCompany(park.companyId);
           
-          const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
-          sheetsExportSuccess = true;
-          spreadsheetUrl = exportResult.spreadsheetUrl;
+          if (!company || !company.googleSheetId) {
+            sheetsExportError = 'Company does not have a Google Sheets ID configured.';
+          } else {
+            // Get system integration user (alem@bluepaperclip.com) for authentication
+            const lordUser = await storage.getSystemIntegrationUser();
+            
+            if (!lordUser) {
+              sheetsExportError = 'System administrator has not been configured for Google Sheets integration.';
+            } else {
+              // Check if system admin has Google Sheets connected
+              const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+              
+              if (!lordOauthAccount) {
+                sheetsExportError = 'System administrator has not connected Google Sheets. Please contact support.';
+              } else {
+                // Prepare lot data with park information
+                const lotWithPark = {
+                  ...lot,
+                  park: park
+                };
+                
+                const exportResult = await googleSheetsService.exportLotToSheet(lordUser.id, company.googleSheetId, lotWithPark);
+                sheetsExportSuccess = true;
+                spreadsheetUrl = exportResult.spreadsheetUrl;
+              }
+            }
+          }
+        } else {
+          sheetsExportError = 'Lot does not have an associated company for Google Sheets export.';
         }
       } catch (exportError: unknown) {
         console.error('Failed to export lot to Google Sheets:', exportError);
@@ -1357,24 +1372,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let spreadsheetUrl: string | null = null;
       
       try {
-        const userId = req.user!.id;
-        // Check if user has Google Sheets connected
-        const oauthAccount = await storage.getOAuthAccount(userId, 'google-sheets');
-        
-        if (!oauthAccount) {
-          sheetsExportError = 'Please connect your Google account in settings.';
-        } else if (!oauthAccount.spreadsheetId) {
-          sheetsExportError = 'Please link a spreadsheet in settings.';
-        } else {
-          // Prepare lot data with park information
-          const lotWithPark = {
-            ...lot,
-            park: park
-          };
+        // Get company from park to determine which spreadsheet to use
+        if (park && park.companyId) {
+          const company = await storage.getCompany(park.companyId);
           
-          const exportResult = await googleSheetsService.exportLotToSheet(userId, lotWithPark);
-          sheetsExportSuccess = true;
-          spreadsheetUrl = exportResult.spreadsheetUrl;
+          if (!company || !company.googleSheetId) {
+            sheetsExportError = 'Company does not have a Google Sheets ID configured.';
+          } else {
+            // Get system integration user (alem@bluepaperclip.com) for authentication
+            const lordUser = await storage.getSystemIntegrationUser();
+            
+            if (!lordUser) {
+              sheetsExportError = 'System administrator has not been configured for Google Sheets integration.';
+            } else {
+              // Check if system admin has Google Sheets connected
+              const lordOauthAccount = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+              
+              if (!lordOauthAccount) {
+                sheetsExportError = 'System administrator has not connected Google Sheets. Please contact support.';
+              } else {
+                // Prepare lot data with park information
+                const lotWithPark = {
+                  ...lot,
+                  park: park
+                };
+                
+                const exportResult = await googleSheetsService.exportLotToSheet(lordUser.id, company.googleSheetId, lotWithPark);
+                sheetsExportSuccess = true;
+                spreadsheetUrl = exportResult.spreadsheetUrl;
+              }
+            }
+          }
+        } else {
+          sheetsExportError = 'Lot does not have an associated company for Google Sheets export.';
         }
       } catch (exportError: unknown) {
         console.error('Failed to export lot to Google Sheets:', exportError);
@@ -2041,7 +2071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Google Sheets OAuth routes
-  // Diagnostic endpoint to check redirect URIs
+  // Diagnostic endpoint to check redirect URIs and connection status
   app.get('/api/auth/google-sheets/debug', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     const getRedirectUri = () => {
       if (process.env.FRONTEND_BASE_URL && process.env.FRONTEND_BASE_URL.includes('https://')) {
@@ -2053,6 +2083,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return 'http://localhost:5000/api/auth/google-sheets/callback';
     };
     
+    const currentUser = (req as AuthRequest).user!;
+    const currentUserAccount = await storage.getOAuthAccount(currentUser.id, 'google-sheets');
+    
+    const lordUser = await storage.getSystemIntegrationUser();
+    const lordUserAccount = lordUser ? await storage.getOAuthAccount(lordUser.id, 'google-sheets') : null;
+    
     res.json({
       redirectUri: getRedirectUri(),
       envVars: {
@@ -2060,6 +2096,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         REPLIT_DOMAINS: process.env.REPLIT_DOMAINS || 'not set',
         GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'set' : 'not set',
         GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'set' : 'not set',
+      },
+      currentUser: {
+        id: currentUser.id,
+        email: currentUser.email,
+        role: currentUser.role,
+        hasGoogleSheetsConnected: !!currentUserAccount,
+        hasAccessToken: !!currentUserAccount?.accessToken,
+        hasRefreshToken: !!currentUserAccount?.refreshToken,
+        spreadsheetId: currentUserAccount?.spreadsheetId || null,
+      },
+      systemIntegrationUser: {
+        found: !!lordUser,
+        id: lordUser?.id || null,
+        email: lordUser?.email || null,
+        role: lordUser?.role || null,
+        hasGoogleSheetsConnected: !!lordUserAccount,
+        hasAccessToken: !!lordUserAccount?.accessToken,
+        hasRefreshToken: !!lordUserAccount?.refreshToken,
+        spreadsheetId: lordUserAccount?.spreadsheetId || null,
       }
     });
   });
