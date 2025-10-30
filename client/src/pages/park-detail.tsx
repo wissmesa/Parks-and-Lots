@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { 
-  ChevronRight, 
+  ChevronRight,
+  ArrowRight,
   Home, 
   MapPin, 
   Bed, 
@@ -51,13 +52,14 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
+import { useLotPhotos } from "@/hooks/use-lot-photos";
 import type { Park } from "@shared/schema";
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 
 // Lot preview image component
 function LotPreviewImage({ lotId }: { lotId: string }) {
-  const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
-  const [imageError, setImageError] = useState(false);
+  const { data: photos = [], isLoading } = useLotPhotos(lotId);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   
   if (isLoading) {
     return (
@@ -67,20 +69,45 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
     );
   }
   
-  if (hasPhotos && firstPhoto && !imageError) {
+  const validPhotos = photos.filter((_, index) => !imageErrors[index]);
+  const hasPhotos = validPhotos.length > 0;
+  
+  if (hasPhotos) {
     return (
-      <div className="w-full h-full flex-shrink-0 overflow-hidden relative">
-        <img 
-          src={firstPhoto.urlOrPath || firstPhoto.url}
-          alt="Lot preview"
-          className="w-full h-full object-cover"
-          onError={() => {
-            console.error('Failed to load lot image:', firstPhoto.urlOrPath || firstPhoto.url);
-            setImageError(true);
-          }}
-        />
+      <div className="w-full h-full flex-shrink-0 overflow-hidden relative group">
+        <Carousel className="w-full h-full">
+          <CarouselContent className="h-full m-0">
+            {validPhotos.map((photo, index) => (
+              <CarouselItem key={photo.id || index} className="p-0">
+                <div className="w-full h-full relative">
+                  <img 
+                    src={photo.urlOrPath || photo.url}
+                    alt={`Lot preview ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      console.error('Failed to load lot image:', photo.urlOrPath || photo.url);
+                      setImageErrors(prev => ({ ...prev, [index]: true }));
+                    }}
+                  />
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          {validPhotos.length > 1 && (
+            <>
+              <CarouselPrevious 
+                type="button"
+                className="bg-white/90 hover:bg-white border-2 border-gray-200 hover:border-primary transition-all shadow-lg hover:shadow-xl hover:scale-110 text-gray-800 hover:text-gray-800 z-30" 
+              />
+              <CarouselNext 
+                type="button"
+                className="bg-white/90 hover:bg-white border-2 border-gray-200 hover:border-primary transition-all shadow-lg hover:shadow-xl hover:scale-110 text-gray-800 hover:text-gray-800 z-30"
+              />
+            </>
+          )}
+        </Carousel>
         {/* Request Showing Button Overlay */}
-        <div className="absolute bottom-3 right-3 z-10">
+        <div className="absolute bottom-3 right-3 z-20">
           <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
             <Button 
               className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs h-auto"
@@ -95,7 +122,7 @@ function LotPreviewImage({ lotId }: { lotId: string }) {
     );
   }
   
-  // Fallback placeholder when no photos or image error
+  // Fallback placeholder when no photos or all images failed to load
   return (
     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center flex-shrink-0 relative">
       <div className="text-center">
@@ -472,103 +499,111 @@ export default function ParkDetail() {
                 ) : (
                   <div className="space-y-4">
                     {filteredLots.map((lot: Lot) => (
-                      <Link key={lot.id} href={`/lots/${lot.id}`} className="block" data-testid={`link-lot-${lot.id}`}>
-                        <div className="border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer bg-card" data-testid={`card-lot-${lot.id}`}>
-                          <div className="flex flex-col sm:flex-row">
-                            {/* Preview Image */}
-                            <div className="w-full sm:w-96 h-80 sm:h-72 flex-shrink-0">
-                              <LotPreviewImage lotId={lot.id} />
-                            </div>
-                            
-                            {/* Lot Details */}
-                            <div className="flex-1 p-4 sm:p-6">
-                              <div className="flex flex-col h-full">
-                                {/* Header Section - Lot Name */}
-                                <div className="mb-3">
-                                  <h4 className="text-xl font-bold text-foreground mb-3">{lot.nameOrNumber}</h4>
-                                  
-                                  {/* Status badges - separate row for better spacing */}
-                                  <div className="flex flex-wrap gap-2 mb-4">
+                      <div key={lot.id} className="border border-border rounded-lg overflow-hidden hover:shadow-lg transition-all duration-200 bg-card" data-testid={`card-lot-${lot.id}`}>
+                        <div className="flex flex-col sm:flex-row">
+                          {/* Preview Image */}
+                          <div className="w-full sm:w-96 h-80 sm:h-72 flex-shrink-0">
+                            <LotPreviewImage lotId={lot.id} />
+                          </div>
+                          
+                          {/* Lot Details */}
+                          <div className="flex-1 p-4 sm:p-6">
+                            <div className="flex flex-col h-full">
+                              {/* Header Section - Lot Name */}
+                              <div className="mb-3">
+                                <h4 className="text-xl font-bold text-foreground mb-3">{lot.nameOrNumber}</h4>
+                                
+                                {/* Status badges - separate row for better spacing */}
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                  {(() => {
+                                    // Handle both array and single status formats
+                                    const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
+                                    return statusArray.length > 0 ? statusArray.map((s, index) => (
+                                      <Badge key={index} variant="secondary" className="text-xs font-medium px-3 py-1">
+                                        {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
+                                      </Badge>
+                                    )) : (
+                                      <Badge variant="outline" className="text-xs px-3 py-1">No Status</Badge>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                              
+                              {/* Price - prominent display */}
+                              <div className="mb-4">
+                                <div className="flex items-center text-2xl font-bold text-primary">
+                                  <span>
                                     {(() => {
-                                      // Handle both array and single status formats
                                       const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                                      return statusArray.length > 0 ? statusArray.map((s, index) => (
-                                        <Badge key={index} variant="secondary" className="text-xs font-medium px-3 py-1">
-                                          {s === 'FOR_RENT' ? 'For Rent' : s === 'FOR_SALE' ? 'For Sale' : s === 'RENT_TO_OWN' ? 'Rent to Own' : 'Contract for Deed'}
-                                        </Badge>
-                                      )) : (
-                                        <Badge variant="outline" className="text-xs px-3 py-1">No Status</Badge>
-                                      );
+                                      
+                                      // Show pricing based on status and availability
+                                      if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
+                                        return `$${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
+                                      }
+                                      if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
+                                        return `$${parseFloat(lot.priceForSale).toLocaleString()}`;
+                                      }
+                                      if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
+                                        return `$${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
+                                      }
+                                      if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
+                                        return `$${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
+                                      }
+                                      
+                                      // Fallback to legacy price if no specific pricing is available
+                                      if (lot.price) {
+                                        const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
+                                        return `$${parseFloat(lot.price).toLocaleString()}${suffix}`;
+                                      }
+                                      
+                                      return 'Price TBD';
                                     })()}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Property Details */}
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-muted-foreground mb-4">
+                                {lot.bedrooms && (
+                                  <div className="flex items-center">
+                                    <Bed className="w-4 h-4 mr-2 flex-shrink-0" />
+                                    <span>{lot.bedrooms} bed{lot.bedrooms !== 1 ? 's' : ''}</span>
                                   </div>
-                                </div>
-                                
-                                {/* Price - prominent display */}
-                                <div className="mb-4">
-                                  <div className="flex items-center text-2xl font-bold text-primary">
-                                    <span>
-                                      {(() => {
-                                        const statusArray = Array.isArray(lot.status) ? lot.status : (lot.status ? [lot.status] : []);
-                                        
-                                        // Show pricing based on status and availability
-                                        if (statusArray.includes('FOR_RENT') && lot.priceForRent) {
-                                          return `$${parseFloat(lot.priceForRent).toLocaleString()}/mo`;
-                                        }
-                                        if (statusArray.includes('FOR_SALE') && lot.priceForSale) {
-                                          return `$${parseFloat(lot.priceForSale).toLocaleString()}`;
-                                        }
-                                        if (statusArray.includes('RENT_TO_OWN') && lot.priceRentToOwn) {
-                                          return `$${parseFloat(lot.priceRentToOwn).toLocaleString()}/mo`;
-                                        }
-                                        if (statusArray.includes('CONTRACT_FOR_DEED') && lot.priceContractForDeed) {
-                                          return `$${parseFloat(lot.priceContractForDeed).toLocaleString()}/mo`;
-                                        }
-                                        
-                                        // Fallback to legacy price if no specific pricing is available
-                                        if (lot.price) {
-                                          const suffix = statusArray.includes('FOR_RENT') ? '/mo' : '';
-                                          return `$${parseFloat(lot.price).toLocaleString()}${suffix}`;
-                                        }
-                                        
-                                        return 'Price TBD';
-                                      })()}
-                                    </span>
+                                )}
+                                {lot.bathrooms && (
+                                  <div className="flex items-center">
+                                    <Bath className="w-4 h-4 mr-2 flex-shrink-0" />
+                                    <span>{lot.bathrooms} bath{lot.bathrooms !== 1 ? 's' : ''}</span>
                                   </div>
-                                </div>
-                                
-                                {/* Property Details */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm text-muted-foreground mb-4">
-                                  {lot.bedrooms && (
-                                    <div className="flex items-center">
-                                      <Bed className="w-4 h-4 mr-2 flex-shrink-0" />
-                                      <span>{lot.bedrooms} bed{lot.bedrooms !== 1 ? 's' : ''}</span>
-                                    </div>
-                                  )}
-                                  {lot.bathrooms && (
-                                    <div className="flex items-center">
-                                      <Bath className="w-4 h-4 mr-2 flex-shrink-0" />
-                                      <span>{lot.bathrooms} bath{lot.bathrooms !== 1 ? 's' : ''}</span>
-                                    </div>
-                                  )}
-                                  {lot.sqFt && (
-                                    <div className="flex items-center">
-                                      <Ruler className="w-4 h-4 mr-2 flex-shrink-0" />
-                                      <span>{lot.sqFt.toLocaleString()} sq ft</span>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {/* Description */}
-                                <div className="flex-1">
-                                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                                    {lot.description || "Spacious unit with modern amenities"}
-                                  </p>
-                                </div>
+                                )}
+                                {lot.sqFt && (
+                                  <div className="flex items-center">
+                                    <Ruler className="w-4 h-4 mr-2 flex-shrink-0" />
+                                    <span>{lot.sqFt.toLocaleString()} sq ft</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Description */}
+                              <div className="flex-1 mb-4">
+                                <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                                  {lot.description || "Spacious unit with modern amenities"}
+                                </p>
+                              </div>
+                              
+                              {/* View Details Button */}
+                              <div className="mt-auto">
+                                <Link href={`/lots/${lot.id}`} data-testid={`link-lot-${lot.id}`}>
+                                  <Button className="w-full" variant="default">
+                                    View Details
+                                    <ArrowRight className="w-4 h-4 ml-2" />
+                                  </Button>
+                                </Link>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 )}

@@ -26,14 +26,15 @@ import {
   Info,
   Calendar
 } from "lucide-react";
-import { useFirstLotPhoto } from "@/hooks/use-lot-photos";
+import { useLotPhotos } from "@/hooks/use-lot-photos";
 import { ParkCard } from "@/components/ui/park-card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 
 // Lot preview image component for card layout
 function LotPreviewImageCard({ lotId }: { lotId: string }) {
-  const { firstPhoto, hasPhotos, isLoading } = useFirstLotPhoto(lotId);
-  const [imageError, setImageError] = useState(false);
+  const { data: photos = [], isLoading } = useLotPhotos(lotId);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   
   if (isLoading) {
     return (
@@ -43,20 +44,45 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
     );
   }
   
-  if (hasPhotos && firstPhoto && !imageError) {
+  const validPhotos = photos.filter((_, index) => !imageErrors[index]);
+  const hasPhotos = validPhotos.length > 0;
+  
+  if (hasPhotos) {
     return (
-      <div className="h-48 overflow-hidden relative">
-        <img 
-          src={firstPhoto.urlOrPath || firstPhoto.url}
-          alt="Lot preview"
-          className="w-full h-full object-cover"
-          onError={() => {
-            console.error('Failed to load lot image:', firstPhoto.urlOrPath || firstPhoto.url);
-            setImageError(true);
-          }}
-        />
+      <div className="h-48 overflow-hidden relative group">
+        <Carousel className="w-full h-full">
+          <CarouselContent className="h-48 m-0">
+            {validPhotos.map((photo, index) => (
+              <CarouselItem key={photo.id || index} className="p-0">
+                <div className="h-48 relative">
+                  <img 
+                    src={photo.urlOrPath || photo.url}
+                    alt={`Lot preview ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={() => {
+                      console.error('Failed to load lot image:', photo.urlOrPath || photo.url);
+                      setImageErrors(prev => ({ ...prev, [index]: true }));
+                    }}
+                  />
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          {validPhotos.length > 1 && (
+            <>
+              <CarouselPrevious 
+                type="button"
+                className="bg-white/90 hover:bg-white border-2 border-gray-200 hover:border-primary transition-all shadow-lg hover:shadow-xl hover:scale-110 text-gray-800 hover:text-gray-800 z-30" 
+              />
+              <CarouselNext 
+                type="button"
+                className="bg-white/90 hover:bg-white border-2 border-gray-200 hover:border-primary transition-all shadow-lg hover:shadow-xl hover:scale-110 text-gray-800 hover:text-gray-800 z-30"
+              />
+            </>
+          )}
+        </Carousel>
         {/* Request Showing Button Overlay */}
-        <div className="absolute bottom-4 right-4 z-10">
+        <div className="absolute bottom-4 right-4 z-20">
           <Link href={`/lots/${lotId}?booking=true`} onClick={(e) => e.stopPropagation()}>
             <Button 
               className="py-1.5 px-3 shadow-lg bg-blue-600/90 hover:bg-blue-600 text-xs"
@@ -71,7 +97,7 @@ function LotPreviewImageCard({ lotId }: { lotId: string }) {
     );
   }
   
-  // Fallback placeholder when no photos or image error
+  // Fallback placeholder when no photos or all images failed to load
   return (
     <div className="h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 flex items-center justify-center relative">
       <div className="text-center">
