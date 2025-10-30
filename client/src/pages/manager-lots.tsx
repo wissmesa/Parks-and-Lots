@@ -154,6 +154,7 @@ export default function ManagerLots() {
     specialStatusId: [] as string[],
     houseManufacturer: [] as string[],
     houseModel: [] as string[],
+    facebookAdStatus: [] as string[],
     bedroomsMin: "",
     bedroomsMax: "",
     bathroomsMin: "",
@@ -188,6 +189,7 @@ export default function ManagerLots() {
       specialStatusId: [],
       houseManufacturer: [],
       houseModel: [],
+      facebookAdStatus: [],
       bedroomsMin: "",
       bedroomsMax: "",
       bathroomsMin: "",
@@ -235,6 +237,7 @@ export default function ManagerLots() {
   const hasActiveFilters = () => {
     return filters.status.length > 0 ||
            filters.visibility.length > 0 ||
+           filters.facebookAdStatus.length > 0 ||
            filters.parkId.length > 0 ||
            filters.specialStatusId.length > 0 ||
            filters.houseManufacturer.length > 0 ||
@@ -959,6 +962,14 @@ export default function ManagerLots() {
           return false;
         } else if (wantsHidden && isVisible) {
           // User wants hidden lots but this lot is visible
+          return false;
+        }
+      }
+
+      // Facebook ad status filter
+      if (filters.facebookAdStatus.length > 0) {
+        const hasMatchingStatus = lot.facebookAdStatus && filters.facebookAdStatus.includes(lot.facebookAdStatus);
+        if (!hasMatchingStatus) {
           return false;
         }
       }
@@ -1738,6 +1749,34 @@ export default function ManagerLots() {
                     </PopoverContent>
                   </Popover>
 
+                  {/* Facebook Ad Status Filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="flex items-center gap-1" data-testid="manager-facebook-ad-filter-trigger">
+                        <Filter className="w-4 h-4" />
+                        FB Ads {filters.facebookAdStatus.length > 0 && `(${filters.facebookAdStatus.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48" align="start">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Facebook Ads</Label>
+                        {["ADS_ON", "ADS_OFF"].map((status) => (
+                          <div key={status} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`manager-facebook-ad-${status}`}
+                              checked={filters.facebookAdStatus.includes(status)}
+                              onCheckedChange={() => toggleFilter("facebookAdStatus", status)}
+                              data-testid={`manager-facebook-ad-filter-${status}`}
+                            />
+                            <Label htmlFor={`manager-facebook-ad-${status}`} className="text-sm cursor-pointer">
+                              {status === "ADS_ON" ? "Ads On" : "Ads Off"}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
                   {/* Park Filter */}
                   {assignedParks.length > 1 && (
                     <Popover>
@@ -2021,30 +2060,18 @@ export default function ManagerLots() {
                       </div>
                     )}
                     
-                    {/* Tenant information */}
+                    {/* Facebook Ad Status */}
                     <div className="mb-2">
-                      {lot.tenantId && lot.tenantName ? (
-                        <button
-                          onClick={() => window.location.href = `/manager/tenants?tenant=${lot.tenantId}`}
-                          className="text-left hover:text-primary hover:underline transition-colors w-full"
-                        >
-                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{lot.tenantName}</div>
-                              <div className="text-xs text-muted-foreground">
-                                Tenant • {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
-                                         lot.tenantStatus === 'PENDING' ? 'Pending' : 
-                                         lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
-                                         lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded-md">
-                          No tenant assigned
-                        </div>
-                      )}
+                      <div className="p-2 bg-muted/30 rounded-md">
+                        <div className="text-xs text-muted-foreground mb-1">Facebook Ads</div>
+                        {lot.facebookAdStatus === 'ADS_ON' ? (
+                          <Badge variant="default" className="bg-green-600">Ads On</Badge>
+                        ) : lot.facebookAdStatus === 'ADS_OFF' ? (
+                          <Badge variant="secondary">Ads Off</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No Status</span>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="text-xs text-muted-foreground pt-3 border-t mt-3">
@@ -2206,7 +2233,7 @@ export default function ManagerLots() {
                     <TableHead>Lot</TableHead>
                     <TableHead>Park</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Tenant</TableHead>
+                    <TableHead>Facebook Ads</TableHead>
                     <TableHead>Visibility</TableHead>
                     <TableHead>Created Date</TableHead>
                     <TableHead>Details</TableHead>
@@ -2258,21 +2285,12 @@ export default function ManagerLots() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {lot.tenantId && lot.tenantName ? (
-                          <button
-                            onClick={() => window.location.href = `/manager/tenants?tenant=${lot.tenantId}`}
-                            className="text-left hover:text-primary hover:underline transition-colors"
-                          >
-                            <div className="font-medium">{lot.tenantName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {lot.tenantStatus === 'ACTIVE' ? 'Active' : 
-                               lot.tenantStatus === 'PENDING' ? 'Pending' : 
-                               lot.tenantStatus === 'INACTIVE' ? 'Inactive' : 
-                               lot.tenantStatus === 'TERMINATED' ? 'Terminated' : lot.tenantStatus}
-                            </div>
-                          </button>
+                        {lot.facebookAdStatus === 'ADS_ON' ? (
+                          <Badge variant="default" className="bg-green-600">Ads On</Badge>
+                        ) : lot.facebookAdStatus === 'ADS_OFF' ? (
+                          <Badge variant="secondary">Ads Off</Badge>
                         ) : (
-                          <span className="text-muted-foreground text-sm">No tenant</span>
+                          <span className="text-muted-foreground text-sm">No Status</span>
                         )}
                       </TableCell>
                       <TableCell>
