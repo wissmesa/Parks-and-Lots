@@ -2099,6 +2099,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check system-wide Google Sheets status (checks the lord user that will be used for exports)
+  app.get('/api/auth/google-sheets/system-status', authenticateToken, requireRole('MHP_LORD'), async (req, res) => {
+    try {
+      // Get the MHP_LORD user that will be used for exports
+      const lordUser = await storage.getMhpLordUser();
+      
+      if (!lordUser) {
+        return res.json({ connected: false, message: 'No MHP_LORD user found' });
+      }
+
+      const account = await storage.getOAuthAccount(lordUser.id, 'google-sheets');
+      
+      // Check if we have an account and a valid access token
+      let connected = false;
+      if (account && account.accessToken) {
+        // Verify we can actually get a valid access token
+        const validToken = await googleSheetsService.getValidAccessToken(lordUser.id);
+        connected = !!validToken;
+      }
+      
+      res.json({ 
+        connected,
+        lordUserId: lordUser.id,
+        lordUserName: lordUser.fullName
+      });
+    } catch (error) {
+      console.error('System Google Sheets status check error:', error);
+      res.status(500).json({ message: 'Failed to check system Google Sheets status' });
+    }
+  });
+
   app.post('/api/auth/google-sheets/set-spreadsheet', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;

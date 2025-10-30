@@ -128,8 +128,8 @@ export default function AdminCompanies() {
     enabled: user?.role === 'MHP_LORD',
   });
 
-  const { data: sheetsStatus } = useQuery<{ connected: boolean }>({
-    queryKey: ["/api/auth/google-sheets/status"],
+  const { data: sheetsStatus } = useQuery<{ connected: boolean; lordUserId?: string; lordUserName?: string }>({
+    queryKey: ["/api/auth/google-sheets/system-status"],
     enabled: user?.role === 'MHP_LORD',
   });
 
@@ -593,7 +593,7 @@ export default function AdminCompanies() {
                       onClick={async () => {
                         try {
                           await apiRequest('POST', '/api/auth/google-sheets/disconnect');
-                          queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/status"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/system-status"] });
                           toast({
                             title: "Disconnected",
                             description: "Google Sheets has been disconnected.",
@@ -626,7 +626,7 @@ export default function AdminCompanies() {
                                 setIsConnectingSheets(false);
                                 
                                 if (event.data.success) {
-                                  queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/status"] });
+                                  queryClient.invalidateQueries({ queryKey: ["/api/auth/google-sheets/system-status"] });
                                   toast({
                                     title: "Google Sheets Connected",
                                     description: "You can now add Google Sheet IDs to companies below.",
