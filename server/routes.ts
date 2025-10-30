@@ -1977,6 +1977,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Google Sheets OAuth routes
+  // Diagnostic endpoint to check redirect URIs
+  app.get('/api/auth/google-sheets/debug', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
+    const getRedirectUri = () => {
+      if (process.env.FRONTEND_BASE_URL && process.env.FRONTEND_BASE_URL.includes('https://')) {
+        return `${process.env.FRONTEND_BASE_URL}/api/auth/google-sheets/callback`;
+      }
+      if (process.env.REPLIT_DOMAINS) {
+        return `https://${process.env.REPLIT_DOMAINS}/api/auth/google-sheets/callback`;
+      }
+      return 'http://localhost:5000/api/auth/google-sheets/callback';
+    };
+    
+    res.json({
+      redirectUri: getRedirectUri(),
+      envVars: {
+        FRONTEND_BASE_URL: process.env.FRONTEND_BASE_URL || 'not set',
+        REPLIT_DOMAINS: process.env.REPLIT_DOMAINS || 'not set',
+        GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? 'set' : 'not set',
+        GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? 'set' : 'not set',
+      }
+    });
+  });
+
   app.get('/api/auth/google-sheets/connect', authenticateToken, requireRole(['MHP_LORD', 'MANAGER', 'ADMIN']), async (req, res) => {
     try {
       const user = (req as AuthRequest).user!;
