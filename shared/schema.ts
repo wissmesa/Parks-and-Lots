@@ -110,10 +110,10 @@ export const parks = pgTable("parks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").references(() => companies.id).notNull(),
   name: varchar("name").notNull(),
-  address: varchar("address").notNull(),
-  city: varchar("city").notNull(),
-  state: varchar("state").notNull(),
-  zip: varchar("zip").notNull(),
+  address: varchar("address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zip: varchar("zip"),
   description: text("description"),
   meetingPlace: text("meeting_place"),
   amenities: text("amenities").array(),
@@ -732,6 +732,10 @@ export const insertCompanySchema = createInsertSchema(companies, {
 });
 
 export const insertParkSchema = createInsertSchema(parks, {
+  address: z.string().optional().nullable().transform(val => val === '' ? null : val),
+  city: z.string().optional().nullable().transform(val => val === '' ? null : val),
+  state: z.string().optional().nullable().transform(val => val === '' ? null : val),
+  zip: z.string().optional().nullable().transform(val => val === '' ? null : val),
   amenities: z
     .array(
       z.union([

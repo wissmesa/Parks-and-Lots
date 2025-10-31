@@ -263,10 +263,11 @@ export default function ManagerParks() {
         description: "Park created successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Create park error:', error);
       toast({
         title: "Error",
-        description: "Failed to create park",
+        description: error?.message || "Failed to create park. Please ensure all required fields are filled in.",
         variant: "destructive",
       });
     },
@@ -328,10 +329,11 @@ export default function ManagerParks() {
         description: "Park deleted successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Delete park error:', error);
       toast({
         title: "Error",
-        description: "Failed to delete park",
+        description: error?.message || "Failed to delete park. This park may have associated lots or other data.",
         variant: "destructive",
       });
     },
@@ -441,6 +443,14 @@ export default function ManagerParks() {
       setNewAmenity({ name: '', icon: 'check' }); // Clear the input
     }
     
+    // Clean up empty string fields (convert to undefined so they're not sent)
+    const cleanedData = Object.fromEntries(
+      Object.entries(finalFormData).map(([key, value]) => [
+        key,
+        value === '' ? undefined : value
+      ])
+    );
+    
     // Check if lot rent has changed and we're editing
     if (editingPark && finalFormData.lotRent !== originalLotRent) {
       setShowLotRentConfirm(true);
@@ -448,9 +458,9 @@ export default function ManagerParks() {
     }
     
     if (editingPark) {
-      updateMutation.mutate(finalFormData);
+      updateMutation.mutate(cleanedData);
     } else {
-      createMutation.mutate(finalFormData);
+      createMutation.mutate(cleanedData);
     }
   };
 
@@ -1006,7 +1016,6 @@ export default function ManagerParks() {
                       id="create-address"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      required
                       data-testid="input-park-address"
                     />
                   </div>
@@ -1017,7 +1026,6 @@ export default function ManagerParks() {
                         id="create-city"
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        required
                         data-testid="input-park-city"
                       />
                     </div>
@@ -1027,7 +1035,6 @@ export default function ManagerParks() {
                         id="create-state"
                         value={formData.state}
                         onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                        required
                         data-testid="input-park-state"
                       />
                     </div>
@@ -1037,7 +1044,6 @@ export default function ManagerParks() {
                         id="create-zip"
                         value={formData.zip}
                         onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
-                        required
                         data-testid="input-park-zip"
                       />
                     </div>

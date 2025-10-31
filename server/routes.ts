@@ -47,6 +47,7 @@ import {
   insertTenantSchema,
   bookingSchema
 } from "@shared/schema";
+import { z } from "zod";
 import { randomBytes, createHash } from "crypto";
 import { sendInviteEmail, sendPasswordResetEmail, sendTenantInviteEmail } from "./email";
 
@@ -3383,7 +3384,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(company);
     } catch (error) {
       console.error('Create company error:', error);
-      res.status(400).json({ message: 'Invalid company data' });
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const missingFields = error.errors
+          .filter(err => err.message === 'Required')
+          .map(err => err.path.join('.'));
+        
+        if (missingFields.length > 0) {
+          return res.status(400).json({ 
+            message: `Missing required fields: ${missingFields.join(', ')}` 
+          });
+        }
+        
+        // Handle other validation errors
+        const errorMessages = error.errors.map(err => 
+          `${err.path.join('.')}: ${err.message}`
+        ).join('; ');
+        
+        return res.status(400).json({ 
+          message: `Validation error: ${errorMessages}` 
+        });
+      }
+      
+      res.status(400).json({ message: 'Failed to create company. Please check your input.' });
     }
   });
 
@@ -3716,7 +3740,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(park);
     } catch (error) {
       console.error('Create park error:', error);
-      res.status(400).json({ message: 'Invalid park data' });
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const missingFields = error.errors
+          .filter(err => err.message === 'Required')
+          .map(err => err.path.join('.'));
+        
+        if (missingFields.length > 0) {
+          return res.status(400).json({ 
+            message: `Missing required fields: ${missingFields.join(', ')}` 
+          });
+        }
+        
+        // Handle other validation errors
+        const errorMessages = error.errors.map(err => 
+          `${err.path.join('.')}: ${err.message}`
+        ).join('; ');
+        
+        return res.status(400).json({ 
+          message: `Validation error: ${errorMessages}` 
+        });
+      }
+      
+      res.status(400).json({ message: 'Failed to create park. Please check your input.' });
     }
   });
 
@@ -3803,11 +3850,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/parks/:id', authenticateToken, requireParkAccess, async (req, res) => {
     try {
+      // Check if park has any lots
+      const lotsInPark = await storage.getLots({ parkId: req.params.id, includeInactive: true });
+      
+      if (lotsInPark && lotsInPark.length > 0) {
+        return res.status(400).json({ 
+          message: `Cannot delete park. It has ${lotsInPark.length} lot(s) associated with it. Please delete or reassign the lots first.` 
+        });
+      }
+      
       await storage.deletePark(req.params.id);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete park error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      
+      // Check for foreign key constraint violations
+      if (error?.code === '23503') {
+        return res.status(400).json({ 
+          message: 'Cannot delete park because it has associated data (lots, photos, or managers). Please remove associated data first.' 
+        });
+      }
+      
+      res.status(500).json({ 
+        message: error?.message || 'Failed to delete park. Please try again.' 
+      });
     }
   });
 
@@ -4756,7 +4822,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: unknown) {
       console.error('Create lot error:', error);
-      res.status(400).json({ message: 'Invalid lot data' });
+      
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const missingFields = error.errors
+          .filter(err => err.message === 'Required')
+          .map(err => err.path.join('.'));
+        
+        if (missingFields.length > 0) {
+          return res.status(400).json({ 
+            message: `Missing required fields: ${missingFields.join(', ')}` 
+          });
+        }
+        
+        // Handle other validation errors
+        const errorMessages = error.errors.map(err => 
+          `${err.path.join('.')}: ${err.message}`
+        ).join('; ');
+        
+        return res.status(400).json({ 
+          message: `Validation error: ${errorMessages}` 
+        });
+      }
+      
+      res.status(400).json({ message: 'Failed to create lot. Please check your input.' });
     }
   });
 

@@ -285,10 +285,11 @@ export default function AdminParks() {
         description: "Park created successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Create park error:', error);
       toast({
         title: "Error",
-        description: "Failed to create park",
+        description: error?.message || "Failed to create park. Please ensure all required fields are filled in.",
         variant: "destructive",
       });
     },
@@ -350,10 +351,11 @@ export default function AdminParks() {
         description: "Park deleted successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Delete park error:', error);
       toast({
         title: "Error",
-        description: "Failed to delete park",
+        description: error?.message || "Failed to delete park. This park may have associated lots or other data.",
         variant: "destructive",
       });
     },
@@ -492,6 +494,14 @@ export default function AdminParks() {
       setNewAmenity({ name: '', icon: 'check' }); // Clear the input
     }
     
+    // Clean up empty string fields (convert to undefined so they're not sent)
+    const cleanedData = Object.fromEntries(
+      Object.entries(finalFormData).map(([key, value]) => [
+        key,
+        value === '' ? undefined : value
+      ])
+    );
+    
     // Check if lot rent has changed and we're editing
     if (editingPark && finalFormData.lotRent !== originalLotRent) {
       setShowLotRentConfirm(true);
@@ -499,9 +509,9 @@ export default function AdminParks() {
     }
     
     if (editingPark) {
-      updateMutation.mutate(finalFormData);
+      updateMutation.mutate(cleanedData);
     } else {
-      createMutation.mutate(finalFormData);
+      createMutation.mutate(cleanedData);
     }
   };
 
@@ -738,7 +748,6 @@ export default function AdminParks() {
                       id="address"
                       value={formData.address}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -748,7 +757,6 @@ export default function AdminParks() {
                         id="city"
                         value={formData.city}
                         onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                        required
                       />
                     </div>
                     <div>
@@ -757,7 +765,6 @@ export default function AdminParks() {
                         id="state"
                         value={formData.state}
                         onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                        required
                       />
                     </div>
                   </div>
