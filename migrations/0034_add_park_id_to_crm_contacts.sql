@@ -8,3 +8,4 @@ ALTER TABLE "crm_contacts" ADD CONSTRAINT "crm_contacts_park_id_parks_id_fk" FOR
 CREATE INDEX IF NOT EXISTS "crm_contacts_park_idx" ON "crm_contacts" ("park_id");
 
 
+

@@ -7179,8 +7179,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Convert empty strings to null for optional fields
+      const body = { ...req.body };
+      if (body.parkId === '') body.parkId = null;
+      if (body.email === '') body.email = null;
+      if (body.phone === '') body.phone = null;
+      if (body.source === '') body.source = null;
+      if (body.tenantId === '') body.tenantId = null;
+
+      // Validate parkId exists if provided
+      if (body.parkId) {
+        const park = await storage.getPark(body.parkId);
+        if (!park) {
+          return res.status(404).json({ message: 'Selected park not found' });
+        }
+      }
+
       const contactData = {
-        ...req.body,
+        ...body,
         companyId,
         createdBy: req.user!.id
       };
@@ -7211,26 +7227,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Contact not found' });
       }
 
-      if (contact.companyId !== req.user!.companyId) {
+      // MHP_LORD can update any contact, others can only update their company's contacts
+      const isLord = req.user!.role === 'MHP_LORD';
+      if (!isLord && contact.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
-      const updated = await storage.updateCrmContact(req.params.id, req.body);
+      // Convert empty strings to null for optional foreign key fields
+      const updates = { ...req.body };
+      if (updates.parkId === '') updates.parkId = null;
+      if (updates.email === '') updates.email = null;
+      if (updates.phone === '') updates.phone = null;
+      if (updates.source === '') updates.source = null;
+      if (updates.tenantId === '') updates.tenantId = null;
+
+      // Validate parkId exists if provided
+      if (updates.parkId) {
+        const park = await storage.getPark(updates.parkId);
+        if (!park) {
+          return res.status(404).json({ message: 'Selected park not found' });
+        }
+      }
+
+      // Remove fields that shouldn't be updated
+      delete updates.id;
+      delete updates.createdBy;
+      delete updates.createdAt;
+      delete updates.updatedAt;
+
+      // Don't allow changing companyId unless user is MHP_LORD
+      if (!isLord) {
+        // Remove companyId from updates for non-LORD users to prevent unauthorized changes
+        delete updates.companyId;
+      } else if (updates.companyId && updates.companyId !== contact.companyId) {
+        // For MHP_LORD, validate the new company exists if they're changing it
+        const newCompany = await storage.getCompany(updates.companyId);
+        if (!newCompany) {
+          return res.status(404).json({ message: 'Selected company not found' });
+        }
+      }
+
+      console.log('Updating contact with data:', updates);
+
+      const updated = await storage.updateCrmContact(req.params.id, updates);
       
-      // Log activity
+      // Log activity (use updated companyId in case it was changed by MHP_LORD)
       await storage.createCrmActivity({
         type: 'UPDATED',
         description: `Contact updated`,
         entityType: 'CONTACT',
         entityId: updated.id,
         userId: req.user!.id,
-        companyId: contact.companyId
+        companyId: updated.companyId
       });
 
       res.json(updated);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update CRM contact error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      console.error('Error details:', error.message, error.stack);
+      res.status(500).json({ 
+        message: 'Internal server error',
+        error: error.message || 'Unknown error'
+      });
     }
   });
 
@@ -7353,21 +7411,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId
       });
 
+      // Automatically create association between contact and deal
+      try {
+        await storage.createCrmAssociation({
+          sourceType: 'CONTACT',
+          sourceId: contactId,
+          targetType: 'DEAL',
+          targetId: deal.id,
+          relationshipType: 'primary_contact',
+          companyId,
+          createdBy: req.user!.id
+        });
+
+        // Log association activity
+        await storage.createCrmActivity({
+          type: 'ASSOCIATION_ADDED',
+          description: `Associated deal with contact`,
+          entityType: 'DEAL',
+          entityId: deal.id,
+          userId: req.user!.id,
+          companyId
+        });
+
+        await storage.createCrmActivity({
+          type: 'ASSOCIATION_ADDED',
+          description: `Associated contact with deal`,
+          entityType: 'CONTACT',
+          entityId: contactId,
+          userId: req.user!.id,
+          companyId
+        });
+      } catch (associationError) {
+        console.error('Failed to create association for deal:', associationError);
+        console.error('Association error details:', associationError instanceof Error ? associationError.message : String(associationError));
+        // Continue anyway - deal was created successfully
+      }
+
       res.json(deal);
     } catch (error) {
       console.error('Create CRM deal error:', error);
+      console.error('Error details:', error instanceof Error ? error.message : String(error));
+      console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
       res.status(500).json({ message: 'Internal server error' });
     }
   });
 
   app.patch('/api/crm/deals/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const deal = await storage.getCrmDeal(req.params.id);
       if (!deal) {
         return res.status(404).json({ message: 'Deal not found' });
       }
 
-      if (deal.companyId !== req.user!.companyId) {
+      // MHP_LORD can update any deal, others can only update their company's deals
+      if (!isLord && deal.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7526,12 +7624,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/crm/tasks/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const task = await storage.getCrmTask(req.params.id);
       if (!task) {
         return res.status(404).json({ message: 'Task not found' });
       }
 
-      if (task.companyId !== req.user!.companyId) {
+      // MHP_LORD can update any task, others can only update their company's tasks
+      if (!isLord && task.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7579,12 +7679,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/crm/tasks/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const task = await storage.getCrmTask(req.params.id);
       if (!task) {
         return res.status(404).json({ message: 'Task not found' });
       }
 
-      if (task.companyId !== req.user!.companyId) {
+      // MHP_LORD can delete any task, others can only delete their company's tasks
+      if (!isLord && task.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7661,12 +7763,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/crm/notes/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const note = await storage.getCrmNote(req.params.id);
       if (!note) {
         return res.status(404).json({ message: 'Note not found' });
       }
 
-      if (note.companyId !== req.user!.companyId) {
+      // MHP_LORD can delete any note, others can only delete their company's notes
+      if (!isLord && note.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7803,11 +7907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/crm/associations', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      const companyId = req.user!.companyId;
-      if (!companyId) {
-        return res.status(403).json({ message: 'User must be assigned to a company' });
-      }
-
       const { sourceType, sourceId, targetType, targetId } = req.body;
       
       // Validate required fields
@@ -7815,6 +7914,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ 
           message: 'Missing required fields: sourceType, sourceId, targetType, and targetId are required' 
         });
+      }
+
+      // Derive companyId from the entities being associated
+      let companyId: string | null = req.user!.companyId;
+      
+      // If user doesn't have companyId, try to get it from the source or target entity
+      if (!companyId) {
+        if (sourceType === 'DEAL') {
+          const deal = await storage.getCrmDeal(sourceId);
+          companyId = deal?.companyId as string;
+        } else if (sourceType === 'CONTACT') {
+          const contact = await storage.getCrmContact(sourceId);
+          companyId = contact?.companyId as string;
+        } else if (sourceType === 'LOT') {
+          const lot = await storage.getLot(sourceId);
+          if (lot?.parkId) {
+            const park = await storage.getPark(lot.parkId);
+            companyId = park?.companyId as string;
+          }
+        } else if (targetType === 'DEAL') {
+          const deal = await storage.getCrmDeal(targetId);
+          companyId = deal?.companyId as string;
+        } else if (targetType === 'CONTACT') {
+          const contact = await storage.getCrmContact(targetId);
+          companyId = contact?.companyId as string;
+        } else if (targetType === 'LOT') {
+          const lot = await storage.getLot(targetId);
+          if (lot?.parkId) {
+            const park = await storage.getPark(lot.parkId);
+            companyId = park?.companyId as string;
+          }
+        }
+      }
+
+      if (!companyId) {
+        return res.status(403).json({ message: 'Could not determine company for association' });
+      }
+
+      // Check access permissions
+      const isLord = req.user!.role === 'MHP_LORD';
+      if (!isLord) {
+        // Non-Lord users must have a companyId assigned
+        if (!req.user!.companyId) {
+          return res.status(403).json({ message: 'User must be assigned to a company to create associations' });
+        }
+        // Non-Lord users can only create associations for their own company
+        if (companyId !== req.user!.companyId) {
+          return res.status(403).json({ message: 'Cannot create association for different company' });
+        }
       }
 
       const associationData = {
@@ -7855,6 +8003,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/crm/associations/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
+      const association = await storage.getCrmAssociation(req.params.id);
+      if (!association) {
+        return res.status(404).json({ message: 'Association not found' });
+      }
+
+      // MHP_LORD can delete any association, others can only delete their company's associations
+      if (!isLord && association.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
       await storage.deleteCrmAssociation(req.params.id);
       res.json({ message: 'Association deleted successfully' });
     } catch (error) {
@@ -7866,13 +8025,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get company users for CRM messaging
   app.get('/api/crm/company-users', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const companyId = req.user!.companyId;
-      if (!companyId) {
+      
+      // MHP_LORD can see all users, others need to be in a company
+      if (!isLord && !companyId) {
         return res.status(403).json({ message: 'User must be assigned to a company' });
       }
 
       const users = await storage.getUsers();
-      const companyUsers = users.filter(u => u.companyId === companyId && u.isActive);
+      
+      // MHP_LORD can message all active users, others only their company users
+      const companyUsers = isLord 
+        ? users.filter(u => u.isActive)
+        : users.filter(u => u.companyId === companyId && u.isActive);
       
       // Return users without sensitive data
       const safeUsers = companyUsers.map(u => ({
@@ -7893,13 +8059,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/crm/units', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const isLord = req.user!.role === 'MHP_LORD';
-      const { page = '1', limit = '25', parkId, status, minPrice, maxPrice, bedrooms, bathrooms } = req.query;
+      const { page = '1', limit = '25', parkId, status, minPrice, maxPrice, bedrooms, bathrooms, q } = req.query;
       
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
       const offset = (pageNum - 1) * limitNum;
+      const searchQuery = q ? (q as string).toLowerCase().trim() : '';
       
-      let allLots = [];
+      let allLots: any[] = [];
 
       if (isLord) {
         // Lords can see all units from all companies
@@ -7933,12 +8100,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create a map of parkId to park name
         const parkMap = new Map(parks.map(p => [p.id, p.name]));
         
+        // Get company name
+        const company = await storage.getCompany(companyId);
+        const companyName = company?.name || null;
+        
         for (const parkId of parkIds) {
           const parkLots = await storage.getLots({ parkId });
-          // Enrich each lot with park name
+          // Enrich each lot with park name and company name
           const enrichedLots = parkLots.map(lot => ({
             ...lot,
-            parkName: parkMap.get(lot.parkId || '') || null
+            parkName: parkMap.get(lot.parkId || '') || null,
+            companyName: companyName
           }));
           allLots.push(...enrichedLots);
         }
@@ -7946,6 +8118,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply filters
       let filteredLots = allLots;
+      
+      // Apply search query filter (searches unit name/number, park name, and company name)
+      if (searchQuery) {
+        filteredLots = filteredLots.filter(lot => {
+          const nameOrNumber = (lot.nameOrNumber || '').toLowerCase();
+          const parkName = (lot.parkName || '').toLowerCase();
+          const companyName = (lot.companyName || '').toLowerCase();
+          
+          return nameOrNumber.includes(searchQuery) || 
+                 parkName.includes(searchQuery) || 
+                 companyName.includes(searchQuery);
+        });
+      }
       
       if (parkId) {
         filteredLots = filteredLots.filter(lot => lot.parkId === parkId);
@@ -8161,11 +8346,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Handle sending messages
     socket.on('send_message', async (data: { receiverId: string; content: string }) => {
       try {
+        // Get receiver's info to determine companyId
+        const receiver = await storage.getUser(data.receiverId);
+        if (!receiver) {
+          socket.emit('message_error', { message: 'Receiver not found' });
+          return;
+        }
+
+        // Use sender's companyId if available, otherwise use receiver's companyId
+        // This allows MHP_LORD users without a companyId to message anyone
+        const companyId = user.companyId || receiver.companyId;
+        if (!companyId) {
+          socket.emit('message_error', { message: 'No company association found' });
+          return;
+        }
+
         const message = await storage.createCrmMessage({
           senderId: user.id,
           receiverId: data.receiverId,
           content: data.content,
-          companyId: user.companyId!
+          companyId: companyId
         });
 
         // Send to receiver
@@ -8175,7 +8375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         socket.emit('message_sent', message);
       } catch (error) {
         console.error('Error sending message:', error);
-        socket.emit('error', { message: 'Failed to send message' });
+        socket.emit('message_error', { message: 'Failed to send message' });
       }
     });
 

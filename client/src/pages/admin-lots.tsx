@@ -630,6 +630,9 @@ export default function AdminLots() {
     },
     onSuccess: (updatedLot) => {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      // Invalidate CRM deals for real-time unit pricing updates
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
       // Invalidate audit logs for real-time updates
       if (editingLot?.id) {
         queryClient.invalidateQueries({ queryKey: ['audit-logs', 'LOT', editingLot.id] });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
@@ -34,12 +34,20 @@ export default function CrmUnits() {
   const user = AuthManager.getUser();
   const isLord = user?.role === 'MHP_LORD';
 
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   const { data: unitsData, isLoading } = useQuery({
-    queryKey: ["/api/crm/units", currentPage, itemsPerPage],
+    queryKey: ["/api/crm/units", currentPage, itemsPerPage, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
       params.append("page", currentPage.toString());
       params.append("limit", itemsPerPage.toString());
+      if (searchQuery) {
+        params.append("q", searchQuery);
+      }
       
       const res = await fetch(`/api/crm/units?${params.toString()}`, { 
         headers: AuthManager.getAuthHeaders(),
@@ -52,16 +60,11 @@ export default function CrmUnits() {
   });
 
   const units: Unit[] = unitsData?.units || [];
-  const totalCount = unitsData?.totalCount || 0;
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const totalCount = unitsData?.pagination?.totalCount || 0;
+  const totalPages = unitsData?.pagination?.totalPages || Math.ceil(totalCount / itemsPerPage);
 
-  // Filter units by search query
-  const filteredUnits = units.filter((unit) =>
-    unit.nameOrNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Sort units
-  const sortedUnits = [...filteredUnits].sort((a, b) => {
+  // Sort units (filtering is now handled by the API)
+  const sortedUnits = [...units].sort((a, b) => {
     switch (sortBy) {
       case "name-asc":
         return a.nameOrNumber.localeCompare(b.nameOrNumber);

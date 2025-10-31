@@ -234,6 +234,9 @@ export function CreateLotFromFacebookDialog({
       queryClient.invalidateQueries({ queryKey: ['/api/lots'] });
       queryClient.invalidateQueries({ queryKey: ['/api/manager/lots'] });
       queryClient.invalidateQueries({ queryKey: ['/api/company-manager/lots'] });
+      // Invalidate CRM deals for real-time unit pricing updates
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
       setCreatedLotId(data.id);
       setCreatedLotName(formData.nameOrNumber);
       

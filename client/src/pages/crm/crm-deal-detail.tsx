@@ -99,7 +99,7 @@ export default function CrmDealDetail() {
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Deal>>({});
   const [newNote, setNewNote] = useState("");
-  const [newTask, setNewTask] = useState({ title: "", description: "" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", assignedTo: "" });
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deleteDealOpen, setDeleteDealOpen] = useState(false);
   const [taskSortBy, setTaskSortBy] = useState("date-newest");
@@ -210,6 +210,8 @@ export default function CrmDealDetail() {
       if (!res.ok) throw new Error("Failed to delete deal");
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
       toast({ title: "Success", description: "Deal deleted successfully" });
       setLocation("/crm/deals");
     },
@@ -247,7 +249,7 @@ export default function CrmDealDetail() {
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (data: { title: string; description: string }) => {
+    mutationFn: async (data: { title: string; description: string; assignedTo: string }) => {
       const res = await fetch("/api/crm/tasks", {
         method: "POST",
         headers: {
@@ -261,7 +263,7 @@ export default function CrmDealDetail() {
           entityId: id,
           status: "TODO",
           priority: "MEDIUM",
-          assignedTo: user?.id,
+          assignedTo: data.assignedTo || user?.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to create task");
@@ -271,7 +273,7 @@ export default function CrmDealDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
       toast({ title: "Success", description: "Task created successfully" });
-      setNewTask({ title: "", description: "" });
+      setNewTask({ title: "", description: "", assignedTo: "" });
     },
   });
 
@@ -690,6 +692,22 @@ export default function CrmDealDetail() {
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                   rows={2}
                 />
+                <Select 
+                  value={newTask.assignedTo} 
+                  onValueChange={(value) => setNewTask({ ...newTask, assignedTo: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign to me (default)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Assign to me (default)</SelectItem>
+                    {companyUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.fullName} {u.id === user?.id ? "(me)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   onClick={() => createTaskMutation.mutate(newTask)}
                   disabled={!newTask.title.trim() || createTaskMutation.isPending}

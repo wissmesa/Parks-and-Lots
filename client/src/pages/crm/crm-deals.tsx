@@ -27,6 +27,17 @@ interface Deal {
   companyName?: string | null;
   contactParkName?: string | null;
   contactCompanyName?: string | null;
+  lotNameOrNumber?: string | null;
+  lotPriceForRent?: string | null;
+  lotPriceForSale?: string | null;
+  lotPriceRentToOwn?: string | null;
+  lotPriceContractForDeed?: string | null;
+  lotDepositForRent?: string | null;
+  lotDepositForSale?: string | null;
+  lotDepositRentToOwn?: string | null;
+  lotDepositContractForDeed?: string | null;
+  lotDownPaymentContractForDeed?: string | null;
+  lotRent?: string | null;
 }
 
 interface Company {
@@ -92,6 +103,11 @@ function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void 
           </div>
         </CardHeader>
         <CardContent className="p-4 pt-0 cursor-pointer" onClick={onClick}>
+          {deal.lotNameOrNumber && (
+            <div className="text-xs text-muted-foreground mb-2">
+              <span className="font-medium">Unit:</span> {deal.lotNameOrNumber}
+            </div>
+          )}
           {deal.value && (
             <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
               <DollarSign className="h-4 w-4 flex-shrink-0" />
@@ -115,6 +131,36 @@ function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void 
               </div>
             )}
           </div>
+          {(deal.lotPriceForRent || deal.lotPriceForSale || deal.lotPriceRentToOwn || deal.lotPriceContractForDeed || deal.lotRent) && (
+            <div className="mt-3 pt-3 border-t space-y-1">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Unit Pricing:</div>
+              {deal.lotPriceForRent && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">For Rent:</span> ${parseFloat(deal.lotPriceForRent).toLocaleString()}
+                </div>
+              )}
+              {deal.lotPriceForSale && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">For Sale:</span> ${parseFloat(deal.lotPriceForSale).toLocaleString()}
+                </div>
+              )}
+              {deal.lotPriceRentToOwn && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Rent-to-Own:</span> ${parseFloat(deal.lotPriceRentToOwn).toLocaleString()}
+                </div>
+              )}
+              {deal.lotPriceContractForDeed && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Contract for Deed:</span> ${parseFloat(deal.lotPriceContractForDeed).toLocaleString()}
+                </div>
+              )}
+              {deal.lotRent && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="font-medium">Lot Rent:</span> ${parseFloat(deal.lotRent).toLocaleString()}/mo
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -263,6 +309,7 @@ export default function CrmDeals() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
       toast({ title: "Success", description: "Deal created successfully" });
       setIsCreateOpen(false);
       setNewDeal({ title: "", value: "", stage: "QUALIFIED_LEAD", probability: "50", contactId: "" });
@@ -559,6 +606,11 @@ export default function CrmDeals() {
                   <CardTitle className="text-base">{activeDeal.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
+                  {activeDeal.lotNameOrNumber && (
+                    <div className="text-xs text-muted-foreground mb-2">
+                      <span className="font-medium">Unit:</span> {activeDeal.lotNameOrNumber}
+                    </div>
+                  )}
                   {activeDeal.value && (
                     <div className="flex items-center gap-1 text-sm font-semibold text-green-600">
                       <DollarSign className="h-4 w-4" />
@@ -582,6 +634,36 @@ export default function CrmDeals() {
                       </div>
                     )}
                   </div>
+                  {(activeDeal.lotPriceForRent || activeDeal.lotPriceForSale || activeDeal.lotPriceRentToOwn || activeDeal.lotPriceContractForDeed || activeDeal.lotRent) && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-1">Unit Pricing:</div>
+                      {activeDeal.lotPriceForRent && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">For Rent:</span> ${parseFloat(activeDeal.lotPriceForRent).toLocaleString()}
+                        </div>
+                      )}
+                      {activeDeal.lotPriceForSale && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">For Sale:</span> ${parseFloat(activeDeal.lotPriceForSale).toLocaleString()}
+                        </div>
+                      )}
+                      {activeDeal.lotPriceRentToOwn && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Rent-to-Own:</span> ${parseFloat(activeDeal.lotPriceRentToOwn).toLocaleString()}
+                        </div>
+                      )}
+                      {activeDeal.lotPriceContractForDeed && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Contract for Deed:</span> ${parseFloat(activeDeal.lotPriceContractForDeed).toLocaleString()}
+                        </div>
+                      )}
+                      {activeDeal.lotRent && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Lot Rent:</span> ${parseFloat(activeDeal.lotRent).toLocaleString()}/mo
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : null}

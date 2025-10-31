@@ -252,6 +252,7 @@ export interface IStorage {
   
   // CRM Association operations
   getCrmAssociations(sourceType: string, sourceId: string): Promise<any[]>;
+  getCrmAssociation(id: string): Promise<CrmAssociation | undefined>;
   createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation>;
   deleteCrmAssociation(id: string): Promise<void>;
 }
@@ -1250,9 +1251,53 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    // First remove any manager assignments
+    // Delete all related data before deleting the user to avoid foreign key constraint violations
+    
+    // 1. Remove manager assignments
     await this.removeManagerAssignments(id);
-    // Then delete the user
+    
+    // 2. Delete Google Calendar tokens
+    await db.delete(googleCalendarTokens).where(eq(googleCalendarTokens.userId, id));
+    
+    // 3. Delete showings where user is the manager
+    await db.delete(showings).where(eq(showings.managerId, id));
+    
+    // 4. Delete OAuth accounts
+    await db.delete(oauthAccounts).where(eq(oauthAccounts.userId, id));
+    
+    // 5. Delete invites created by this user
+    await db.delete(invites).where(eq(invites.createdByUserId, id));
+    
+    // 6. Delete CRM messages (as sender or receiver)
+    await db.delete(crmMessages).where(eq(crmMessages.senderId, id));
+    await db.delete(crmMessages).where(eq(crmMessages.receiverId, id));
+    
+    // 7. Delete CRM activities
+    await db.delete(crmActivities).where(eq(crmActivities.userId, id));
+    
+    // 8. Delete audit logs
+    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
+    
+    // 9. Delete CRM tasks assigned to or created by this user
+    await db.delete(crmTasks).where(eq(crmTasks.assignedTo, id));
+    await db.delete(crmTasks).where(eq(crmTasks.createdBy, id));
+    
+    // 10. Delete CRM deals assigned to or created by this user
+    await db.delete(crmDeals).where(eq(crmDeals.assignedTo, id));
+    await db.delete(crmDeals).where(eq(crmDeals.createdBy, id));
+    
+    // 11. Delete CRM notes created by this user
+    await db.delete(crmNotes).where(eq(crmNotes.createdBy, id));
+    
+    // 12. Delete CRM contacts created by this user
+    await db.delete(crmContacts).where(eq(crmContacts.createdBy, id));
+    
+    // 13. Delete CRM associations created by this user
+    await db.delete(crmAssociations).where(eq(crmAssociations.createdBy, id));
+    
+    // Note: loginLogs has onDelete: 'set null', so it's handled automatically by the database
+    
+    // Finally, delete the user
     await db.delete(users).where(eq(users.id, id));
   }
 
@@ -2196,16 +2241,91 @@ export class DatabaseStorage implements IStorage {
       contactEmail: crmContacts.email,
       contactCompanyName: sql<string>`contact_company.name`.as('contactCompanyName'),
       contactParkName: sql<string>`contact_park.name`.as('contactParkName'),
+      lotNameOrNumber: lots.nameOrNumber,
+      lotPriceForRent: lots.priceForRent,
+      lotPriceForSale: lots.priceForSale,
+      lotPriceRentToOwn: lots.priceRentToOwn,
+      lotPriceContractForDeed: lots.priceContractForDeed,
+      lotDepositForRent: lots.depositForRent,
+      lotDepositForSale: lots.depositForSale,
+      lotDepositRentToOwn: lots.depositRentToOwn,
+      lotDepositContractForDeed: lots.depositContractForDeed,
+      lotDownPaymentContractForDeed: lots.downPaymentContractForDeed,
+      lotRent: lots.lotRent,
     })
       .from(crmDeals)
       .leftJoin(companies, eq(crmDeals.companyId, companies.id))
       .leftJoin(crmContacts, eq(crmDeals.contactId, crmContacts.id))
       .leftJoin(sql`companies AS contact_company`, sql`contact_company.id = ${crmContacts.companyId}`)
       .leftJoin(sql`parks AS contact_park`, sql`contact_park.id = ${crmContacts.parkId}`)
+      .leftJoin(lots, eq(crmDeals.lotId, lots.id))
       .where(and(...conditions))
       .orderBy(desc(crmDeals.createdAt));
 
-    return results;
+    // For deals without direct lotId, check associations
+    const enrichedResults = await Promise.all(
+      results.map(async (deal) => {
+        // If deal already has lot data from direct lotId, return as is
+        if (deal.lotNameOrNumber) {
+          return deal;
+        }
+
+        // Check for lot associations
+        const lotAssociations = await db.select({
+          lotId: crmAssociations.targetId,
+        })
+          .from(crmAssociations)
+          .where(
+            and(
+              eq(crmAssociations.sourceType, 'DEAL'),
+              eq(crmAssociations.sourceId, deal.id),
+              eq(crmAssociations.targetType, 'LOT')
+            )
+          )
+          .limit(1);
+
+        if (lotAssociations.length > 0) {
+          // Fetch lot details
+          const [lotDetails] = await db.select({
+            nameOrNumber: lots.nameOrNumber,
+            priceForRent: lots.priceForRent,
+            priceForSale: lots.priceForSale,
+            priceRentToOwn: lots.priceRentToOwn,
+            priceContractForDeed: lots.priceContractForDeed,
+            depositForRent: lots.depositForRent,
+            depositForSale: lots.depositForSale,
+            depositRentToOwn: lots.depositRentToOwn,
+            depositContractForDeed: lots.depositContractForDeed,
+            downPaymentContractForDeed: lots.downPaymentContractForDeed,
+            lotRent: lots.lotRent,
+          })
+            .from(lots)
+            .where(eq(lots.id, lotAssociations[0].lotId));
+
+          if (lotDetails) {
+            return {
+              ...deal,
+              lotId: lotAssociations[0].lotId,
+              lotNameOrNumber: lotDetails.nameOrNumber,
+              lotPriceForRent: lotDetails.priceForRent,
+              lotPriceForSale: lotDetails.priceForSale,
+              lotPriceRentToOwn: lotDetails.priceRentToOwn,
+              lotPriceContractForDeed: lotDetails.priceContractForDeed,
+              lotDepositForRent: lotDetails.depositForRent,
+              lotDepositForSale: lotDetails.depositForSale,
+              lotDepositRentToOwn: lotDetails.depositRentToOwn,
+              lotDepositContractForDeed: lotDetails.depositContractForDeed,
+              lotDownPaymentContractForDeed: lotDetails.downPaymentContractForDeed,
+              lotRent: lotDetails.lotRent,
+            };
+          }
+        }
+
+        return deal;
+      })
+    );
+
+    return enrichedResults;
   }
 
   async getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string; parkId?: string; companyId?: string }): Promise<any[]> {
@@ -2251,12 +2371,24 @@ export class DatabaseStorage implements IStorage {
       contactEmail: crmContacts.email,
       contactCompanyName: sql<string>`contact_company.name`.as('contactCompanyName'),
       contactParkName: sql<string>`contact_park.name`.as('contactParkName'),
+      lotNameOrNumber: lots.nameOrNumber,
+      lotPriceForRent: lots.priceForRent,
+      lotPriceForSale: lots.priceForSale,
+      lotPriceRentToOwn: lots.priceRentToOwn,
+      lotPriceContractForDeed: lots.priceContractForDeed,
+      lotDepositForRent: lots.depositForRent,
+      lotDepositForSale: lots.depositForSale,
+      lotDepositRentToOwn: lots.depositRentToOwn,
+      lotDepositContractForDeed: lots.depositContractForDeed,
+      lotDownPaymentContractForDeed: lots.downPaymentContractForDeed,
+      lotRent: lots.lotRent,
     })
       .from(crmDeals)
       .leftJoin(companies, eq(crmDeals.companyId, companies.id))
       .leftJoin(crmContacts, eq(crmDeals.contactId, crmContacts.id))
       .leftJoin(sql`companies AS contact_company`, sql`contact_company.id = ${crmContacts.companyId}`)
       .leftJoin(sql`parks AS contact_park`, sql`contact_park.id = ${crmContacts.parkId}`)
+      .leftJoin(lots, eq(crmDeals.lotId, lots.id))
       .orderBy(desc(crmDeals.createdAt));
 
     if (conditions.length > 0) {
@@ -2264,7 +2396,71 @@ export class DatabaseStorage implements IStorage {
     }
 
     const results = await query;
-    return results;
+
+    // For deals without direct lotId, check associations
+    const enrichedResults = await Promise.all(
+      results.map(async (deal) => {
+        // If deal already has lot data from direct lotId, return as is
+        if (deal.lotNameOrNumber) {
+          return deal;
+        }
+
+        // Check for lot associations
+        const lotAssociations = await db.select({
+          lotId: crmAssociations.targetId,
+        })
+          .from(crmAssociations)
+          .where(
+            and(
+              eq(crmAssociations.sourceType, 'DEAL'),
+              eq(crmAssociations.sourceId, deal.id),
+              eq(crmAssociations.targetType, 'LOT')
+            )
+          )
+          .limit(1);
+
+        if (lotAssociations.length > 0) {
+          // Fetch lot details
+          const [lotDetails] = await db.select({
+            nameOrNumber: lots.nameOrNumber,
+            priceForRent: lots.priceForRent,
+            priceForSale: lots.priceForSale,
+            priceRentToOwn: lots.priceRentToOwn,
+            priceContractForDeed: lots.priceContractForDeed,
+            depositForRent: lots.depositForRent,
+            depositForSale: lots.depositForSale,
+            depositRentToOwn: lots.depositRentToOwn,
+            depositContractForDeed: lots.depositContractForDeed,
+            downPaymentContractForDeed: lots.downPaymentContractForDeed,
+            lotRent: lots.lotRent,
+          })
+            .from(lots)
+            .where(eq(lots.id, lotAssociations[0].lotId));
+
+          if (lotDetails) {
+            return {
+              ...deal,
+              lotId: lotAssociations[0].lotId,
+              lotNameOrNumber: lotDetails.nameOrNumber,
+              lotPriceForRent: lotDetails.priceForRent,
+              lotPriceForSale: lotDetails.priceForSale,
+              lotPriceRentToOwn: lotDetails.priceRentToOwn,
+              lotPriceContractForDeed: lotDetails.priceContractForDeed,
+              lotDepositForRent: lotDetails.depositForRent,
+              lotDepositForSale: lotDetails.depositForSale,
+              lotDepositRentToOwn: lotDetails.depositRentToOwn,
+              lotDepositContractForDeed: lotDetails.depositContractForDeed,
+              lotDownPaymentContractForDeed: lotDetails.downPaymentContractForDeed,
+              lotRent: lotDetails.lotRent,
+            };
+          }
+        }
+
+        return deal;
+      })
+    );
+
+    return enrichedResults;
   }
 
   async getCrmDeal(id: string): Promise<CrmDeal | undefined> {
@@ -2923,6 +3119,13 @@ export class DatabaseStorage implements IStorage {
     );
 
     return enrichedAssociations;
+  }
+
+  async getCrmAssociation(id: string): Promise<CrmAssociation | undefined> {
+    const [association] = await db.select()
+      .from(crmAssociations)
+      .where(eq(crmAssociations.id, id));
+    return association;
   }
 
   async createCrmAssociation(association: InsertCrmAssociation): Promise<CrmAssociation> {

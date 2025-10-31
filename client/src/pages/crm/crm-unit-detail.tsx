@@ -119,7 +119,7 @@ export default function CrmUnitDetail() {
   const [isEditingInfo, setIsEditingInfo] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Lot>>({});
   const [newNote, setNewNote] = useState("");
-  const [newTask, setNewTask] = useState({ title: "", description: "" });
+  const [newTask, setNewTask] = useState({ title: "", description: "", assignedTo: "" });
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [taskSortBy, setTaskSortBy] = useState("date-newest");
 
@@ -266,7 +266,7 @@ export default function CrmUnitDetail() {
 
   // Create task mutation
   const createTaskMutation = useMutation({
-    mutationFn: async (data: { title: string; description: string }) => {
+    mutationFn: async (data: { title: string; description: string; assignedTo: string }) => {
       const res = await fetch("/api/crm/tasks", {
         method: "POST",
         headers: {
@@ -280,7 +280,7 @@ export default function CrmUnitDetail() {
           entityId: id,
           status: "TODO",
           priority: "MEDIUM",
-          assignedTo: user?.id,
+          assignedTo: data.assignedTo || user?.id,
         }),
       });
       if (!res.ok) throw new Error("Failed to create task");
@@ -290,7 +290,7 @@ export default function CrmUnitDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/activities"] });
       toast({ title: "Success", description: "Task created successfully" });
-      setNewTask({ title: "", description: "" });
+      setNewTask({ title: "", description: "", assignedTo: "" });
     },
   });
 
@@ -1000,6 +1000,22 @@ export default function CrmUnitDetail() {
                   onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                   rows={2}
                 />
+                <Select 
+                  value={newTask.assignedTo} 
+                  onValueChange={(value) => setNewTask({ ...newTask, assignedTo: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign to me (default)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Assign to me (default)</SelectItem>
+                    {companyUsers.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.fullName} {u.id === user?.id ? "(me)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   onClick={() => createTaskMutation.mutate(newTask)}
                   disabled={!newTask.title.trim() || createTaskMutation.isPending}

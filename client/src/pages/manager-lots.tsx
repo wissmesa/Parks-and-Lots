@@ -443,6 +443,9 @@ export default function ManagerLots() {
         parkId: ''
       });
       queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
+      // Invalidate CRM deals for real-time unit pricing updates
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
       
       // Handle Google Sheets export status
       if (data.sheetsExportSuccess) {
@@ -539,6 +542,9 @@ export default function ManagerLots() {
       setIsEditModalOpen(false);
       setEditingLot(null);
       queryClient.invalidateQueries({ queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"] });
+      // Invalidate CRM deals for real-time unit pricing updates
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/associations"] });
     },
     onError: (error) => {
       toast({

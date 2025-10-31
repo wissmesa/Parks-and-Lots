@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckSquare, Search, User, Briefcase, Trash2, Check } from "lucide-react";
+import { Plus, CheckSquare, Search, User, Briefcase, Trash2, Check, Clock } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AuthManager } from "@/lib/auth";
@@ -53,6 +53,7 @@ export default function CrmTasks() {
     description: "",
     dueDate: "",
     priority: "MEDIUM",
+    assignedTo: "",
   });
 
   const { data: tasksData, isLoading } = useQuery({
@@ -69,6 +70,20 @@ export default function CrmTasks() {
     refetchInterval: 30000,
   });
 
+  // Fetch company users for task assignment
+  const { data: usersData } = useQuery({
+    queryKey: ["/api/crm/company-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/company-users", { 
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include" 
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch("/api/crm/tasks", {
@@ -78,7 +93,10 @@ export default function CrmTasks() {
           ...AuthManager.getAuthHeaders()
         },
         credentials: "include",
-        body: JSON.stringify({ ...data, assignedTo: user?.id }),
+        body: JSON.stringify({ 
+          ...data, 
+          assignedTo: data.assignedTo || user?.id 
+        }),
       });
       if (!res.ok) throw new Error("Failed to create task");
       return res.json();
@@ -87,7 +105,7 @@ export default function CrmTasks() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tasks"] });
       toast({ title: "Success", description: "Task created successfully" });
       setIsCreateOpen(false);
-      setNewTask({ title: "", description: "", dueDate: "", priority: "MEDIUM" });
+      setNewTask({ title: "", description: "", dueDate: "", priority: "MEDIUM", assignedTo: "" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create task", variant: "destructive" });
@@ -154,6 +172,7 @@ export default function CrmTasks() {
   });
 
   const tasks: Task[] = tasksData?.tasks || [];
+  const companyUsers = usersData?.users || [];
 
   // Filter tasks by search query
   const filteredTasks = tasks.filter((task) => {
@@ -263,6 +282,22 @@ export default function CrmTasks() {
                     <SelectItem value="MEDIUM">Medium</SelectItem>
                     <SelectItem value="HIGH">High</SelectItem>
                     <SelectItem value="URGENT">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="assignedTo">Assign To</Label>
+                <Select value={newTask.assignedTo} onValueChange={(value) => setNewTask({ ...newTask, assignedTo: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign to me (default)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Assign to me (default)</SelectItem>
+                    {companyUsers.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.fullName} {u.id === user?.id ? "(me)" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

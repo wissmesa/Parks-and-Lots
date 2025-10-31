@@ -134,12 +134,14 @@ export function AssociationsSection({ entityType, entityId }: AssociationsSectio
     }
   };
 
-  const getPrimaryPrice = (lot: any) => {
-    if (lot.priceForRent) return { value: lot.priceForRent, label: "Rent" };
-    if (lot.priceForSale) return { value: lot.priceForSale, label: "Sale" };
-    if (lot.priceRentToOwn) return { value: lot.priceRentToOwn, label: "Rent to Own" };
-    if (lot.priceContractForDeed) return { value: lot.priceContractForDeed, label: "Contract" };
-    return null;
+  const getAllPrices = (lot: any) => {
+    const prices = [];
+    if (lot.priceForRent) prices.push({ value: lot.priceForRent, label: "For Rent" });
+    if (lot.priceForSale) prices.push({ value: lot.priceForSale, label: "For Sale" });
+    if (lot.priceRentToOwn) prices.push({ value: lot.priceRentToOwn, label: "Rent-to-Own" });
+    if (lot.priceContractForDeed) prices.push({ value: lot.priceContractForDeed, label: "Contract for Deed" });
+    if (lot.lotRent) prices.push({ value: lot.lotRent, label: "Lot Rent", suffix: "/mo" });
+    return prices;
   };
 
   if (isLoading) {
@@ -294,7 +296,7 @@ export function AssociationsSection({ entityType, entityId }: AssociationsSectio
               </div>
               <div className="space-y-2">
                 {lotAssociations.map((assoc) => {
-                  const primaryPrice = assoc.entityDetails ? getPrimaryPrice(assoc.entityDetails) : null;
+                  const allPrices = assoc.entityDetails ? getAllPrices(assoc.entityDetails) : [];
                   return (
                     <div
                       key={assoc.id}
@@ -315,10 +317,15 @@ export function AssociationsSection({ entityType, entityId }: AssociationsSectio
                               </Badge>
                             ))}
                           </div>
-                          {primaryPrice && (
-                            <div className="flex items-center gap-1 text-sm text-blue-600 font-semibold mt-1">
-                              <DollarSign className="h-3 w-3" />
-                              {parseFloat(primaryPrice.value).toLocaleString()} ({primaryPrice.label})
+                          {allPrices.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {allPrices.map((price, index) => (
+                                <div key={index} className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <DollarSign className="h-3 w-3" />
+                                  <span className="font-medium">{price.label}:</span>
+                                  <span>${parseFloat(price.value).toLocaleString()}{price.suffix || ""}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
