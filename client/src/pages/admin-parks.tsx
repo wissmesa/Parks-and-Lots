@@ -91,6 +91,9 @@ export default function AdminParks() {
   const [assigningLots, setAssigningLots] = useState<Park | null>(null);
   const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
   const [lotSearchText, setLotSearchText] = useState("");
+  
+  const isLord = user?.role === 'MHP_LORD';
+  const isCompanyManager = user?.role === 'ADMIN';
   const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
   const [editingStatus, setEditingStatus] = useState<SpecialStatus | null>(null);
   const [statusFormData, setStatusFormData] = useState({
@@ -151,19 +154,29 @@ export default function AdminParks() {
   });
 
   // Redirect if not admin
-  if (user?.role !== 'MHP_LORD') {
+  if (user?.role !== 'MHP_LORD' && user?.role !== 'ADMIN') {
     window.location.href = '/';
     return null;
   }
 
+  // Fetch parks - Lords get all, Company Managers get their company's parks
   const { data: parks, isLoading } = useQuery<{ parks: Park[] }>({
-    queryKey: ["/api/parks"],
-    enabled: user?.role === 'MHP_LORD',
+    queryKey: isLord ? ["/api/parks"] : ["/api/company-manager/parks"],
+    queryFn: async () => {
+      if (isLord) {
+        const response = await apiRequest("GET", "/api/parks");
+        return response.json();
+      } else {
+        const response = await apiRequest("GET", "/api/company-manager/parks");
+        return response.json();
+      }
+    },
+    enabled: !!user,
   });
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'MHP_LORD',
+    enabled: isLord,
   });
 
   const parksList = parks?.parks || [];
@@ -263,13 +276,20 @@ export default function AdminParks() {
     return filtered;
   }, [parksList, searchText, filters, sortBy, sortOrder]);
 
+  // Fetch lots - Lords get all, Company Managers get their company's lots
   const { data: lots } = useQuery<{ lots: Lot[] }>({
-    queryKey: ["/api/lots", "includeInactive=true", "limit=10000"],
+    queryKey: isLord ? ["/api/lots", "includeInactive=true", "limit=10000"] : ["/api/company-manager/lots"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/lots?includeInactive=true&limit=10000");
-      return response.json();
+      if (isLord) {
+        const response = await apiRequest("GET", "/api/lots?includeInactive=true&limit=10000");
+        return response.json();
+      } else {
+        const response = await apiRequest("GET", "/api/company-manager/lots");
+        const data = await response.json();
+        return { lots: data }; // Wrap in same format as Lord's response
+      }
     },
-    enabled: user?.role === 'MHP_LORD',
+    enabled: !!user,
   });
 
   const createMutation = useMutation({
@@ -1456,14 +1476,14 @@ export default function AdminParks() {
 
         {/* Lot Assignment Dialog */}
         <Dialog open={!!assigningLots} onOpenChange={(open) => !open && setAssigningLots(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh]">
-            <DialogHeader>
+          <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 Assign Lots to {assigningLots?.name}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
+            <div className="flex flex-col gap-4 overflow-hidden flex-1">
+              <div className="flex-shrink-0">
                 <p className="text-sm text-muted-foreground mb-3">
                   Select lots to assign to this park. You can search to find specific lots.
                 </p>
@@ -1484,7 +1504,7 @@ export default function AdminParks() {
               </div>
               
               {/* Lots List */}
-              <div className="max-h-96 overflow-y-auto space-y-2 border rounded-md p-3">
+              <div className="flex-1 overflow-y-auto space-y-2 border rounded-md p-3 min-h-0">
                 {filteredLotsForAssignment.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     {lotSearchText ? 'No lots found matching your search.' : 'No lots available.'}
@@ -1525,7 +1545,7 @@ export default function AdminParks() {
               </div>
               
               {/* Action Buttons */}
-              <div className="flex justify-between items-center pt-2 border-t">
+              <div className="flex justify-between items-center pt-4 flex-shrink-0 border-t mt-4">
                 <div className="flex gap-2">
                   <Button
                     type="button"

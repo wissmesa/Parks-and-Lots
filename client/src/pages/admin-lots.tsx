@@ -412,35 +412,57 @@ export default function AdminLots() {
     setImportResults(null);
   };
 
-  // Redirect if not admin
-  if (user?.role !== 'MHP_LORD') {
+  // Redirect if not admin or company manager
+  if (user?.role !== 'MHP_LORD' && user?.role !== 'ADMIN') {
     window.location.href = '/';
     return null;
   }
 
+  const isLord = user?.role === 'MHP_LORD';
+  const isCompanyManager = user?.role === 'ADMIN';
+
+  // Fetch lots - Lords get all, Company Managers get their company's lots
   const { data: lots, isLoading } = useQuery<Lot[]>({
-    queryKey: ["/api/lots", "includeInactive=true", filters.searchText],
+    queryKey: isLord ? ["/api/lots", "includeInactive=true", filters.searchText] : ["/api/company-manager/lots"],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        includeInactive: 'true',
-        limit: '10000'
-      });
-      
-      // Add search parameter if there's search text
-      if (filters.searchText.trim()) {
-        params.append('q', filters.searchText.trim());
+      if (isLord) {
+        const params = new URLSearchParams({
+          includeInactive: 'true',
+          limit: '10000'
+        });
+        
+        // Add search parameter if there's search text
+        if (filters.searchText.trim()) {
+          params.append('q', filters.searchText.trim());
+        }
+        
+        const response = await apiRequest("GET", `/api/lots?${params.toString()}`);
+        const data = await response.json();
+        return data.lots || data; // Handle both formats
+      } else {
+        // Company Manager
+        const response = await apiRequest("GET", "/api/company-manager/lots");
+        const data = await response.json();
+        return data;
       }
-      
-      const response = await apiRequest("GET", `/api/lots?${params.toString()}`);
-      const data = await response.json();
-      return data.lots || data; // Handle both formats
     },
-    enabled: user?.role === 'MHP_LORD',
+    enabled: !!user,
   });
 
+  // Fetch parks - Lords get all, Company Managers get their company's parks
   const { data: parks } = useQuery<{ parks: Park[] }>({
-    queryKey: ["/api/parks"],
-    enabled: user?.role === 'MHP_LORD',
+    queryKey: isLord ? ["/api/parks"] : ["/api/company-manager/parks"],
+    queryFn: async () => {
+      if (isLord) {
+        const response = await apiRequest("GET", "/api/parks");
+        return response.json();
+      } else {
+        // Company Manager
+        const response = await apiRequest("GET", "/api/company-manager/parks");
+        return response.json();
+      }
+    },
+    enabled: !!user,
   });
 
   // Pre-fill lot rent from park when parkId changes (only for new lots)
@@ -455,7 +477,7 @@ export default function AdminLots() {
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["/api/companies"],
-    enabled: user?.role === 'MHP_LORD',
+    enabled: isLord,
   });
 
   // Special statuses query for the selected park
@@ -751,6 +773,9 @@ export default function AdminLots() {
   };
 
   const handleEdit = (lot: Lot) => {
+    console.log('Editing lot:', lot);
+    console.log('Lot parkId:', lot.parkId);
+    console.log('Available parks:', parksList);
     setEditingLot(lot);
     setFormData({
       nameOrNumber: lot.nameOrNumber,
@@ -823,6 +848,13 @@ export default function AdminLots() {
   const rawLotsList = lots ?? [];
   const parksList = parks?.parks ?? [];
   const companiesList = companies ?? [];
+  
+  console.log('Admin Lots - Parks data:', parks);
+  console.log('Admin Lots - parksList:', parksList);
+  console.log('Admin Lots - parksList length:', parksList.length);
+  console.log('Admin Lots - User role:', user?.role);
+  console.log('Admin Lots - isLord:', isLord);
+  console.log('Admin Lots - isCompanyManager:', isCompanyManager);
   
   // Create efficient lookup maps for relationships
   const parkById = new Map(parksList.map(p => [p.id, p]));
@@ -2437,18 +2469,33 @@ export default function AdminLots() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-parkId">Park *</Label>
-                    <Select value={formData.parkId} onValueChange={(value) => setFormData(prev => ({ ...prev, parkId: value }))}>
-                      <SelectTrigger className="mt-1">
+                    <Select 
+                      value={formData.parkId} 
+                      onValueChange={(value) => {
+                        console.log('Park changed to:', value);
+                        setFormData(prev => ({ ...prev, parkId: value }));
+                      }}
+                    >
+                      <SelectTrigger className="mt-1" data-testid="edit-lot-park-select">
                         <SelectValue placeholder="Select a park" />
                       </SelectTrigger>
                       <SelectContent>
-                        {parksList.map((park: Park) => (
-                          <SelectItem key={park.id} value={park.id}>
-                            {park.name}
-                          </SelectItem>
-                        ))}
+                        {parksList.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">No parks available</div>
+                        ) : (
+                          parksList.map((park: Park) => (
+                            <SelectItem key={park.id} value={park.id}>
+                              {park.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
+                    {parksList.length === 0 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        No parks loaded. Please refresh the page.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="edit-nameOrNumber">Lot Name/Number *</Label>

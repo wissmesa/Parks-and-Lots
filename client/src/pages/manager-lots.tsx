@@ -344,6 +344,13 @@ export default function ManagerLots() {
   // Fetch lots for assigned parks or company lots
   const { data: lots, isLoading } = useQuery<Lot[]>({
     queryKey: isCompanyManager ? ["/api/company-manager/lots"] : ["/api/manager/lots"],
+    queryFn: async () => {
+      const endpoint = isCompanyManager ? "/api/company-manager/lots" : "/api/manager/lots";
+      const response = await apiRequest("GET", endpoint);
+      const data = await response.json();
+      // Handle both array format and object format
+      return Array.isArray(data) ? data : (data.lots || []);
+    },
     enabled: user?.role === 'MANAGER' || user?.role === 'ADMIN',
   });
 
@@ -1192,8 +1199,12 @@ export default function ManagerLots() {
                 </DialogHeader>
                 <form onSubmit={handleCreateSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="parkId">Park</Label>
-                    <Select value={formData.parkId} onValueChange={(value) => setFormData(prev => ({ ...prev, parkId: value }))}>
+                    <Label htmlFor="parkId">Park *</Label>
+                    <Select 
+                      value={formData.parkId} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, parkId: value }))}
+                      disabled={editingLot && !isCompanyManager}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a park" />
                       </SelectTrigger>
@@ -1209,6 +1220,11 @@ export default function ManagerLots() {
                         })}
                       </SelectContent>
                     </Select>
+                    {editingLot && !isCompanyManager && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Only company managers can change the park assignment
+                      </p>
+                    )}
                   </div>
                   
                   <div>
@@ -2388,6 +2404,36 @@ export default function ManagerLots() {
                 {/* Basic Information Section */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium border-b pb-2">Basic Information</h3>
+                  
+                  <div>
+                    <Label htmlFor="edit-parkId">Park *</Label>
+                    <Select 
+                      value={formData.parkId} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, parkId: value }))}
+                      disabled={editingLot && !isCompanyManager}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select a park" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(assignedParks) && assignedParks.map((park: any) => {
+                          const parkId = isCompanyManager ? park.id : park.parkId;
+                          const parkName = isCompanyManager ? park.name : park.parkName;
+                          return (
+                            <SelectItem key={parkId} value={parkId}>
+                              {parkName}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {editingLot && !isCompanyManager && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Only company managers can change the park assignment
+                      </p>
+                    )}
+                  </div>
+                  
                   <div>
                     <Label htmlFor="edit-nameOrNumber">Lot Name/Number *</Label>
                     <Input

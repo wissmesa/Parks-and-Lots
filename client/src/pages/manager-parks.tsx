@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
-import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search, Trash2 } from "lucide-react";
+import { TreePine, Edit, MapPin, Camera, X, Plus, Tag, MoreHorizontal, List, Grid3X3, Facebook, ArrowUp, ArrowDown, Filter, Search, Trash2, Home } from "lucide-react";
 import { FacebookPostDialog } from "@/components/ui/facebook-post-dialog";
 import { AMENITY_ICON_OPTIONS, getAmenityIcon, type AmenityType } from "@/pages/park-detail";
 
@@ -79,6 +79,9 @@ export default function ManagerParks() {
   const [showLotRentConfirm, setShowLotRentConfirm] = useState(false);
   const [newAmenity, setNewAmenity] = useState({ name: '', icon: 'check' });
   const [showPhotos, setShowPhotos] = useState<string | null>(null);
+  const [assigningLots, setAssigningLots] = useState<Park | null>(null);
+  const [selectedLotIds, setSelectedLotIds] = useState<string[]>([]);
+  const [lotSearchText, setLotSearchText] = useState("");
   const [manageSpecialStatuses, setManageSpecialStatuses] = useState<Park | null>(null);
   const [editingStatus, setEditingStatus] = useState<SpecialStatus | null>(null);
   const [statusFormData, setStatusFormData] = useState({
@@ -142,6 +145,9 @@ export default function ManagerParks() {
   }
 
   const isCompanyManager = user?.role === 'ADMIN';
+  
+  console.log('Manager Parks - User role:', user?.role);
+  console.log('Manager Parks - isCompanyManager:', isCompanyManager);
 
   const { data: assignments, isLoading: assignmentsLoading, error } = useQuery<Assignment[]>({
     queryKey: ["/api/manager/assignments"],
@@ -172,6 +178,23 @@ export default function ManagerParks() {
 
   // Filter parks to only show assigned ones
   const parks = allParks?.filter(park => parkIds.includes(park.id)) || [];
+
+  // Fetch lots for company managers (for assign lots feature)
+  const { data: lotsData } = useQuery<any[]>({
+    queryKey: ["/api/company-manager/lots"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/company-manager/lots");
+      const data = await response.json();
+      console.log('Company Manager Lots Response:', data);
+      return data;
+    },
+    enabled: isCompanyManager,
+  });
+
+  const lotsList = lotsData || [];
+  
+  console.log('Lots List for Assignment:', lotsList);
+  console.log('Lots List Length:', lotsList.length);
 
   // Get unique values for filters
   const uniqueCities = useMemo(() => {
@@ -428,6 +451,31 @@ export default function ManagerParks() {
     setNewAmenity({ name: '', icon: 'check' });
   };
 
+  const handleAssignLots = (park: Park) => {
+    setAssigningLots(park);
+    setLotSearchText("");
+    // Pre-select lots already assigned to this park
+    const currentLots = lotsList.filter(lot => lot.parkId === park.id);
+    setSelectedLotIds(currentLots.map(lot => lot.id));
+  };
+
+  const handleLotSelection = (lotId: string, isChecked: boolean) => {
+    setSelectedLotIds(prev => 
+      isChecked 
+        ? [...prev, lotId]
+        : prev.filter(id => id !== lotId)
+    );
+  };
+
+  const handleConfirmLotAssignment = () => {
+    if (assigningLots) {
+      assignLotsMutation.mutate({
+        parkId: assigningLots.id,
+        lotIds: selectedLotIds
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -609,6 +657,48 @@ export default function ManagerParks() {
       });
     },
   });
+
+  const assignLotsMutation = useMutation({
+    mutationFn: async ({ parkId, lotIds }: { parkId: string; lotIds: string[] }) => {
+      return Promise.all(
+        lotIds.map(lotId => 
+          apiRequest("PATCH", `/api/lots/${lotId}`, { parkId })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/parks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/company-manager/lots"] });
+      setAssigningLots(null);
+      setSelectedLotIds([]);
+      toast({
+        title: "Success",
+        description: "Lots assigned successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign lots",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Filtered lots for assignment dialog
+  const filteredLotsForAssignment = useMemo(() => {
+    if (!lotSearchText.trim()) return lotsList;
+    
+    const searchLower = lotSearchText.toLowerCase();
+    return lotsList.filter(lot => {
+      const matchesName = lot.nameOrNumber?.toLowerCase().includes(searchLower);
+      const matchesDescription = lot.description?.toLowerCase().includes(searchLower);
+      const currentPark = parks.find(p => p.id === lot.parkId);
+      const matchesPark = currentPark?.name?.toLowerCase().includes(searchLower);
+      
+      return matchesName || matchesDescription || matchesPark;
+    });
+  }, [lotsList, lotSearchText, parks]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -852,6 +942,15 @@ export default function ManagerParks() {
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Park
                               </DropdownMenuItem>
+                              {isCompanyManager && (
+                                <DropdownMenuItem
+                                  onClick={() => park && handleAssignLots(park)}
+                                  data-testid={`assign-lots-${park?.id || 'unknown'}`}
+                                >
+                                  <Home className="w-4 h-4 mr-2" />
+                                  Assign Lots
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 onClick={() => park?.id && setShowPhotos(park.id)}
                                 data-testid={`manage-photos-${park?.id || 'unknown'}`}
@@ -939,6 +1038,12 @@ export default function ManagerParks() {
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Park
                               </DropdownMenuItem>
+                              {isCompanyManager && (
+                                <DropdownMenuItem onClick={() => park && handleAssignLots(park)}>
+                                  <Home className="w-4 h-4 mr-2" />
+                                  Assign Lots
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => park?.id && setShowPhotos(park.id)}>
                                 <Camera className="w-4 h-4 mr-2" />
                                 Manage Photos
@@ -1465,6 +1570,119 @@ export default function ManagerParks() {
                   entityName={parks.find(p => p?.id === showPhotos)?.name || "Park"}
                 />
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Assign Lots Dialog */}
+          <Dialog open={!!assigningLots} onOpenChange={(open) => !open && setAssigningLots(null)}>
+            <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
+                <DialogTitle>
+                  Assign Lots to {assigningLots?.name}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 overflow-hidden flex-1">
+                <div className="flex-shrink-0">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Select lots to assign to this park. You can search to find specific lots.
+                  </p>
+                  
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Input
+                      placeholder="Search lots by name, description, or current park..."
+                      value={lotSearchText}
+                      onChange={(e) => setLotSearchText(e.target.value)}
+                      className="mb-3"
+                    />
+                    <div className="text-xs text-muted-foreground mb-2">
+                      Showing {filteredLotsForAssignment.length} of {lotsList.length} lots
+                      {selectedLotIds.length > 0 && ` • ${selectedLotIds.length} selected`}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Lots List */}
+                <div className="flex-1 overflow-y-auto space-y-2 border rounded-md p-3 min-h-0">
+                  {filteredLotsForAssignment.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      {lotSearchText ? 'No lots found matching your search.' : 'No lots available.'}
+                    </div>
+                  ) : (
+                    filteredLotsForAssignment.map(lot => (
+                      <div key={lot.id} className="flex items-start space-x-2 p-2 hover:bg-muted/50 rounded">
+                        <input
+                          type="checkbox"
+                          id={`lot-${lot.id}`}
+                          checked={selectedLotIds.includes(lot.id)}
+                          onChange={(e) => handleLotSelection(lot.id, e.target.checked)}
+                          className="rounded border-gray-300 mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <Label htmlFor={`lot-${lot.id}`} className="text-sm font-medium cursor-pointer block">
+                            {lot.nameOrNumber}
+                          </Label>
+                          {lot.description && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {lot.description}
+                            </p>
+                          )}
+                          {lot.parkId !== assigningLots?.id && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Currently assigned to: {parks.find(p => p.id === lot.parkId)?.name || 'Unassigned'}
+                            </p>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {lot.bedrooms} bed • {lot.bathrooms} bath • {lot.sqFt} sq ft
+                            {lot.price && ` • $${parseInt(lot.price).toLocaleString()}`}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex justify-between items-center pt-4 flex-shrink-0 border-t mt-4">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentlyAssigned = lotsList.filter(lot => lot.parkId === assigningLots?.id).map(lot => lot.id);
+                        setSelectedLotIds(currentlyAssigned);
+                      }}
+                    >
+                      Reset to Current
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedLotIds([])}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setAssigningLots(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleConfirmLotAssignment}
+                      disabled={assignLotsMutation.isPending}
+                    >
+                      {assignLotsMutation.isPending ? "Assigning..." : "Assign Lots"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
 
