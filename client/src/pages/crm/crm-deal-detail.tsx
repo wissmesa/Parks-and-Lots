@@ -37,6 +37,10 @@ interface Deal {
   probability?: number | null;
   expectedCloseDate?: string | null;
   contactId?: string | null;
+  contactFirstName?: string | null;
+  contactLastName?: string | null;
+  contactCompanyName?: string | null;
+  contactParkName?: string | null;
   lotId?: string | null;
   createdAt: string;
 }
@@ -97,6 +101,7 @@ export default function CrmDealDetail() {
   const [newNote, setNewNote] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "" });
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [deleteDealOpen, setDeleteDealOpen] = useState(false);
   const [taskSortBy, setTaskSortBy] = useState("date-newest");
 
   // Fetch deal
@@ -191,6 +196,25 @@ export default function CrmDealDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update deal", variant: "destructive" });
+    },
+  });
+
+  // Delete deal mutation
+  const deleteDealMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/crm/deals/${id}`, {
+        method: "DELETE",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete deal");
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Deal deleted successfully" });
+      setLocation("/crm/deals");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete deal", variant: "destructive" });
     },
   });
 
@@ -426,6 +450,13 @@ export default function CrmDealDetail() {
             <Badge className={getStageColor(deal.stage)}>
               {DEAL_STAGES.find((s) => s.value === deal.stage)?.label}
             </Badge>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDealOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Deal
+            </Button>
           </div>
         </div>
       </div>
@@ -563,6 +594,29 @@ export default function CrmDealDetail() {
                         <span className="text-sm text-muted-foreground">Created:</span>
                         <p className="mt-1">{new Date(deal.createdAt).toLocaleDateString()}</p>
                       </div>
+                      {deal.contactFirstName && deal.contactLastName && (
+                        <div className="pt-4 border-t">
+                          <span className="text-sm font-medium">Associated Contact</span>
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <span className="text-sm text-muted-foreground">Name:</span>{" "}
+                              <span>{deal.contactFirstName} {deal.contactLastName}</span>
+                            </div>
+                            {deal.contactCompanyName && (
+                              <div>
+                                <span className="text-sm text-muted-foreground">Company:</span>{" "}
+                                <span>{deal.contactCompanyName}</span>
+                              </div>
+                            )}
+                            {deal.contactParkName && (
+                              <div>
+                                <span className="text-sm text-muted-foreground">Park:</span>{" "}
+                                <span>{deal.contactParkName}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </CardContent>
@@ -768,6 +822,27 @@ export default function CrmDealDetail() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Deal Confirmation Dialog */}
+      <AlertDialog open={deleteDealOpen} onOpenChange={setDeleteDealOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Deal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this deal? This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDealMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

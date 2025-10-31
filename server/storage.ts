@@ -203,16 +203,16 @@ export interface IStorage {
   cleanOldLoginLogs(): Promise<void>;
   
   // CRM Contact operations
-  getCrmContacts(companyId: string, filters?: { q?: string }): Promise<CrmContact[]>;
-  getAllCrmContacts(filters?: { q?: string }): Promise<any[]>;
+  getCrmContacts(companyId: string, filters?: { q?: string; parkId?: string; companyId?: string }): Promise<any[]>;
+  getAllCrmContacts(filters?: { q?: string; parkId?: string; companyId?: string }): Promise<any[]>;
   getCrmContact(id: string): Promise<CrmContact | undefined>;
   createCrmContact(contact: InsertCrmContact): Promise<CrmContact>;
   updateCrmContact(id: string, updates: Partial<InsertCrmContact>): Promise<CrmContact>;
   deleteCrmContact(id: string): Promise<void>;
   
   // CRM Deal operations
-  getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<CrmDeal[]>;
-  getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<any[]>;
+  getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string; parkId?: string }): Promise<any[]>;
+  getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string; parkId?: string; companyId?: string }): Promise<any[]>;
   getCrmDeal(id: string): Promise<CrmDeal | undefined>;
   createCrmDeal(deal: InsertCrmDeal): Promise<CrmDeal>;
   updateCrmDeal(id: string, updates: Partial<InsertCrmDeal>): Promise<CrmDeal>;
@@ -1965,7 +1965,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // CRM Contact operations
-  async getCrmContacts(companyId: string, filters?: { q?: string }): Promise<CrmContact[]> {
+  async getCrmContacts(companyId: string, filters?: { q?: string; parkId?: string; companyId?: string }): Promise<any[]> {
     const conditions = [eq(crmContacts.companyId, companyId)];
     
     if (filters?.q) {
@@ -1980,15 +1980,38 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    const results = await db.select()
+    if (filters?.parkId) {
+      conditions.push(eq(crmContacts.parkId, filters.parkId));
+    }
+
+    const results = await db.select({
+      id: crmContacts.id,
+      firstName: crmContacts.firstName,
+      lastName: crmContacts.lastName,
+      email: crmContacts.email,
+      phone: crmContacts.phone,
+      source: crmContacts.source,
+      companyId: crmContacts.companyId,
+      parkId: crmContacts.parkId,
+      companyName: companies.name,
+      parkName: parks.name,
+      createdBy: crmContacts.createdBy,
+      tags: crmContacts.tags,
+      notes: crmContacts.notes,
+      tenantId: crmContacts.tenantId,
+      createdAt: crmContacts.createdAt,
+      updatedAt: crmContacts.updatedAt,
+    })
       .from(crmContacts)
+      .leftJoin(companies, eq(crmContacts.companyId, companies.id))
+      .leftJoin(parks, eq(crmContacts.parkId, parks.id))
       .where(and(...conditions))
       .orderBy(desc(crmContacts.createdAt));
 
     return results;
   }
 
-  async getAllCrmContacts(filters?: { q?: string }): Promise<any[]> {
+  async getAllCrmContacts(filters?: { q?: string; parkId?: string; companyId?: string }): Promise<any[]> {
     const conditions = [];
     
     if (filters?.q) {
@@ -2003,6 +2026,14 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    if (filters?.companyId) {
+      conditions.push(eq(crmContacts.companyId, filters.companyId));
+    }
+
+    if (filters?.parkId) {
+      conditions.push(eq(crmContacts.parkId, filters.parkId));
+    }
+
     let query = db.select({
       id: crmContacts.id,
       firstName: crmContacts.firstName,
@@ -2011,7 +2042,9 @@ export class DatabaseStorage implements IStorage {
       phone: crmContacts.phone,
       source: crmContacts.source,
       companyId: crmContacts.companyId,
+      parkId: crmContacts.parkId,
       companyName: companies.name,
+      parkName: parks.name,
       createdBy: crmContacts.createdBy,
       tags: crmContacts.tags,
       notes: crmContacts.notes,
@@ -2021,6 +2054,7 @@ export class DatabaseStorage implements IStorage {
     })
       .from(crmContacts)
       .leftJoin(companies, eq(crmContacts.companyId, companies.id))
+      .leftJoin(parks, eq(crmContacts.parkId, parks.id))
       .orderBy(desc(crmContacts.createdAt));
 
     if (conditions.length > 0) {
@@ -2031,8 +2065,29 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async getCrmContact(id: string): Promise<CrmContact | undefined> {
-    const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, id));
+  async getCrmContact(id: string): Promise<any> {
+    const [contact] = await db.select({
+      id: crmContacts.id,
+      firstName: crmContacts.firstName,
+      lastName: crmContacts.lastName,
+      email: crmContacts.email,
+      phone: crmContacts.phone,
+      source: crmContacts.source,
+      companyId: crmContacts.companyId,
+      parkId: crmContacts.parkId,
+      companyName: companies.name,
+      parkName: parks.name,
+      createdBy: crmContacts.createdBy,
+      tags: crmContacts.tags,
+      notes: crmContacts.notes,
+      tenantId: crmContacts.tenantId,
+      createdAt: crmContacts.createdAt,
+      updatedAt: crmContacts.updatedAt,
+    })
+      .from(crmContacts)
+      .leftJoin(companies, eq(crmContacts.companyId, companies.id))
+      .leftJoin(parks, eq(crmContacts.parkId, parks.id))
+      .where(eq(crmContacts.id, id));
     return contact;
   }
 
@@ -2050,11 +2105,59 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCrmContact(id: string): Promise<void> {
+    // Delete all related records first to avoid foreign key constraint errors
+    
+    // 1. Delete notes for this contact
+    await db.delete(crmNotes).where(
+      and(
+        eq(crmNotes.entityType, 'CONTACT'),
+        eq(crmNotes.entityId, id)
+      )
+    );
+    
+    // 2. Delete tasks for this contact
+    await db.delete(crmTasks).where(
+      and(
+        eq(crmTasks.entityType, 'CONTACT'),
+        eq(crmTasks.entityId, id)
+      )
+    );
+    
+    // 3. Delete activities for this contact
+    await db.delete(crmActivities).where(
+      and(
+        eq(crmActivities.entityType, 'CONTACT'),
+        eq(crmActivities.entityId, id)
+      )
+    );
+    
+    // 4. Delete associations where this contact is the source
+    await db.delete(crmAssociations).where(
+      and(
+        eq(crmAssociations.sourceType, 'CONTACT'),
+        eq(crmAssociations.sourceId, id)
+      )
+    );
+    
+    // 5. Delete associations where this contact is the target
+    await db.delete(crmAssociations).where(
+      and(
+        eq(crmAssociations.targetType, 'CONTACT'),
+        eq(crmAssociations.targetId, id)
+      )
+    );
+    
+    // 6. Update deals to remove the contact reference (set to null instead of deleting deals)
+    await db.update(crmDeals)
+      .set({ contactId: null })
+      .where(eq(crmDeals.contactId, id));
+    
+    // 7. Finally, delete the contact
     await db.delete(crmContacts).where(eq(crmContacts.id, id));
   }
 
   // CRM Deal operations
-  async getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<CrmDeal[]> {
+  async getCrmDeals(companyId: string, filters?: { stage?: string; assignedTo?: string; contactId?: string; parkId?: string }): Promise<any[]> {
     const conditions = [eq(crmDeals.companyId, companyId)];
 
     if (filters?.stage) {
@@ -2069,15 +2172,43 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(crmDeals.contactId, filters.contactId));
     }
 
-    const results = await db.select()
+    if (filters?.parkId) {
+      conditions.push(eq(crmContacts.parkId, filters.parkId));
+    }
+
+    const results = await db.select({
+      id: crmDeals.id,
+      title: crmDeals.title,
+      value: crmDeals.value,
+      stage: crmDeals.stage,
+      probability: crmDeals.probability,
+      expectedCloseDate: crmDeals.expectedCloseDate,
+      contactId: crmDeals.contactId,
+      lotId: crmDeals.lotId,
+      assignedTo: crmDeals.assignedTo,
+      companyId: crmDeals.companyId,
+      companyName: companies.name,
+      createdBy: crmDeals.createdBy,
+      createdAt: crmDeals.createdAt,
+      updatedAt: crmDeals.updatedAt,
+      contactFirstName: crmContacts.firstName,
+      contactLastName: crmContacts.lastName,
+      contactEmail: crmContacts.email,
+      contactCompanyName: sql<string>`contact_company.name`.as('contactCompanyName'),
+      contactParkName: sql<string>`contact_park.name`.as('contactParkName'),
+    })
       .from(crmDeals)
+      .leftJoin(companies, eq(crmDeals.companyId, companies.id))
+      .leftJoin(crmContacts, eq(crmDeals.contactId, crmContacts.id))
+      .leftJoin(sql`companies AS contact_company`, sql`contact_company.id = ${crmContacts.companyId}`)
+      .leftJoin(sql`parks AS contact_park`, sql`contact_park.id = ${crmContacts.parkId}`)
       .where(and(...conditions))
       .orderBy(desc(crmDeals.createdAt));
 
     return results;
   }
 
-  async getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string }): Promise<any[]> {
+  async getAllCrmDeals(filters?: { stage?: string; assignedTo?: string; contactId?: string; parkId?: string; companyId?: string }): Promise<any[]> {
     const conditions = [];
 
     if (filters?.stage) {
@@ -2090,6 +2221,14 @@ export class DatabaseStorage implements IStorage {
 
     if (filters?.contactId) {
       conditions.push(eq(crmDeals.contactId, filters.contactId));
+    }
+
+    if (filters?.companyId) {
+      conditions.push(eq(crmDeals.companyId, filters.companyId));
+    }
+
+    if (filters?.parkId) {
+      conditions.push(eq(crmContacts.parkId, filters.parkId));
     }
 
     let query = db.select({
@@ -2107,9 +2246,17 @@ export class DatabaseStorage implements IStorage {
       createdBy: crmDeals.createdBy,
       createdAt: crmDeals.createdAt,
       updatedAt: crmDeals.updatedAt,
+      contactFirstName: crmContacts.firstName,
+      contactLastName: crmContacts.lastName,
+      contactEmail: crmContacts.email,
+      contactCompanyName: sql<string>`contact_company.name`.as('contactCompanyName'),
+      contactParkName: sql<string>`contact_park.name`.as('contactParkName'),
     })
       .from(crmDeals)
       .leftJoin(companies, eq(crmDeals.companyId, companies.id))
+      .leftJoin(crmContacts, eq(crmDeals.contactId, crmContacts.id))
+      .leftJoin(sql`companies AS contact_company`, sql`contact_company.id = ${crmContacts.companyId}`)
+      .leftJoin(sql`parks AS contact_park`, sql`contact_park.id = ${crmContacts.parkId}`)
       .orderBy(desc(crmDeals.createdAt));
 
     if (conditions.length > 0) {
@@ -2139,6 +2286,49 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCrmDeal(id: string): Promise<void> {
+    // Delete all related records first to avoid foreign key constraint errors
+    
+    // 1. Delete notes for this deal
+    await db.delete(crmNotes).where(
+      and(
+        eq(crmNotes.entityType, 'DEAL'),
+        eq(crmNotes.entityId, id)
+      )
+    );
+    
+    // 2. Delete tasks for this deal
+    await db.delete(crmTasks).where(
+      and(
+        eq(crmTasks.entityType, 'DEAL'),
+        eq(crmTasks.entityId, id)
+      )
+    );
+    
+    // 3. Delete activities for this deal
+    await db.delete(crmActivities).where(
+      and(
+        eq(crmActivities.entityType, 'DEAL'),
+        eq(crmActivities.entityId, id)
+      )
+    );
+    
+    // 4. Delete associations where this deal is the source
+    await db.delete(crmAssociations).where(
+      and(
+        eq(crmAssociations.sourceType, 'DEAL'),
+        eq(crmAssociations.sourceId, id)
+      )
+    );
+    
+    // 5. Delete associations where this deal is the target
+    await db.delete(crmAssociations).where(
+      and(
+        eq(crmAssociations.targetType, 'DEAL'),
+        eq(crmAssociations.targetId, id)
+      )
+    );
+    
+    // 6. Finally, delete the deal
     await db.delete(crmDeals).where(eq(crmDeals.id, id));
   }
 

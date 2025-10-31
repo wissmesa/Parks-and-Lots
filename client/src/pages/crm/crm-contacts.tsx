@@ -37,6 +37,8 @@ export default function CrmContacts() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
+  const [parkFilter, setParkFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Contact>>({});
@@ -47,6 +49,7 @@ export default function CrmContacts() {
     phone: "",
     source: "",
     companyId: "",
+    parkId: "",
   });
 
   const isLord = user?.role === 'MHP_LORD';
@@ -57,12 +60,26 @@ export default function CrmContacts() {
     enabled: isLord,
   });
 
+  // Fetch parks
+  const { data: parksData } = useQuery({
+    queryKey: ["/api/parks"],
+  });
+
+  const parks = parksData?.parks || [];
+
   // Fetch contacts
   const { data: contactsData, isLoading } = useQuery({
-    queryKey: ["/api/crm/contacts", searchQuery],
+    queryKey: ["/api/crm/contacts", searchQuery, parkFilter, companyFilter],
     queryFn: async () => {
-      const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : "";
-      const res = await fetch(`/api/crm/contacts${params}`, {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("q", searchQuery);
+      if (parkFilter !== "all") params.append("parkId", parkFilter);
+      if (companyFilter !== "all") params.append("companyId", companyFilter);
+      
+      const queryString = params.toString();
+      const url = `/api/crm/contacts${queryString ? `?${queryString}` : ''}`;
+      
+      const res = await fetch(url, {
         headers: AuthManager.getAuthHeaders(),
         credentials: "include",
       });
@@ -126,7 +143,7 @@ export default function CrmContacts() {
 
   const contacts: Contact[] = contactsData?.contacts || [];
 
-  // Sort contacts
+  // Sort contacts (filtering is now done on backend)
   const sortedContacts = [...contacts].sort((a, b) => {
     switch (sortBy) {
       case "name-asc":
@@ -261,6 +278,25 @@ export default function CrmContacts() {
                   placeholder="Website, Referral, etc."
                 />
               </div>
+              <div>
+                <Label htmlFor="parkId">Park (Optional)</Label>
+                <Select
+                  value={newContact.parkId || "none"}
+                  onValueChange={(value) => setNewContact({ ...newContact, parkId: value === "none" ? "" : value })}
+                >
+                  <SelectTrigger id="parkId">
+                    <SelectValue placeholder="Select a park (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {parks.map((park: any) => (
+                      <SelectItem key={park.id} value={park.id}>
+                        {park.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 onClick={() => createMutation.mutate(newContact)}
                 disabled={!newContact.firstName || !newContact.lastName || (isLord && !newContact.companyId) || createMutation.isPending}
@@ -273,27 +309,63 @@ export default function CrmContacts() {
         </Dialog>
       </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search contacts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="mb-6 space-y-4">
+        {/* Search and Sort Row */}
+        <div className="flex gap-4">
+          <div className="relative flex-1 min-w-[250px]">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+              <SelectItem value="date-newest">Newest First</SelectItem>
+              <SelectItem value="date-oldest">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Sort by..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-            <SelectItem value="date-newest">Newest First</SelectItem>
-            <SelectItem value="date-oldest">Oldest First</SelectItem>
-          </SelectContent>
-        </Select>
+
+        {/* Filters Row */}
+        <div className="flex gap-4 flex-wrap">
+          <Select value={parkFilter} onValueChange={setParkFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by park..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Parks</SelectItem>
+              {parks.map((park: any) => (
+                <SelectItem key={park.id} value={park.id}>
+                  {park.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {isLord && (
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by company..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies?.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -309,6 +381,7 @@ export default function CrmContacts() {
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead>Park</TableHead>
                 {isLord && <TableHead>Company</TableHead>}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -395,6 +468,11 @@ export default function CrmContacts() {
                     ) : (
                       contact.source
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {contact.parkName || '-'}
+                    </span>
                   </TableCell>
                   {isLord && (
                     <TableCell>

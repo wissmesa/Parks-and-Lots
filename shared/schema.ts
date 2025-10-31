@@ -321,6 +321,7 @@ export const crmContacts = pgTable("crm_contacts", {
   phone: varchar("phone"),
   source: varchar("source"), // e.g., "website", "referral", "walk-in"
   companyId: varchar("company_id").references(() => companies.id).notNull(),
+  parkId: varchar("park_id").references(() => parks.id),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
   tags: text("tags").array(), // Array of tags for categorization
   notes: text("notes"), // Quick notes field
@@ -329,6 +330,7 @@ export const crmContacts = pgTable("crm_contacts", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   companyIdx: index("crm_contacts_company_idx").on(table.companyId),
+  parkIdx: index("crm_contacts_park_idx").on(table.parkId),
   emailIdx: index("crm_contacts_email_idx").on(table.email),
 }));
 
@@ -598,6 +600,10 @@ export const crmContactsRelations = relations(crmContacts, ({ one, many }) => ({
   company: one(companies, {
     fields: [crmContacts.companyId],
     references: [companies.id],
+  }),
+  park: one(parks, {
+    fields: [crmContacts.parkId],
+    references: [parks.id],
   }),
   createdByUser: one(users, {
     fields: [crmContacts.createdBy],

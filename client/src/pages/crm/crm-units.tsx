@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Building2, DollarSign, Bed, Bath, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building2, DollarSign, Bed, Bath, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { AuthManager } from "@/lib/auth";
 
 interface Unit {
@@ -28,13 +29,19 @@ export default function CrmUnits() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name-asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const user = AuthManager.getUser();
   const isLord = user?.role === 'MHP_LORD';
 
   const { data: unitsData, isLoading } = useQuery({
-    queryKey: ["/api/crm/units"],
+    queryKey: ["/api/crm/units", currentPage, itemsPerPage],
     queryFn: async () => {
-      const res = await fetch("/api/crm/units", { 
+      const params = new URLSearchParams();
+      params.append("page", currentPage.toString());
+      params.append("limit", itemsPerPage.toString());
+      
+      const res = await fetch(`/api/crm/units?${params.toString()}`, { 
         headers: AuthManager.getAuthHeaders(),
         credentials: "include" 
       });
@@ -45,6 +52,8 @@ export default function CrmUnits() {
   });
 
   const units: Unit[] = unitsData?.units || [];
+  const totalCount = unitsData?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
 
   // Filter units by search query
   const filteredUnits = units.filter((unit) =>
@@ -80,6 +89,48 @@ export default function CrmUnits() {
     setLocation(`/crm/units/${unitId}`);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    if (totalPages <= maxPagesToShow) {
+      // Show all pages if total is small
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Show first page, last page, and pages around current page
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push(-1); // ellipsis
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push(-1); // ellipsis
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push(-1); // ellipsis
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push(-1); // ellipsis
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -87,8 +138,8 @@ export default function CrmUnits() {
         <p className="text-muted-foreground">View all available units and lots</p>
       </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="relative flex-1">
+      <div className="mb-6 flex gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search units..."
@@ -106,6 +157,17 @@ export default function CrmUnits() {
             <SelectItem value="name-desc">Unit Number (Z-A)</SelectItem>
             <SelectItem value="price-high">Price (High to Low)</SelectItem>
             <SelectItem value="price-low">Price (Low to High)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Items per page" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 per page</SelectItem>
+            <SelectItem value="25">25 per page</SelectItem>
+            <SelectItem value="50">50 per page</SelectItem>
+            <SelectItem value="100">100 per page</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -218,6 +280,58 @@ export default function CrmUnits() {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-4 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} units
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {/* Previous Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((page, index) => (
+                    page === -1 ? (
+                      <span key={`ellipsis-${index}`} className="px-2">...</span>
+                    ) : (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                        className="min-w-[40px]"
+                      >
+                        {page}
+                      </Button>
+                    )
+                  ))}
+                </div>
+
+                {/* Next Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="text-center py-12 border rounded-lg">

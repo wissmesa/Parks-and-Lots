@@ -44,6 +44,10 @@ interface Contact {
   source?: string | null;
   tags?: string[] | null;
   createdAt: string;
+  companyId?: string | null;
+  companyName?: string | null;
+  parkId?: string | null;
+  parkName?: string | null;
 }
 
 interface Note {
@@ -91,6 +95,7 @@ export default function CrmContactDetail() {
   const [newNote, setNewNote] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "" });
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
+  const [deleteContactOpen, setDeleteContactOpen] = useState(false);
   const [taskSortBy, setTaskSortBy] = useState("date-newest");
 
   // Fetch contact
@@ -118,6 +123,20 @@ export default function CrmContactDetail() {
       return res.json();
     },
     enabled: !!user,
+  });
+
+  // Fetch parks
+  const { data: parksData } = useQuery<{ parks: any[] }>({
+    queryKey: ["/api/parks"],
+  });
+
+  const parks = parksData?.parks || [];
+
+  // Fetch companies for MHP_LORD users
+  const isLord = user?.role === 'MHP_LORD';
+  const { data: companies } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
+    enabled: isLord,
   });
 
   // Fetch notes
@@ -185,6 +204,25 @@ export default function CrmContactDetail() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update contact", variant: "destructive" });
+    },
+  });
+
+  // Delete contact mutation
+  const deleteContactMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/crm/contacts/${id}`, {
+        method: "DELETE",
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete contact");
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Contact deleted successfully" });
+      setLocation("/crm/contacts");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete contact", variant: "destructive" });
     },
   });
 
@@ -337,6 +375,8 @@ export default function CrmContactDetail() {
         email: contact.email || "",
         phone: contact.phone || "",
         source: contact.source || "",
+        parkId: contact.parkId || "",
+        companyId: contact.companyId || "",
       });
       setIsEditingInfo(true);
     }
@@ -392,10 +432,21 @@ export default function CrmContactDetail() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Contacts
         </Button>
-        <h1 className="text-3xl font-bold">
-          {contact.firstName} {contact.lastName}
-        </h1>
-        <p className="text-muted-foreground">Contact Details</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">
+              {contact.firstName} {contact.lastName}
+            </h1>
+            <p className="text-muted-foreground">Contact Details</p>
+          </div>
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteContactOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Contact
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="info" className="space-y-4">
@@ -468,9 +519,54 @@ export default function CrmContactDetail() {
                           onChange={(e) => setEditForm({ ...editForm, source: e.target.value })}
                         />
                       </div>
+                      {isLord && (
+                        <div>
+                          <Label>Company *</Label>
+                          <Select
+                            value={editForm.companyId || ""}
+                            onValueChange={(value) => setEditForm({ ...editForm, companyId: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a company" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {companies?.map((company: any) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div>
+                        <Label>Park (Optional)</Label>
+                        <Select
+                          value={editForm.parkId || "none"}
+                          onValueChange={(value) => setEditForm({ ...editForm, parkId: value === "none" ? "" : value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a park (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {parks.map((park: any) => (
+                              <SelectItem key={park.id} value={park.id}>
+                                {park.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </>
                   ) : (
                     <>
+                      {contact.companyName && (
+                        <div>
+                          <span className="text-sm text-muted-foreground">Company:</span>{" "}
+                          <span>{contact.companyName}</span>
+                        </div>
+                      )}
                       {contact.email && (
                         <div className="flex items-center gap-2">
                           <Mail className="h-5 w-5 text-muted-foreground" />
@@ -487,6 +583,12 @@ export default function CrmContactDetail() {
                         <div>
                           <span className="text-sm text-muted-foreground">Source:</span>{" "}
                           <span>{contact.source}</span>
+                        </div>
+                      )}
+                      {contact.parkName && (
+                        <div>
+                          <span className="text-sm text-muted-foreground">Park:</span>{" "}
+                          <span>{contact.parkName}</span>
                         </div>
                       )}
                       <div>
@@ -698,6 +800,27 @@ export default function CrmContactDetail() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Contact Confirmation Dialog */}
+      <AlertDialog open={deleteContactOpen} onOpenChange={setDeleteContactOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this contact? This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteContactMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -25,6 +25,8 @@ interface Deal {
   createdAt: string;
   companyId?: string | null;
   companyName?: string | null;
+  contactParkName?: string | null;
+  contactCompanyName?: string | null;
 }
 
 interface Company {
@@ -44,7 +46,7 @@ const DEAL_STAGES = [
 ];
 
 // Draggable Deal Card Component
-function DraggableDealCard({ deal, onClick, showCompany }: { deal: Deal; onClick: () => void; showCompany?: boolean }) {
+function DraggableDealCard({ deal, onClick }: { deal: Deal; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: deal.id,
     data: { deal },
@@ -101,11 +103,18 @@ function DraggableDealCard({ deal, onClick, showCompany }: { deal: Deal; onClick
               {deal.probability}% probability
             </div>
           )}
-          {showCompany && deal.companyName && (
-            <div className="text-xs text-muted-foreground mt-2 truncate">
-              {deal.companyName}
-            </div>
-          )}
+          <div className="space-y-1 mt-2">
+            {deal.contactCompanyName && (
+              <div className="text-xs text-muted-foreground truncate">
+                <span className="font-medium">Company:</span> {deal.contactCompanyName}
+              </div>
+            )}
+            {deal.contactParkName && (
+              <div className="text-xs text-muted-foreground truncate">
+                <span className="font-medium">Park:</span> {deal.contactParkName}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -117,12 +126,10 @@ function DroppableStageColumn({
   stage,
   deals,
   onDealClick,
-  showCompany,
 }: {
   stage: { value: string; label: string };
   deals: Deal[];
   onDealClick: (dealId: string) => void;
-  showCompany?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.value,
@@ -133,7 +140,7 @@ function DroppableStageColumn({
       ref={setNodeRef}
       className="flex-shrink-0 w-80"
     >
-      <div className={`border rounded-lg p-4 min-h-[200px] transition-all ${
+      <div className={`border rounded-lg p-4 min-h-[500px] h-full transition-all ${
         isOver ? "border-primary bg-primary/5" : "border-border bg-background"
       }`}>
         <h3 className="font-semibold mb-4 text-sm uppercase tracking-wide text-muted-foreground">
@@ -145,7 +152,6 @@ function DroppableStageColumn({
               key={deal.id}
               deal={deal}
               onClick={() => onDealClick(deal.id)}
-              showCompany={showCompany}
             />
           ))}
           {deals.length === 0 && (
@@ -167,12 +173,16 @@ export default function CrmDeals() {
   const [sortBy, setSortBy] = useState("title-asc");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [assignedToFilter, setAssignedToFilter] = useState<string>("all");
+  const [parkFilter, setParkFilter] = useState<string>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [newDeal, setNewDeal] = useState({
     title: "",
     value: "",
     stage: "QUALIFIED_LEAD",
     probability: "50",
-    companyId: "",
+    contactId: "",
   });
 
   const isLord = user?.role === 'MHP_LORD';
@@ -183,10 +193,48 @@ export default function CrmDeals() {
     enabled: isLord,
   });
 
-  const { data: dealsData, isLoading } = useQuery({
-    queryKey: ["/api/crm/deals"],
+  // Fetch parks
+  const { data: parksData } = useQuery({
+    queryKey: ["/api/parks"],
+  });
+
+  // Fetch company users for assignedTo filter
+  const { data: usersData } = useQuery({
+    queryKey: ["/api/crm/company-users"],
+    enabled: !!user,
+  });
+
+  const parks = parksData?.parks || [];
+  const companyUsers = usersData?.users || [];
+
+  // Fetch contacts for deal creation
+  const { data: contactsData } = useQuery({
+    queryKey: ["/api/crm/contacts"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/deals", { 
+      const res = await fetch("/api/crm/contacts", {
+        headers: AuthManager.getAuthHeaders(),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch contacts");
+      return res.json();
+    },
+  });
+
+  const contacts = contactsData?.contacts || [];
+
+  const { data: dealsData, isLoading } = useQuery({
+    queryKey: ["/api/crm/deals", stageFilter, assignedToFilter, parkFilter, companyFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (stageFilter !== "all") params.append("stage", stageFilter);
+      if (assignedToFilter !== "all") params.append("assignedTo", assignedToFilter);
+      if (parkFilter !== "all") params.append("parkId", parkFilter);
+      if (companyFilter !== "all") params.append("companyId", companyFilter);
+      
+      const queryString = params.toString();
+      const url = `/api/crm/deals${queryString ? `?${queryString}` : ''}`;
+      
+      const res = await fetch(url, { 
         headers: AuthManager.getAuthHeaders(),
         credentials: "include" 
       });
@@ -217,7 +265,7 @@ export default function CrmDeals() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
       toast({ title: "Success", description: "Deal created successfully" });
       setIsCreateOpen(false);
-      setNewDeal({ title: "", value: "", stage: "QUALIFIED_LEAD", probability: "50", companyId: "" });
+      setNewDeal({ title: "", value: "", stage: "QUALIFIED_LEAD", probability: "50", contactId: "" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create deal", variant: "destructive" });
@@ -329,26 +377,28 @@ export default function CrmDeals() {
               <DialogTitle>Create New Deal</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {isLord && (
-                <div>
-                  <Label htmlFor="companyId">Company *</Label>
-                  <Select
-                    value={newDeal.companyId}
-                    onValueChange={(value) => setNewDeal({ ...newDeal, companyId: value })}
-                  >
-                    <SelectTrigger id="companyId">
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies?.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div>
+                <Label htmlFor="contactId">Contact *</Label>
+                <Select
+                  value={newDeal.contactId}
+                  onValueChange={(value) => setNewDeal({ ...newDeal, contactId: value })}
+                >
+                  <SelectTrigger id="contactId">
+                    <SelectValue placeholder="Select a contact" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contacts.map((contact: any) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.firstName} {contact.lastName}
+                        {contact.companyName && ` (${contact.companyName})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The deal will inherit the company and park from this contact
+                </p>
+              </div>
               <div>
                 <Label htmlFor="title">Deal Title *</Label>
                 <Input
@@ -387,7 +437,7 @@ export default function CrmDeals() {
                   probability: newDeal.probability ? parseInt(newDeal.probability) : 50,
                   assignedTo: user?.id,
                 })}
-                disabled={!newDeal.title || (isLord && !newDeal.companyId) || createMutation.isPending || !user?.id}
+                disabled={!newDeal.title || !newDeal.contactId || createMutation.isPending || !user?.id}
                 className="w-full"
               >
                 {createMutation.isPending ? "Creating..." : "Create Deal"}
@@ -397,29 +447,93 @@ export default function CrmDeals() {
         </Dialog>
       </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search deals..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      <div className="mb-6 space-y-4">
+        {/* Search and Sort Row */}
+        <div className="flex gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search deals..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+              <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+              <SelectItem value="value-high">Value (High to Low)</SelectItem>
+              <SelectItem value="value-low">Value (Low to High)</SelectItem>
+              <SelectItem value="date-newest">Newest First</SelectItem>
+              <SelectItem value="date-oldest">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Sort by..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="title-asc">Title (A-Z)</SelectItem>
-            <SelectItem value="title-desc">Title (Z-A)</SelectItem>
-            <SelectItem value="value-high">Value (High to Low)</SelectItem>
-            <SelectItem value="value-low">Value (Low to High)</SelectItem>
-            <SelectItem value="date-newest">Newest First</SelectItem>
-            <SelectItem value="date-oldest">Oldest First</SelectItem>
-          </SelectContent>
-        </Select>
+
+        {/* Filters Row */}
+        <div className="flex gap-4 flex-wrap">
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by stage..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Stages</SelectItem>
+              {DEAL_STAGES.map((stage) => (
+                <SelectItem key={stage.value} value={stage.value}>
+                  {stage.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by assignee..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Users</SelectItem>
+              {companyUsers.map((u: any) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={parkFilter} onValueChange={setParkFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by park..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Parks</SelectItem>
+              {parks.map((park: any) => (
+                <SelectItem key={park.id} value={park.id}>
+                  {park.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {isLord && (
+            <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by company..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies?.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -428,14 +542,13 @@ export default function CrmDeals() {
         </div>
       ) : (
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-400px)]">
             {DEAL_STAGES.map((stage) => (
               <DroppableStageColumn
                 key={stage.value}
                 stage={stage}
                 deals={dealsByStage[stage.value] || []}
                 onDealClick={handleDealClick}
-                showCompany={isLord}
               />
             ))}
           </div>
@@ -457,11 +570,18 @@ export default function CrmDeals() {
                       {activeDeal.probability}% probability
                     </div>
                   )}
-                  {isLord && activeDeal.companyName && (
-                    <div className="text-xs text-muted-foreground mt-2 truncate">
-                      {activeDeal.companyName}
-                    </div>
-                  )}
+                  <div className="space-y-1 mt-2">
+                    {activeDeal.contactCompanyName && (
+                      <div className="text-xs text-muted-foreground truncate">
+                        <span className="font-medium">Company:</span> {activeDeal.contactCompanyName}
+                      </div>
+                    )}
+                    {activeDeal.contactParkName && (
+                      <div className="text-xs text-muted-foreground truncate">
+                        <span className="font-medium">Park:</span> {activeDeal.contactParkName}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ) : null}

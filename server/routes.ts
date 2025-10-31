@@ -7109,19 +7109,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/crm/contacts', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const isLord = req.user!.role === 'MHP_LORD';
-      const { q } = req.query;
+      const { q, parkId, companyId } = req.query;
       let contacts = [];
 
       if (isLord) {
         // Lords can see all contacts from all companies
-        contacts = await storage.getAllCrmContacts({ q: q as string });
+        contacts = await storage.getAllCrmContacts({ 
+          q: q as string, 
+          parkId: parkId as string,
+          companyId: companyId as string
+        });
       } else {
         // Regular users see only their company's contacts
-        const companyId = req.user!.companyId;
-        if (!companyId) {
+        const userCompanyId = req.user!.companyId;
+        if (!userCompanyId) {
           return res.status(403).json({ message: 'User must be assigned to a company' });
         }
-        contacts = await storage.getCrmContacts(companyId, { q: q as string });
+        contacts = await storage.getCrmContacts(userCompanyId, { 
+          q: q as string,
+          parkId: parkId as string
+        });
       }
 
       res.json({ contacts });
@@ -7229,12 +7236,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/crm/contacts/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const contact = await storage.getCrmContact(req.params.id);
       if (!contact) {
         return res.status(404).json({ message: 'Contact not found' });
       }
 
-      if (contact.companyId !== req.user!.companyId) {
+      // MHP_LORD can delete any contact, others can only delete their company's contacts
+      if (!isLord && contact.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7250,7 +7259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/crm/deals', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const isLord = req.user!.role === 'MHP_LORD';
-      const { stage, assignedTo, contactId } = req.query;
+      const { stage, assignedTo, contactId, parkId, companyId } = req.query;
       let deals = [];
 
       if (isLord) {
@@ -7258,18 +7267,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deals = await storage.getAllCrmDeals({
           stage: stage as string,
           assignedTo: assignedTo as string,
-          contactId: contactId as string
+          contactId: contactId as string,
+          parkId: parkId as string,
+          companyId: companyId as string
         });
       } else {
         // Regular users see only their company's deals
-        const companyId = req.user!.companyId;
-        if (!companyId) {
+        const userCompanyId = req.user!.companyId;
+        if (!userCompanyId) {
           return res.status(403).json({ message: 'User must be assigned to a company' });
         }
-        deals = await storage.getCrmDeals(companyId, {
+        deals = await storage.getCrmDeals(userCompanyId, {
           stage: stage as string,
           assignedTo: assignedTo as string,
-          contactId: contactId as string
+          contactId: contactId as string,
+          parkId: parkId as string
         });
       }
       
@@ -7302,24 +7314,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/crm/deals', authenticateToken, async (req: AuthRequest, res) => {
     try {
-      // For MHP_LORD, accept companyId from request body; for others, use user's companyId
-      let companyId: string | undefined;
-      if (req.user!.role === 'MHP_LORD') {
-        companyId = req.body.companyId;
-        if (!companyId) {
-          return res.status(400).json({ message: 'Company selection is required' });
-        }
-        // Validate company exists
-        const company = await storage.getCompany(companyId);
-        if (!company) {
-          return res.status(404).json({ message: 'Selected company not found' });
-        }
-      } else {
-        companyId = req.user!.companyId;
-        if (!companyId) {
-          return res.status(403).json({ message: 'User must be assigned to a company' });
-        }
+      const { contactId } = req.body;
+      
+      if (!contactId) {
+        return res.status(400).json({ message: 'Contact is required for deal creation' });
       }
+
+      // Get the contact to derive company
+      const contact = await storage.getCrmContact(contactId);
+      if (!contact) {
+        return res.status(404).json({ message: 'Contact not found' });
+      }
+
+      // For MHP_LORD, verify they can access this contact's company
+      const isLord = req.user!.role === 'MHP_LORD';
+      if (!isLord && contact.companyId !== req.user!.companyId) {
+        return res.status(403).json({ message: 'Cannot create deal for contact from different company' });
+      }
+
+      // Use the contact's company
+      const companyId = contact.companyId as string;
 
       const dealData = {
         ...req.body,
@@ -7390,12 +7404,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/crm/deals/:id', authenticateToken, async (req: AuthRequest, res) => {
     try {
+      const isLord = req.user!.role === 'MHP_LORD';
       const deal = await storage.getCrmDeal(req.params.id);
       if (!deal) {
         return res.status(404).json({ message: 'Deal not found' });
       }
 
-      if (deal.companyId !== req.user!.companyId) {
+      // MHP_LORD can delete any deal, others can only delete their company's deals
+      if (!isLord && deal.companyId !== req.user!.companyId) {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -7877,7 +7893,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/crm/units', authenticateToken, async (req: AuthRequest, res) => {
     try {
       const isLord = req.user!.role === 'MHP_LORD';
-      let lots = [];
+      const { page = '1', limit = '25', parkId, status, minPrice, maxPrice, bedrooms, bathrooms } = req.query;
+      
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+      
+      let allLots = [];
 
       if (isLord) {
         // Lords can see all units from all companies
@@ -7895,7 +7917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parkName: parkMap.get(lot.parkId || '') || null,
             companyName: companyMap.get(lot.parkId || '') || null
           }));
-          lots.push(...enrichedLots);
+          allLots.push(...enrichedLots);
         }
       } else {
         // Non-Lords see only units from their company
@@ -7918,11 +7940,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...lot,
             parkName: parkMap.get(lot.parkId || '') || null
           }));
-          lots.push(...enrichedLots);
+          allLots.push(...enrichedLots);
         }
       }
 
-      res.json({ units: lots });
+      // Apply filters
+      let filteredLots = allLots;
+      
+      if (parkId) {
+        filteredLots = filteredLots.filter(lot => lot.parkId === parkId);
+      }
+      
+      if (status) {
+        filteredLots = filteredLots.filter(lot => 
+          lot.status && lot.status.includes(status as string)
+        );
+      }
+      
+      if (minPrice) {
+        const min = parseFloat(minPrice as string);
+        filteredLots = filteredLots.filter(lot => {
+          const prices = [
+            lot.priceForRent,
+            lot.priceForSale,
+            lot.priceRentToOwn,
+            lot.priceContractForDeed
+          ].filter(p => p !== null).map(p => parseFloat(p as string));
+          return prices.length > 0 && Math.min(...prices) >= min;
+        });
+      }
+      
+      if (maxPrice) {
+        const max = parseFloat(maxPrice as string);
+        filteredLots = filteredLots.filter(lot => {
+          const prices = [
+            lot.priceForRent,
+            lot.priceForSale,
+            lot.priceRentToOwn,
+            lot.priceContractForDeed
+          ].filter(p => p !== null).map(p => parseFloat(p as string));
+          return prices.length > 0 && Math.max(...prices) <= max;
+        });
+      }
+      
+      if (bedrooms) {
+        const bedroomCount = bedrooms === '4+' ? 4 : parseInt(bedrooms as string);
+        filteredLots = filteredLots.filter(lot => {
+          if (bedrooms === '4+') {
+            return lot.bedrooms && lot.bedrooms >= bedroomCount;
+          }
+          return lot.bedrooms === bedroomCount;
+        });
+      }
+      
+      if (bathrooms) {
+        const bathroomCount = bathrooms === '3+' ? 3 : parseFloat(bathrooms as string);
+        filteredLots = filteredLots.filter(lot => {
+          if (bathrooms === '3+') {
+            return lot.bathrooms && lot.bathrooms >= bathroomCount;
+          }
+          return lot.bathrooms === bathroomCount;
+        });
+      }
+
+      const totalCount = filteredLots.length;
+      const totalPages = Math.ceil(totalCount / limitNum);
+      
+      // Apply pagination
+      const paginatedLots = filteredLots.slice(offset, offset + limitNum);
+
+      res.json({ 
+        units: paginatedLots,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          totalCount,
+          totalPages
+        }
+      });
     } catch (error) {
       console.error('Get CRM units error:', error);
       res.status(500).json({ message: 'Internal server error' });
