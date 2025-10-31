@@ -113,10 +113,12 @@ export default function ManagerDashboard() {
             <CalendarConnection />
           </div>
 
-          {/* Google Sheets Connection */}
-          <div className="mb-8">
-            <SheetsConnection />
-          </div>
+          {/* Google Sheets Connection - Only visible to MHP_LORD */}
+          {user?.role === 'MHP_LORD' && (
+            <div className="mb-8">
+              <SheetsConnection />
+            </div>
+          )}
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
