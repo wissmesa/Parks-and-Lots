@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -276,7 +276,8 @@ function AmenitiesCard({ park }: { park: Park | undefined }) {
 export default function ParkDetail() {
   const { id } = useParams();
   const [statusFilter, setStatusFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
+  const [bedroomFilter, setBedroomFilter] = useState<string>("all");
+  const [bathroomFilter, setBathroomFilter] = useState<string>("all");
 
   const { data: park, isLoading: parkLoading } = useQuery<Park>({
     queryKey: ["/api/parks", id],
@@ -329,6 +330,50 @@ export default function ParkDetail() {
   const totalLots = lotsData?.pagination?.total || 0;
   const parkPhotos = (photos || []) as any[];
 
+  // Extract unique bedroom options from lots
+  const availableBedrooms = useMemo(() => {
+    const bedroomSet = new Set<number>();
+    lots.forEach((lot: Lot) => {
+      if (lot.bedrooms !== null && lot.bedrooms !== undefined) {
+        bedroomSet.add(lot.bedrooms);
+      }
+    });
+    return Array.from(bedroomSet).sort((a, b) => a - b);
+  }, [lots]);
+
+  // Extract unique bathroom options from lots
+  const availableBathrooms = useMemo(() => {
+    const bathroomSet = new Set<number>();
+    lots.forEach((lot: Lot) => {
+      if (lot.bathrooms !== null && lot.bathrooms !== undefined) {
+        bathroomSet.add(lot.bathrooms);
+      }
+    });
+    return Array.from(bathroomSet).sort((a, b) => a - b);
+  }, [lots]);
+
+  // Filter lots based on bedroom and bathroom selections
+  const filteredLots = useMemo(() => {
+    return lots.filter((lot: Lot) => {
+      // Bedroom filter
+      if (bedroomFilter !== "all") {
+        const selectedBedrooms = parseInt(bedroomFilter);
+        if (lot.bedrooms !== selectedBedrooms) {
+          return false;
+        }
+      }
+      
+      // Bathroom filter
+      if (bathroomFilter !== "all") {
+        const selectedBathrooms = parseInt(bathroomFilter);
+        if (lot.bathrooms !== selectedBathrooms) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [lots, bedroomFilter, bathroomFilter]);
 
   if (parkLoading) {
     return (
@@ -356,12 +401,6 @@ export default function ParkDetail() {
       </div>
     );
   }
-
-  const filteredLots = lots.filter((lot: Lot) => {
-    if (sizeFilter === "small" && (lot.bedrooms || 0) > 2) return false;
-    if (sizeFilter === "large" && (lot.bedrooms || 0) < 3) return false;
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -466,14 +505,30 @@ export default function ParkDetail() {
                         <SelectItem value="CONTRACT_FOR_DEED">Contract for Deed</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={sizeFilter} onValueChange={setSizeFilter}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Any Size" />
+                    <Select value={bedroomFilter} onValueChange={setBedroomFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Bedrooms" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Any Size</SelectItem>
-                        <SelectItem value="small">1-2 BR</SelectItem>
-                        <SelectItem value="large">3+ BR</SelectItem>
+                        <SelectItem value="all">All Bedrooms</SelectItem>
+                        {availableBedrooms.map((br) => (
+                          <SelectItem key={br} value={br.toString()}>
+                            {br} {br === 1 ? 'Bedroom' : 'Bedrooms'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={bathroomFilter} onValueChange={setBathroomFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Bathrooms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Bathrooms</SelectItem>
+                        {availableBathrooms.map((ba) => (
+                          <SelectItem key={ba} value={ba.toString()}>
+                            {ba} {ba === 1 ? 'Bathroom' : 'Bathrooms'}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
